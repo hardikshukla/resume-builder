@@ -1,100 +1,250 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { LLMProvider, ResumeBuilderOutput } from '@/types';
+import { ResumeForm } from '@/components/ResumeForm';
+import { OutputPanel } from '@/components/OutputPanel';
+import { Sparkles, ExternalLink } from 'lucide-react';
+
+// ── sessionStorage keys ───────────────────────────────────────────────────────
+const S = {
+  provider:        'rb_provider',
+  anthropicKey:    'rb_apikey_anthropic',
+  openaiKey:       'rb_apikey_openai',
+  anthropicModel:  'rb_model_anthropic',
+  openaiModel:     'rb_model_openai',
+  ollamaModel:     'rb_model_ollama',
+};
+const LOCAL_RESUME = 'rb_resume';
+
+type GenerationResult = {
+  result: ResumeBuilderOutput;
+  providerUsed: string;
+  fallbackOccurred: boolean;
+  fallbackReason?: string;
+};
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [resume,         setResume]         = useState('');
+  const [jobDescription, setJD]             = useState('');
+  const [companyName,    setCompany]        = useState('');
+  const [provider,       setProvider]       = useState<LLMProvider>('anthropic');
+  const [anthropicKey,   setAnthropicKey]   = useState('');
+  const [openaiKey,      setOpenaiKey]      = useState('');
+  const [anthropicModel, setAnthropicModel] = useState('');
+  const [openaiModel,    setOpenaiModel]    = useState('');
+  const [ollamaModel,    setOllamaModel]    = useState('');
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [isRefining,     setIsRefining]     = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [refineError,    setRefineError]    = useState<string | null>(null);
+  const [output,         setOutput]         = useState<GenerationResult | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Restore from storage on mount
+  useEffect(() => {
+    const ss = (k: string) => sessionStorage.getItem(k) ?? '';
+    setResume(localStorage.getItem(LOCAL_RESUME) ?? '');
+    const p = ss(S.provider) as LLMProvider;
+    if (p) setProvider(p);
+    setAnthropicKey(ss(S.anthropicKey));
+    setOpenaiKey(ss(S.openaiKey));
+    setAnthropicModel(ss(S.anthropicModel));
+    setOpenaiModel(ss(S.openaiModel));
+    setOllamaModel(ss(S.ollamaModel));
+  }, []);
+
+  // Helpers — persist on change
+  const handleResumeChange = useCallback((v: string) => {
+    setResume(v); localStorage.setItem(LOCAL_RESUME, v);
+  }, []);
+
+  const persist = (key: string, setter: (v: string) => void) =>
+    (v: string) => { setter(v); sessionStorage.setItem(key, v); };
+
+  const handleProviderChange = useCallback((p: LLMProvider) => {
+    setProvider(p); sessionStorage.setItem(S.provider, p);
+  }, []);
+
+  async function handleGenerate() {
+    setIsLoading(true);
+    setError(null);
+    setOutput(null);
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resume,
+          jobDescription,
+          companyName: companyName || undefined,
+          provider,
+          anthropicKey:   anthropicKey   || undefined,
+          openaiKey:      openaiKey      || undefined,
+          anthropicModel: anthropicModel || undefined,
+          openaiModel:    openaiModel    || undefined,
+          ollamaModel:    ollamaModel    || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error ?? 'Generation failed');
+
+      setOutput(json.data);
+      setJD(''); // clear JD after success
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleRefine(selectedRecs: string[]) {
+    if (!output) return;
+    setIsRefining(true);
+    setRefineError(null);
+    try {
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentOutput:           output.result,
+          selectedRecommendations: selectedRecs,
+          provider,
+          anthropicKey:   anthropicKey   || undefined,
+          openaiKey:      openaiKey      || undefined,
+          anthropicModel: anthropicModel || undefined,
+          openaiModel:    openaiModel    || undefined,
+          ollamaModel:    ollamaModel    || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error ?? 'Refine failed');
+      // Merge refined resume+coverLetter, keep original gapAnalysis
+      setOutput((prev) =>
+        prev
+          ? {
+              ...prev,
+              result: {
+                ...prev.result,
+                resume:      json.data.resume,
+                coverLetter: json.data.coverLetter,
+              },
+            }
+          : prev
+      );
+    } catch (e) {
+      setRefineError(e instanceof Error ? e.message : 'Unknown refine error');
+    } finally {
+      setIsRefining(false);
+    }
+  }
+
+  return (
+    <div className="app-root">
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="header-brand">
+            <div className="brand-icon"><Sparkles size={22} /></div>
+            <div>
+              <h1 className="brand-name">Resume Builder</h1>
+              <p className="brand-tagline">AI-powered · ATS-optimized · Tailored to every JD</p>
+            </div>
+          </div>
+          <div className="header-meta">
+            <span className="version-badge">v1.0</span>
+            <a href="https://github.com" target="_blank" rel="noopener noreferrer"
+              className="github-link" aria-label="View on GitHub">
+              <ExternalLink size={18} />
+            </a>
+          </div>
         </div>
+      </header>
+
+      <main className="app-main">
+        <section className="left-panel" aria-label="Resume inputs">
+          <ResumeForm
+            resume={resume}
+            jobDescription={jobDescription}
+            companyName={companyName}
+            provider={provider}
+            anthropicKey={anthropicKey}
+            openaiKey={openaiKey}
+            anthropicModel={anthropicModel}
+            openaiModel={openaiModel}
+            ollamaModel={ollamaModel}
+            isLoading={isLoading}
+            onResumeChange={handleResumeChange}
+            onJobDescriptionChange={setJD}
+            onCompanyNameChange={setCompany}
+            onProviderChange={handleProviderChange}
+            onAnthropicKeyChange={persist(S.anthropicKey,   setAnthropicKey)}
+            onOpenaiKeyChange={persist(S.openaiKey,         setOpenaiKey)}
+            onAnthropicModelChange={persist(S.anthropicModel, setAnthropicModel)}
+            onOpenaiModelChange={persist(S.openaiModel,     setOpenaiModel)}
+            onOllamaModelChange={persist(S.ollamaModel,     setOllamaModel)}
+            onSubmit={handleGenerate}
+          />
+        </section>
+
+        <section className="right-panel" aria-label="Generated output">
+          {(isLoading || isRefining) && (
+            <div className="loading-state">
+              <div className="loading-orb" />
+              {isLoading ? (
+                <>
+                  <p className="loading-text">Analyzing JD and tailoring your resume…</p>
+                  <p className="loading-sub">This may take 1-3 minutes depending on resume length</p>
+                </>
+              ) : (
+                <>
+                  <p className="loading-text">Applying selected improvements…</p>
+                  <p className="loading-sub">Usually 15–30 seconds</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {(error || refineError) && !isLoading && !isRefining && (
+            <div className="error-card" role="alert">
+              <div className="error-icon">❌</div>
+              <div>
+                <strong>{refineError ? 'Refine failed' : 'Generation failed'}</strong>
+                <p className="error-msg">{error || refineError}</p>
+              </div>
+            </div>
+          )}
+
+          {!isLoading && !error && !output && (
+            <div className="empty-state">
+              <div className="empty-icon">✨</div>
+              <h2 className="empty-title">Your tailored resume will appear here</h2>
+              <p className="empty-sub">
+                Fill in your resume and a job description, then click{' '}
+                <strong>Generate Tailored Resume</strong>.
+              </p>
+              <div className="empty-features">
+                <div className="feature-pill">🎯 ATS Match Score</div>
+                <div className="feature-pill">📊 Gap Analysis</div>
+                <div className="feature-pill">📄 Tailored Resume</div>
+                <div className="feature-pill">✉️ Cover Letter</div>
+                <div className="feature-pill">📥 .docx Download</div>
+              </div>
+            </div>
+          )}
+
+          {output && !isLoading && (
+            <OutputPanel
+              data={output}
+              companyName={companyName || undefined}
+              onRefine={handleRefine}
+              isRefining={isRefining}
+            />
+          )}
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="app-footer">
+        <p>API keys stored in session only · Never logged or persisted server-side</p>
       </footer>
     </div>
   );

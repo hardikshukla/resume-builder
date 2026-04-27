@@ -1,0 +1,39 @@
+import { ResumeBuilderOutput } from '@/types';
+
+const BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? 'llama3';
+
+export async function callOllama(
+  prompt: string,
+  modelOverride?: string
+): Promise<ResumeBuilderOutput> {
+  const model = modelOverride || DEFAULT_MODEL;
+
+  const response = await fetch(`${BASE_URL}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt,
+      stream: false,
+      format: 'json',
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    if (response.status === 404) {
+      throw new Error(
+        `Ollama model "${model}" is not installed. ` +
+        `Use the "Fetch models" button to see what's available, ` +
+        `or run: ollama pull ${model}`
+      );
+    }
+    throw new Error(`Ollama HTTP ${response.status}: ${body}`);
+  }
+
+  const data = (await response.json()) as { response: string };
+  const raw = data.response.trim();
+  const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  return JSON.parse(cleaned) as ResumeBuilderOutput;
+}
