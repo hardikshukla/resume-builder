@@ -609,6 +609,8 @@ body {
 .section-yellow { border-color: rgba(245,158,11,0.2); background: rgba(245,158,11,0.04); }
 .section-red    { border-color: rgba(239,68,68,0.2);  background: rgba(239,68,68,0.04);  }
 .section-blue   { border-color: rgba(59,130,246,0.2); background: rgba(59,130,246,0.04); }
+.section-purple { border-color: rgba(168,85,247,0.25); background: rgba(168,85,247,0.04); }
+.section-orange { border-color: rgba(251,146,60,0.25); background: rgba(251,146,60,0.04); }
 
 .collapsible-header {
   width: 100%;
@@ -635,6 +637,211 @@ body {
 .section-yellow .collapsible-icon { color: var(--yellow); }
 .section-red    .collapsible-icon { color: var(--red);    }
 .section-blue   .collapsible-icon { color: var(--blue);   }
+.section-purple .collapsible-icon { color: #c084fc;       }
+.section-orange .collapsible-icon { color: #fb923c;       }
+
+/* ─── ATS Optimization Summary ───────────────────────────────────────────── */
+.ats-summary-body {
+  padding: 4px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ats-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  background: rgba(168,85,247,0.06);
+  border: 1px solid rgba(168,85,247,0.15);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  line-height: 1.55;
+}
+.ats-summary-icon { color: #c084fc; margin-top: 1px; flex-shrink: 0; }
+.ats-summary-label { font-weight: 600; color: var(--text); }
+.ats-summary-text  { color: var(--text-dim); }
+
+.ats-summary-group { display: flex; flex-direction: column; gap: 4px; }
+
+.ats-summary-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0 2px;
+}
+
+/* Coloured list items inside ATS summary groups */
+.ats-item-green  { color: #4ade80 !important; }
+.ats-item-green::before  { color: #4ade80 !important; }
+.ats-item-orange { color: #fb923c !important; }
+.ats-item-orange::before { color: #fb923c !important; }
+.ats-item-yellow { color: #fbbf24 !important; }
+.ats-item-yellow::before { color: #fbbf24 !important; }
+
+/* ─── Revert Banner ──────────────────────────────────────────────────────────── */
+.revert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(108,99,255,0.08);
+  border: 1px solid rgba(108,99,255,0.25);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  animation: fade-in-down 0.25s ease;
+}
+.revert-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.revert-score-before { color: var(--text-muted); text-decoration: line-through; }
+.revert-score-after  { color: #4ade80; font-weight: 600; }
+.revert-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(108,99,255,0.4);
+  background: rgba(108,99,255,0.12);
+  color: #a78bfa;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.revert-btn:hover {
+  background: rgba(108,99,255,0.22);
+  border-color: rgba(108,99,255,0.6);
+  color: #fff;
+}
+
+/* ─── Original | Updated View Toggle ─────────────────────────────────────────── */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.view-toggle-btn {
+  padding: 4px 14px;
+  border-radius: 99px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.view-toggle-btn:hover { color: var(--text-dim); }
+.view-toggle-active {
+  background: var(--accent) !important;
+  color: #fff !important;
+  box-shadow: 0 1px 4px rgba(108,99,255,0.35);
+}
+
+/* ─── Missing Keywords Panel ─────────────────────────────────────────────────── */
+.mkp-body {
+  padding: 8px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mkp-intro {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  padding: 8px 10px;
+  background: rgba(251,146,60,0.06);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid rgba(251,146,60,0.4);
+}
+.mkp-intro em { color: #fb923c; font-style: normal; font-weight: 600; }
+.mkp-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mkp-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-input);
+}
+.mkp-card:hover { border-color: rgba(251,146,60,0.4); background: rgba(251,146,60,0.04); }
+.mkp-card-selected {
+  border-color: rgba(251,146,60,0.55) !important;
+  background: rgba(251,146,60,0.08) !important;
+}
+.mkp-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mkp-keyword {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+.mkp-section-tag {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(251,146,60,0.15);
+  color: #fb923c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mkp-suggestion {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-left: 24px;
+}
+.mkp-note {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid rgba(251,146,60,0.3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color var(--transition);
+  margin-top: 2px;
+}
+.mkp-note::placeholder { color: var(--text-muted); }
+.mkp-note:focus { border-color: #fb923c; box-shadow: 0 0 0 2px rgba(251,146,60,0.15); }
 
 .collapsible-title { flex: 1; }
 
@@ -716,6 +923,85 @@ body {
 
 .refine-action-row {
   padding: 12px 14px 4px;
+}
+
+.refine-action-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.refine-applied-banner {
+  margin: 4px 14px 8px;
+  padding: 8px 12px;
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: #4ade80;
+  font-weight: 500;
+  animation: fade-in-down 0.3s ease;
+}
+
+@keyframes fade-in-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Recommendation Status Badges ───────────────────────────────────────────── */
+/* Header: "X/Y applied" pill replaces the plain count */
+.rec-applied-count {
+  font-size: 0.7rem;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: rgba(34,197,94,0.15);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #4ade80;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Make the refine-label a proper flex row so the badge sits at the right */
+.refine-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  cursor: pointer;
+}
+.rec-text { flex: 1; line-height: 1.5; }
+
+/* Status badge pill */
+.rec-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.rec-status-applied {
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #4ade80;
+}
+.rec-status-pending {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Applied rows get a subtle green left-accent */
+.refine-item.rec-applied {
+  border-left: 3px solid rgba(34,197,94,0.35) !important;
+  background: rgba(34,197,94,0.03) !important;
 }
 
 .refine-btn {

@@ -321,6 +321,45 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
     }
   }
 
+  // ── PUBLICATIONS ────────────────────────────────────────────────────────────
+  if (resume.publications && resume.publications.length > 0) {
+    children.push(sectionHeader('PUBLICATIONS'));
+    for (const pub of resume.publications) {
+      children.push(
+        new Paragraph({
+          numbering: { reference: 'resume-bullets', level: 0 },
+          children: [new TextRun({ text: pub, font: 'Times New Roman', size: 20 })],
+        })
+      );
+    }
+  }
+
+  // ── AWARDS ──────────────────────────────────────────────────────────────────
+  if (resume.awards && resume.awards.length > 0) {
+    children.push(sectionHeader('AWARDS & HONOURS'));
+    for (const award of resume.awards) {
+      children.push(
+        new Paragraph({
+          numbering: { reference: 'resume-bullets', level: 0 },
+          children: [new TextRun({ text: award, font: 'Times New Roman', size: 20 })],
+        })
+      );
+    }
+  }
+
+  // ── LANGUAGES ───────────────────────────────────────────────────────────────
+  if (resume.languages && resume.languages.length > 0) {
+    children.push(sectionHeader('LANGUAGES'));
+    for (const lang of resume.languages) {
+      children.push(
+        new Paragraph({
+          numbering: { reference: 'resume-bullets', level: 0 },
+          children: [new TextRun({ text: lang, font: 'Times New Roman', size: 20 })],
+        })
+      );
+    }
+  }
+
   const doc = new Document({
     numbering: bulletNumbering,
     sections: [

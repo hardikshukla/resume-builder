@@ -39,6 +39,13 @@ export default function Home() {
   const [error,          setError]          = useState<string | null>(null);
   const [refineError,    setRefineError]    = useState<string | null>(null);
   const [output,         setOutput]         = useState<GenerationResult | null>(null);
+  // originalOutput is locked after generation and NEVER modified by refine.
+  // Every refine call uses it as the base so results are always predictable.
+  const [originalOutput, setOriginalOutput] = useState<GenerationResult | null>(null);
+  const [hasRefined,     setHasRefined]     = useState(false);
+  // Which recommendation strings are currently reflected in the refined resume.
+  // Cleared when the user reverts; replaced on every new refine call.
+  const [appliedRecs,    setAppliedRecs]    = useState<string[]>([]);
 
   // Restore from storage on mount
   useEffect(() => {
@@ -69,6 +76,9 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setOutput(null);
+    setOriginalOutput(null);
+    setHasRefined(false);
+    setAppliedRecs([]);
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -90,7 +100,8 @@ export default function Home() {
       if (!json.success) throw new Error(json.error ?? 'Generation failed');
 
       setOutput(json.data);
-      setJD(''); // clear JD after success
+      setOriginalOutput(json.data); // lock the original — never overwritten by refine
+      setJD('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -99,7 +110,10 @@ export default function Home() {
   }
 
   async function handleRefine(selectedRecs: string[]) {
-    if (!output) return;
+    // Always refines from the ORIGINAL output — never chains on top of a previous refine.
+    // This means deselecting a recommendation and re-applying gives a clean result
+    // with only the currently-selected items, with no residue from previous runs.
+    if (!originalOutput) return;
     setIsRefining(true);
     setRefineError(null);
     try {
@@ -107,7 +121,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentOutput:           output.result,
+          currentOutput:           originalOutput.result, // ← always the original
           selectedRecommendations: selectedRecs,
           provider,
           anthropicKey:   anthropicKey   || undefined,
@@ -119,7 +133,7 @@ export default function Home() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Refine failed');
-      // Merge refined resume+coverLetter, keep original gapAnalysis
+
       setOutput((prev) =>
         prev
           ? {
@@ -128,14 +142,31 @@ export default function Home() {
                 ...prev.result,
                 resume:      json.data.resume,
                 coverLetter: json.data.coverLetter,
+                gapAnalysis: {
+                  ...prev.result.gapAnalysis,
+                  ...(json.data.updatedMatchScore != null && {
+                    matchScore: json.data.updatedMatchScore,
+                  }),
+                },
               },
             }
           : prev
       );
+      setHasRefined(true);
+      setAppliedRecs(selectedRecs); // record exactly what's now in the refined resume
     } catch (e) {
       setRefineError(e instanceof Error ? e.message : 'Unknown refine error');
     } finally {
       setIsRefining(false);
+    }
+  }
+
+  // Revert to original — zero tokens, zero API calls, instant.
+  function handleRevert() {
+    if (originalOutput) {
+      setOutput(originalOutput);
+      setHasRefined(false);
+      setAppliedRecs([]); // nothing applied after reverting to original
     }
   }
 
@@ -238,6 +269,12 @@ export default function Home() {
               companyName={companyName || undefined}
               onRefine={handleRefine}
               isRefining={isRefining}
+              hasRefined={hasRefined}
+              appliedRecs={appliedRecs}
+              originalMatchScore={originalOutput?.result.gapAnalysis.matchScore}
+              originalResume={originalOutput?.result.resume}
+              originalCoverLetter={originalOutput?.result.coverLetter}
+              onRevert={handleRevert}
             />
           )}
         </section>

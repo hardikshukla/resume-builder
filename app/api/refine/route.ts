@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RefineRequest, RefineResponse, ResumeData, CoverLetterData } from '@/types';
-import { buildRefinePrompt, buildSystemPrompt } from '@/lib/prompt';
+import { buildRefinePrompt } from '@/lib/prompt';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 120; // refine is faster than full generation
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
       const response = await client.messages.create({
         model,
         max_tokens: 6000,
-        system: buildSystemPrompt(),
         messages: [{ role: 'user', content: refinePrompt }],
       });
 
@@ -74,8 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
           model,
           max_tokens: 6000,
           messages: [
-            { role: 'system', content: buildSystemPrompt() },
-            { role: 'user',   content: refinePrompt },
+            { role: 'user', content: refinePrompt },
           ],
         }),
       });
@@ -106,7 +104,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
     // ── Parse & validate output ────────────────────────────────────────────────
     const cleaned = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
 
-    let parsed: { resume: ResumeData; coverLetter: CoverLetterData };
+    let parsed: { resume: ResumeData; coverLetter: CoverLetterData; updatedMatchScore?: number };
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -123,7 +121,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
       });
     }
 
-    return NextResponse.json({ success: true, data: parsed });
+    return NextResponse.json({
+      success: true,
+      data: {
+        resume:             parsed.resume,
+        coverLetter:        parsed.coverLetter,
+        updatedMatchScore:  typeof parsed.updatedMatchScore === 'number'
+                              ? Math.min(100, Math.max(0, Math.round(parsed.updatedMatchScore)))
+                              : undefined,
+      },
+    });
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

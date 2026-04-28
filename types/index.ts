@@ -23,12 +23,28 @@ export interface LLMResponse {
 
 // ── Resume Builder Output ─────────────────────────────────────────────────────
 
+/**
+ * A keyword from the JD that has no evidence in the candidate's resume.
+ * Never embedded in the resume text — surfaced in the UI so the user can
+ * consciously decide which ones apply to their experience.
+ */
+export interface MissingKeyword {
+  keyword: string;          // e.g. "Kubernetes"
+  suggestedSection: string; // e.g. "Core Competencies"
+  suggestedBullet: string;  // e.g. "Orchestrated containerised workloads using Kubernetes"
+}
+
 export interface GapAnalysis {
   matchScore: number;
-  strongMatches: string[];
-  gaps: string[];
-  dealbreakers: string[];
-  recommendations: string[];
+  strongMatches: string[];    // PRESENT — keyword already in resume
+  gaps: string[];             // IMPLIED — experience existed, term was added
+  dealbreakers: string[];     // MISSING — no evidence in candidate background
+  recommendations: string[];  // Actionable suggestions the candidate can selectively apply
+
+  // ── ATS Optimization Summary ─────────────────────────────────────────────────
+  keywordsAdded: string[];          // Implied keywords that were woven into the rewrite
+  missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
+  summaryChanges: string;            // One sentence: what changed in the Summary and why
 }
 
 export interface ContactInfo {
@@ -76,6 +92,9 @@ export interface ResumeData {
   experience: ExperienceEntry[];     // projects nested inside each entry
   education: EducationEntry[];
   certifications: string[];
+  publications?: string[];           // journal papers, books, conference proceedings
+  awards?: string[];                 // honours, prizes, fellowships
+  languages?: string[];              // spoken/written languages + proficiency
 }
 
 export interface CoverLetterData {
@@ -131,6 +150,7 @@ export interface RefineResponse {
   data?: {
     resume: ResumeData;
     coverLetter: CoverLetterData;
+    updatedMatchScore?: number; // Re-evaluated ATS score after applying improvements
   };
   error?: string;
 }
