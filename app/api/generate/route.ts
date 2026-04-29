@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runLLM } from '@/lib/llm';
 import { GenerateRequest, LLMProvider } from '@/types';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS } from '@/lib/constants';
 
 export const maxDuration = 180; // match LLM timeout — large prompts can take 90-120s
 
@@ -15,7 +16,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (body.resume.length > MAX_RESUME_CHARS) {
+      return NextResponse.json(
+        { success: false, error: `Resume is too long (${body.resume.length.toLocaleString()} chars). Please shorten to under ${MAX_RESUME_CHARS.toLocaleString()} characters.` },
+        { status: 400 }
+      );
+    }
+
+    if (body.jobDescription.length > MAX_JD_CHARS) {
+      return NextResponse.json(
+        { success: false, error: `Job description is too long (${body.jobDescription.length.toLocaleString()} chars). Please shorten to under ${MAX_JD_CHARS.toLocaleString()} characters.` },
+        { status: 400 }
+      );
+    }
+
     if (!body.anthropicKey && !body.openaiKey) {
+
       return NextResponse.json(
         {
           success: false,

@@ -4,6 +4,7 @@ import { LLMProvider } from '@/types';
 import { Loader2, Sparkles, FileText, Briefcase, Building2 } from 'lucide-react';
 import { ProviderSelector } from './ProviderSelector';
 import { ResumeUploader } from './ResumeUploader';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS } from '@/lib/constants';
 
 interface ResumeFormProps {
   resume: string;
@@ -43,9 +44,23 @@ export function ResumeForm({
     anthropicKey.trim().length > 0 ||
     openaiKey.trim().length > 0;
 
+  // Derive char-count status for colour coding
+  const resumeStatus =
+    resume.length > MAX_RESUME_CHARS ? 'over' :
+    resume.length > RESUME_WARN_CHARS ? 'warn' : 'ok';
+
+  const jdStatus =
+    jobDescription.length > MAX_JD_CHARS ? 'over' :
+    jobDescription.length > JD_WARN_CHARS ? 'warn' : 'ok';
+
+  const resumeOverLimit = resume.length > MAX_RESUME_CHARS;
+  const jdOverLimit     = jobDescription.length > MAX_JD_CHARS;
+
   const canSubmit =
     resume.trim().length > 0 &&
     jobDescription.trim().length > 0 &&
+    !resumeOverLimit &&
+    !jdOverLimit &&
     hasKey &&
     !isLoading;
 
@@ -86,7 +101,11 @@ export function ResumeForm({
           onChange={(e) => onResumeChange(e.target.value)}
           spellCheck={false}
         />
-        <div className="char-count">{resume.length.toLocaleString()} chars</div>
+        <div className={`char-count char-count--${resumeStatus}`}>
+          {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
+          {resumeStatus === 'warn' && <span className="char-count-label"> · approaching limit</span>}
+          {resumeStatus === 'over' && <span className="char-count-label"> · exceeds limit — generation blocked</span>}
+        </div>
       </div>
 
       {/* Job Description */}
@@ -107,7 +126,11 @@ export function ResumeForm({
           onChange={(e) => onJobDescriptionChange(e.target.value)}
           spellCheck={false}
         />
-        <div className="char-count">{jobDescription.length.toLocaleString()} chars</div>
+        <div className={`char-count char-count--${jdStatus}`}>
+          {jobDescription.length.toLocaleString()} / {MAX_JD_CHARS.toLocaleString()} chars
+          {jdStatus === 'warn' && <span className="char-count-label"> · approaching limit</span>}
+          {jdStatus === 'over' && <span className="char-count-label"> · exceeds limit — generation blocked</span>}
+        </div>
       </div>
 
       {/* Company Name */}

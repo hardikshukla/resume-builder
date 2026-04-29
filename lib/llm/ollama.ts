@@ -1,4 +1,5 @@
 import { ResumeBuilderOutput } from '@/types';
+import { guardOutput } from '@/lib/llm/guard';
 
 const BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL ?? 'llama3';
@@ -35,5 +36,17 @@ export async function callOllama(
   const data = (await response.json()) as { response: string };
   const raw = data.response.trim();
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-  return JSON.parse(cleaned) as ResumeBuilderOutput;
+
+  let parsed: ResumeBuilderOutput;
+  try {
+    parsed = JSON.parse(cleaned) as ResumeBuilderOutput;
+  } catch {
+    throw new Error(
+      'Ollama returned invalid JSON. The model may not support structured output well. ' +
+      'Try a different model or switch to Claude/GPT-4o.'
+    );
+  }
+
+  guardOutput(parsed);
+  return parsed;
 }

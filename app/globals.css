@@ -288,7 +288,13 @@ body {
   font-size: 0.7rem;
   color: var(--text-muted);
   margin-top: 4px;
+  transition: color var(--transition);
 }
+.char-count--ok   { color: var(--text-muted); }
+.char-count--warn { color: var(--yellow); }
+.char-count--over { color: var(--red); font-weight: 600; }
+.char-count-label { font-style: italic; }
+
 
 .ollama-note {
   font-size: 0.82rem;

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { ResumeBuilderOutput } from '@/types';
+import { guardOutput } from '@/lib/llm/guard';
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
 
@@ -24,7 +25,29 @@ export async function callOpenAI(
     ],
   });
 
-  const raw = response.choices[0]?.message?.content ?? '';
+  const choice = response.choices[0];
+
+  if (choice?.finish_reason === 'length') {
+    throw new Error(
+      'OpenAI response was cut off (resume too long). Try shortening your resume or ' +
+      'switching to a model with a larger output limit.'
+    );
+  }
+
+  const raw = choice?.message?.content ?? '';
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-  return JSON.parse(cleaned) as ResumeBuilderOutput;
+
+  let parsed: ResumeBuilderOutput;
+  try {
+    parsed = JSON.parse(cleaned) as ResumeBuilderOutput;
+  } catch {
+    throw new Error(
+      'OpenAI returned invalid JSON. This can happen with very long resumes or content ' +
+      'filter responses. Try again, or switch to a different model.'
+    );
+  }
+
+  guardOutput(parsed);
+  return parsed;
 }
+

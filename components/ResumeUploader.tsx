@@ -2,6 +2,7 @@
 
 import { useRef, useState, DragEvent, ChangeEvent } from 'react';
 import { Upload, FileText, X, AlertCircle } from 'lucide-react';
+import { MAX_FILE_BYTES } from '@/lib/constants';
 
 interface ResumeUploaderProps {
   onExtracted: (text: string, filename: string) => void;
@@ -39,6 +40,14 @@ export function ResumeUploader({ onExtracted }: ResumeUploaderProps) {
   const [state, setState] = useState<UploadState>({ status: 'idle' });
 
   async function processFile(file: File) {
+    // Client-side guard — avoids a round-trip for obviously oversized files
+    if (file.size > MAX_FILE_BYTES) {
+      setState({
+        status: 'error',
+        message: `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 5 MB.`,
+      });
+      return;
+    }
     setState({ status: 'parsing', filename: file.name });
     try {
       const { text, filename } = await parseViaApi(file);
@@ -122,7 +131,7 @@ export function ResumeUploader({ onExtracted }: ResumeUploaderProps) {
                   {isDragging ? 'Drop to upload' : 'Upload resume file'}
                 </span>
                 <span className="upload-hint">
-                  .docx or .txt · drag &amp; drop or click to browse
+                  .docx or .txt · max 5 MB · drag &amp; drop or click to browse
                 </span>
               </div>
             </>

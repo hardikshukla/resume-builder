@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ResumeBuilderOutput } from '@/types';
 import { buildSystemPrompt, buildUserMessage } from '@/lib/prompt';
+import { guardOutput } from '@/lib/llm/guard';
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 
@@ -56,11 +57,16 @@ export async function callAnthropic(
   const raw = content.text.trim();
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
 
+  let parsed: ResumeBuilderOutput;
   try {
-    return JSON.parse(cleaned) as ResumeBuilderOutput;
+    parsed = JSON.parse(cleaned) as ResumeBuilderOutput;
   } catch {
     throw new Error(
       'Claude returned invalid JSON. This can happen with very long resumes — try again.'
     );
   }
+
+  guardOutput(parsed);
+  return parsed;
 }
+

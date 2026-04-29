@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RefineRequest, RefineResponse, ResumeData, CoverLetterData } from '@/types';
 import { buildRefinePrompt } from '@/lib/prompt';
+import { MAX_RESUME_CHARS } from '@/lib/constants';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 120; // refine is faster than full generation
@@ -23,7 +24,17 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
       return NextResponse.json({ success: false, error: 'No recommendations selected.' });
     }
 
+    // Guard: the resume JSON embedded in the refine prompt can be large
+    const resumeJson = JSON.stringify(currentOutput?.resume ?? '');
+    if (resumeJson.length > MAX_RESUME_CHARS * 2) {
+      return NextResponse.json({
+        success: false,
+        error: 'Resume data is too large to refine. Try regenerating with a shorter resume.',
+      });
+    }
+
     const refinePrompt = buildRefinePrompt(
+
       { resume: currentOutput.resume, coverLetter: currentOutput.coverLetter },
       selectedRecommendations
     );

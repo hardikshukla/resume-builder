@@ -76,7 +76,8 @@ CORE COMPETENCIES
 - Keep ALL existing skills from the candidate's resume
 - Add IMPLIED keywords (experience exists, term was missing) — record each in keywordsAdded
 - Do NOT add skills with no basis in the candidate's background
-- Use [PLACEHOLDER: Add {keyword} if applicable] for genuinely missing tools
+- Do NOT add placeholder text of any kind. If a skill is MISSING, report it in missingKeywords only — never in the resume body
+
 
 EXPERIENCE
 - Preserve ALL jobs, projects, and exact date ranges — no reordering, merging, or removal
