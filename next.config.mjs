@@ -67,11 +67,8 @@ export default withSentryConfig(nextConfig, {
   // Upload source maps only in CI/production — avoids leaking them locally
   silent:              true,
   hideSourceMaps:      true,
-  disableLogger:       true,
 
-  // Automatically instrument Next.js server components and API routes
-  autoInstrumentServerFunctions: true,
-  autoInstrumentMiddleware:      true,
+  // Sentry automatically instruments Next.js server components, API routes, and middleware by default now.
 
   // Tunnel Sentry requests through /monitoring to avoid ad-blockers
   tunnelRoute: '/monitoring',

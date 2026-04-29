@@ -16,10 +16,30 @@ function sanitizeFilename(raw: string): string {
     .replace(/[/\\]/g, '')         // block directory separators
     // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1f\x7f]/g, '') // strip control chars
-    .replace(/[^\w\s\-().]/g, '')  // only safe ASCII chars
+    .replace(/[^\w\s\-().+]/g, '') // only safe ASCII chars (now allowing '+')
     .replace(/\s+/g, '_')          // spaces → underscores
     .slice(0, 80)                  // cap length
     || 'document';                 // fallback if empty after sanitising
+}
+
+function toCamelCase(str: string): string {
+  return str
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      if (index === 0) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join('');
+}
+
+function toPascalCase(str: string): string {
+  return str
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('');
 }
 
 export async function POST(req: NextRequest) {
@@ -33,21 +53,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const safeName = sanitizeFilename(body.data.resume.name);
+    const baseName = toCamelCase(body.data.resume.name || 'candidate');
+    const docType = body.type === 'resume' ? 'Resume' : 'CoverLetter';
+    let rawFilename = `${baseName}${docType}`;
+
+    if (body.companyName && body.companyName.trim()) {
+      rawFilename += `+${toPascalCase(body.companyName)}`;
+    }
+
+    const safeName = sanitizeFilename(rawFilename);
+    const filename = `${safeName}.docx`;
 
     let blob: Blob;
-    let filename: string;
 
     if (body.type === 'resume') {
       blob = await generateResumeDOCX(body.data.resume);
-      filename = `${safeName}_Resume.docx`;
     } else {
       blob = await generateCoverLetterDOCX(
         body.data.coverLetter,
         body.data.resume,
         body.companyName
       );
-      filename = `${safeName}_Cover_Letter.docx`;
     }
 
     const buffer = Buffer.from(await blob.arrayBuffer());
