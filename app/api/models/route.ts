@@ -5,7 +5,18 @@ export interface ModelEntry {
   name: string;
 }
 
+// ── In-memory response cache ──────────────────────────────────────────────────
+// Keyed by `${provider}:${key_prefix_8_chars}` so different users don't share
+// each other's model lists while still collapsing duplicate clicks.
+const CACHE_TTL_MS = 60_000;
+const cache = new Map<string, { ts: number; models: ModelEntry[] }>();
+
+function cacheKey(provider: string, apiKey = ''): string {
+  return `${provider}:${apiKey.slice(0, 8)}`;
+}
+
 export async function POST(req: NextRequest) {
+
   try {
     const { provider, anthropicKey, openaiKey, ollamaUrl } =
       (await req.json()) as {
@@ -14,6 +25,13 @@ export async function POST(req: NextRequest) {
         openaiKey?: string;
         ollamaUrl?: string;
       };
+
+    // ── Cache lookup ─────────────────────────────────────────────────────────
+    const ck = cacheKey(provider, anthropicKey ?? openaiKey ?? '');
+    const hit = cache.get(ck);
+    if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+      return NextResponse.json({ models: hit.models, cached: true });
+    }
 
     // ── Anthropic ─────────────────────────────────────────────────────────────
     if (provider === 'anthropic') {
@@ -45,6 +63,7 @@ export async function POST(req: NextRequest) {
         name: m.display_name ?? m.id,
       }));
 
+      cache.set(ck, { ts: Date.now(), models });
       return NextResponse.json({ models });
     }
 
@@ -75,6 +94,7 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.id.localeCompare(a.id))
         .map((m) => ({ id: m.id, name: m.id }));
 
+      cache.set(ck, { ts: Date.now(), models });
       return NextResponse.json({ models });
     }
 
@@ -112,6 +132,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      cache.set(ck, { ts: Date.now(), models });
       return NextResponse.json({ models });
     }
 

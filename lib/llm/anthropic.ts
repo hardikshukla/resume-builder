@@ -2,11 +2,17 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ResumeBuilderOutput } from '@/types';
 import { buildSystemPrompt, buildUserMessage } from '@/lib/prompt';
 import { guardOutput } from '@/lib/llm/guard';
+import { ResumeBuilderOutputSchema } from '@/lib/llm/schema';
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 
 export async function callAnthropic(
-  _combinedPrompt: string,          // kept for signature compatibility, not used
+  /**
+   * `prompt` is used as the user message when resume/jd are not provided
+   * (e.g. future callers that pre-build the full prompt). When resume + jd
+   * are both present, buildUserMessage() is used instead and prompt is ignored.
+   */
+  prompt: string,
   apiKey: string,
   modelOverride?: string,
   resume?: string,
@@ -16,12 +22,12 @@ export async function callAnthropic(
   const client = new Anthropic({ apiKey });
   const model = modelOverride || DEFAULT_MODEL;
 
-  // Use system/user separation — this prevents Anthropic's loop detector from
+  // System/user separation prevents Anthropic's loop detector from
   // triggering on the JSON schema template embedded in a user message.
   const systemPrompt = buildSystemPrompt();
   const userMessage = resume && jd
     ? buildUserMessage(resume, jd, companyName)
-    : _combinedPrompt; // fallback if called without structured args
+    : prompt; // fallback for callers that pre-build their own prompt
 
   let response;
   try {
@@ -59,11 +65,17 @@ export async function callAnthropic(
 
   let parsed: ResumeBuilderOutput;
   try {
-    parsed = JSON.parse(cleaned) as ResumeBuilderOutput;
-  } catch {
-    throw new Error(
-      'Claude returned invalid JSON. This can happen with very long resumes — try again.'
-    );
+    const raw_parsed = JSON.parse(cleaned);
+    const result = ResumeBuilderOutputSchema.safeParse(raw_parsed);
+    if (!result.success) {
+      const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
+      const msg   = result.error.issues[0]?.message ?? 'schema mismatch';
+      throw new Error(`Claude response failed validation at "${field}": ${msg}. Try again.`);
+    }
+    parsed = result.data;
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('failed validation')) throw e;
+    throw new Error('Claude returned invalid JSON. This can happen with very long resumes — try again.');
   }
 
   guardOutput(parsed);

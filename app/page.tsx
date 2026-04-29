@@ -65,12 +65,32 @@ export default function Home() {
     setResume(v); localStorage.setItem(LOCAL_RESUME, v);
   }, []);
 
-  const persist = (key: string, setter: (v: string) => void) =>
-    (v: string) => { setter(v); sessionStorage.setItem(key, v); };
-
   const handleProviderChange = useCallback((p: LLMProvider) => {
     setProvider(p); sessionStorage.setItem(S.provider, p);
   }, []);
+
+  // Stable persist handlers — useCallback prevents ResumeForm from re-rendering
+  // on every parent state change due to new function references.
+  const handleAnthropicKeyChange = useCallback((v: string) => {
+    setAnthropicKey(v); sessionStorage.setItem(S.anthropicKey, v);
+  }, []);
+
+  const handleOpenaiKeyChange = useCallback((v: string) => {
+    setOpenaiKey(v); sessionStorage.setItem(S.openaiKey, v);
+  }, []);
+
+  const handleAnthropicModelChange = useCallback((v: string) => {
+    setAnthropicModel(v); sessionStorage.setItem(S.anthropicModel, v);
+  }, []);
+
+  const handleOpenaiModelChange = useCallback((v: string) => {
+    setOpenaiModel(v); sessionStorage.setItem(S.openaiModel, v);
+  }, []);
+
+  const handleOllamaModelChange = useCallback((v: string) => {
+    setOllamaModel(v); sessionStorage.setItem(S.ollamaModel, v);
+  }, []);
+
 
   async function handleGenerate() {
     setIsLoading(true);
@@ -208,11 +228,11 @@ export default function Home() {
             onJobDescriptionChange={setJD}
             onCompanyNameChange={setCompany}
             onProviderChange={handleProviderChange}
-            onAnthropicKeyChange={persist(S.anthropicKey,   setAnthropicKey)}
-            onOpenaiKeyChange={persist(S.openaiKey,         setOpenaiKey)}
-            onAnthropicModelChange={persist(S.anthropicModel, setAnthropicModel)}
-            onOpenaiModelChange={persist(S.openaiModel,     setOpenaiModel)}
-            onOllamaModelChange={persist(S.ollamaModel,     setOllamaModel)}
+            onAnthropicKeyChange={handleAnthropicKeyChange}
+            onOpenaiKeyChange={handleOpenaiKeyChange}
+            onAnthropicModelChange={handleAnthropicModelChange}
+            onOpenaiModelChange={handleOpenaiModelChange}
+            onOllamaModelChange={handleOllamaModelChange}
             onSubmit={handleGenerate}
           />
         </section>

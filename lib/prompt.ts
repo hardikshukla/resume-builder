@@ -15,11 +15,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * System prompt — instructions, rules, and output schema.
- * Sent as the Anthropic `system` parameter (or prepended for other providers).
+ * System prompt — computed once at module load; every request reuses the same string.
+ * Exported as a function for backward compat with callAnthropic().
  */
-export function buildSystemPrompt(): string {
-  return `You are an expert technical resume writer and ATS specialist with 15+ years of experience at top-tier companies (FAANG / Fortune 500).
+export function buildSystemPrompt(): string { return SYSTEM_PROMPT; }
+
+const SYSTEM_PROMPT = `You are an expert technical resume writer and ATS specialist with 15+ years of experience at top-tier companies (FAANG / Fortune 500).
 
 You have:
 - Screened 10,000+ resumes and conducted hiring calibration sessions
@@ -199,7 +200,6 @@ RULES FOR EXPERIENCE / PROJECTS:
 - Write each project exactly once. Never duplicate.
 
 CRITICAL: Return ONLY the raw JSON object. No explanation, no markdown, no code fences.`;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USER MESSAGE

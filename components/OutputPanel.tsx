@@ -2,7 +2,7 @@
 
 import { CoverLetterData, GapAnalysis, MissingKeyword, ResumeBuilderOutput, ResumeData } from '@/types';
 import { DownloadButton } from './DownloadButton';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -298,21 +298,24 @@ function RefineableRecommendations({
 }) {
   const [open, setOpen] = useState(true);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [wasRefining, setWasRefining] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
+  // useRef tracks previous isRefining without triggering a re-render
+  const prevIsRefining = useRef(false);
 
   // Build a set for O(1) lookups
   const appliedSet = new Set(appliedRecs);
   const appliedCount = recommendations.filter((r) => appliedSet.has(r)).length;
 
-  // Reset selection after refine completes
-  if (isRefining && !wasRefining) setWasRefining(true);
-  if (!isRefining && wasRefining) {
-    setWasRefining(false);
-    setSelected(new Set());
-    setJustApplied(true);
-    setTimeout(() => setJustApplied(false), 3500);
-  }
+  // Reset selection when a refine completes (isRefining: true → false)
+  useEffect(() => {
+    if (!isRefining && prevIsRefining.current) {
+      setSelected(new Set());
+      setJustApplied(true);
+      const timer = setTimeout(() => setJustApplied(false), 3500);
+      return () => clearTimeout(timer);
+    }
+    prevIsRefining.current = isRefining;
+  }, [isRefining]);
 
   if (recommendations.length === 0) return null;
 

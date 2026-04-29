@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { ResumeBuilderOutput } from '@/types';
 import { guardOutput } from '@/lib/llm/guard';
+import { ResumeBuilderOutputSchema } from '@/lib/llm/schema';
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o';
 
@@ -39,8 +40,16 @@ export async function callOpenAI(
 
   let parsed: ResumeBuilderOutput;
   try {
-    parsed = JSON.parse(cleaned) as ResumeBuilderOutput;
-  } catch {
+    const raw_parsed = JSON.parse(cleaned);
+    const result = ResumeBuilderOutputSchema.safeParse(raw_parsed);
+    if (!result.success) {
+      const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
+      const msg   = result.error.issues[0]?.message ?? 'schema mismatch';
+      throw new Error(`OpenAI response failed validation at "${field}": ${msg}. Try again.`);
+    }
+    parsed = result.data;
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('failed validation')) throw e;
     throw new Error(
       'OpenAI returned invalid JSON. This can happen with very long resumes or content ' +
       'filter responses. Try again, or switch to a different model.'
