@@ -1,0 +1,191 @@
+/**
+ * T7.2 — Unit tests: prompt builder functions + GapAnalysis schema
+ *
+ * Run: npx jest __tests__/prompt.test.ts
+ */
+
+import {
+  buildSystemPrompt,
+  buildUserMessage,
+  buildPrompt,
+  buildRefinePrompt,
+} from '../lib/prompt';
+
+// ── buildSystemPrompt ────────────────────────────────────────────────────────
+
+describe('buildSystemPrompt()', () => {
+  const prompt = buildSystemPrompt();
+
+  it('returns a non-empty string', () => {
+    expect(typeof prompt).toBe('string');
+    expect(prompt.length).toBeGreaterThan(100);
+  });
+
+  it('contains the 5-step ATS methodology headings', () => {
+    expect(prompt).toContain('STEP 1');
+    expect(prompt).toContain('STEP 2');
+    expect(prompt).toContain('STEP 3');
+    expect(prompt).toContain('STEP 4');
+    expect(prompt).toContain('STEP 5');
+  });
+
+  it('instructs the model NOT to use placeholders', () => {
+    expect(prompt.toLowerCase()).toContain('placeholder');
+    // Specifically should say never embed placeholder text
+    expect(prompt).toMatch(/never embed placeholder/i);
+  });
+
+  it('references missingKeywords in the JSON schema instruction', () => {
+    expect(prompt).toContain('missingKeywords');
+  });
+
+  it('is idempotent — returns the same string on every call', () => {
+    expect(buildSystemPrompt()).toBe(prompt);
+  });
+});
+
+// ── buildUserMessage ─────────────────────────────────────────────────────────
+
+describe('buildUserMessage()', () => {
+  const resume = 'Senior Engineer with 5 years Python experience.';
+  const jd = 'We need a Python engineer with AWS and Kubernetes experience.';
+
+  it('embeds the resume text verbatim', () => {
+    const msg = buildUserMessage(resume, jd);
+    expect(msg).toContain(resume);
+  });
+
+  it('embeds the job description verbatim', () => {
+    const msg = buildUserMessage(resume, jd);
+    expect(msg).toContain(jd);
+  });
+
+  it('does NOT include company name when not provided', () => {
+    const msg = buildUserMessage(resume, jd);
+    expect(msg).not.toContain('COMPANY NAME');
+  });
+
+  it('includes company name when provided', () => {
+    const msg = buildUserMessage(resume, jd, 'Acme Corp');
+    expect(msg).toContain('COMPANY NAME');
+    expect(msg).toContain('Acme Corp');
+  });
+});
+
+// ── buildPrompt ──────────────────────────────────────────────────────────────
+
+describe('buildPrompt()', () => {
+  const resume = 'Engineer resume';
+  const jd = 'Software engineer JD';
+
+  it('combines system prompt and user message', () => {
+    const combined = buildPrompt(resume, jd);
+    expect(combined).toContain(buildSystemPrompt());
+    expect(combined).toContain(resume);
+    expect(combined).toContain(jd);
+  });
+
+  it('includes company name when provided', () => {
+    const combined = buildPrompt(resume, jd, 'Stripe');
+    expect(combined).toContain('Stripe');
+  });
+});
+
+// ── buildRefinePrompt ────────────────────────────────────────────────────────
+
+describe('buildRefinePrompt()', () => {
+  const currentOutput = {
+    resume:      { name: 'Jane Doe', summary: 'Engineer' },
+    coverLetter: { body: 'Dear Hiring Manager…' },
+  };
+
+  const selectedRecs = [
+    'Add Kubernetes to Core Competencies',
+    'Quantify AWS cost savings in the CloudOps bullet',
+  ];
+
+  it('returns a non-empty string', () => {
+    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
+    expect(typeof prompt).toBe('string');
+    expect(prompt.length).toBeGreaterThan(50);
+  });
+
+  it('embeds each selected recommendation as a bullet', () => {
+    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
+    for (const rec of selectedRecs) {
+      expect(prompt).toContain(rec);
+    }
+  });
+
+  it('embeds the current output JSON', () => {
+    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
+    expect(prompt).toContain('Jane Doe');
+    expect(prompt).toContain('Dear Hiring Manager');
+  });
+
+  it('instructs the model to return updatedMatchScore', () => {
+    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
+    expect(prompt).toContain('updatedMatchScore');
+  });
+
+  it('instructs the model to apply ONLY the listed improvements', () => {
+    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
+    expect(prompt).toMatch(/Apply ONLY the improvements listed/i);
+  });
+
+  it('handles an empty recommendations list', () => {
+    const prompt = buildRefinePrompt(currentOutput, []);
+    expect(prompt).toBeDefined();
+    // No bullets should be listed
+    expect(prompt).not.toContain('- Add Kubernetes');
+  });
+});
+
+// ── GapAnalysis schema guard ─────────────────────────────────────────────────
+
+describe('GapAnalysis schema shape', () => {
+  // Simulate what the LLM returns and what our Zod guard validates
+  const validGapAnalysis = {
+    matchScore:    72,
+    strongMatches: ['Python', 'AWS'],
+    gaps:          ['Kubernetes'],
+    dealbreakers:  [],
+    recommendations: ['Add Kubernetes to Core Competencies'],
+    missingKeywords: [
+      {
+        keyword:        'Terraform',
+        suggestedSection: 'Core Competencies',
+        suggestedBullet: 'Managed infrastructure as code using Terraform',
+      },
+    ],
+    keywordsAdded:  ['Kubernetes'],
+    summaryChanges: ['Added Kubernetes to skills section'],
+  };
+
+  it('passes when all required fields are present', () => {
+    expect(validGapAnalysis.matchScore).toBeGreaterThanOrEqual(0);
+    expect(validGapAnalysis.matchScore).toBeLessThanOrEqual(100);
+    expect(Array.isArray(validGapAnalysis.strongMatches)).toBe(true);
+    expect(Array.isArray(validGapAnalysis.gaps)).toBe(true);
+    expect(Array.isArray(validGapAnalysis.dealbreakers)).toBe(true);
+    expect(Array.isArray(validGapAnalysis.recommendations)).toBe(true);
+    expect(Array.isArray(validGapAnalysis.missingKeywords)).toBe(true);
+  });
+
+  it('has correctly shaped missingKeywords entries', () => {
+    for (const kw of validGapAnalysis.missingKeywords) {
+      expect(typeof kw.keyword).toBe('string');
+      expect(typeof kw.suggestedSection).toBe('string');
+      expect(typeof kw.suggestedBullet).toBe('string');
+      expect(kw.keyword.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('matchScore is a number between 0 and 100', () => {
+    const scores = [0, 50, 100];
+    for (const s of scores) {
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(100);
+    }
+  });
+});

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runLLM } from '@/lib/llm';
 import { GenerateRequest, LLMProvider } from '@/types';
 import { MAX_RESUME_CHARS, MAX_JD_CHARS } from '@/lib/constants';
+import '@/lib/env'; // T7.5 — fail fast if required env vars are missing
 
 export const maxDuration = 180; // match LLM timeout — large prompts can take 90-120s
 

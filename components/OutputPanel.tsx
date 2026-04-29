@@ -689,14 +689,18 @@ export function OutputPanel({
         </div>
       )}
 
-      {/* Match Score */}
+      {/* Keyword Coverage card */}
       <div className="card">
         <div className="card-header">
           <div className="card-icon">🎯</div>
-          <h2 className="card-title">Match Analysis</h2>
+          <h2 className="card-title">Keyword Coverage</h2>
           <span className="provider-tag">via {providerUsed}</span>
         </div>
         <ScoreBadge score={gapAnalysis.matchScore} />
+        <p className="score-disclaimer">
+          Based on keyword frequency against the JD &mdash; not a recruiter&apos;s judgment.
+          Scores above 70% indicate strong keyword alignment.
+        </p>
 
         <div className="gap-sections">
           <CollapsibleSection

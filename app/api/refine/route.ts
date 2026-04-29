@@ -4,6 +4,7 @@ import { buildRefinePrompt } from '@/lib/prompt';
 import { dispatchRaw } from '@/lib/llm/dispatch';
 import { MAX_RESUME_CHARS } from '@/lib/constants';
 import { guardOutput } from '@/lib/llm/guard';
+import '@/lib/env'; // T7.5 — fail fast if required env vars are missing
 
 export const maxDuration = 120;
 

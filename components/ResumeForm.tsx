@@ -17,6 +17,8 @@ interface ResumeFormProps {
   openaiModel: string;
   ollamaModel: string;
   isLoading: boolean;
+  /** When true the provider selector is disabled — prevents mid-session provider switch */
+  providerLocked?: boolean;
   onResumeChange: (v: string) => void;
   onJobDescriptionChange: (v: string) => void;
   onCompanyNameChange: (v: string) => void;
@@ -34,6 +36,7 @@ export function ResumeForm({
   provider, anthropicKey, openaiKey,
   anthropicModel, openaiModel, ollamaModel,
   isLoading,
+  providerLocked = false,
   onResumeChange, onJobDescriptionChange, onCompanyNameChange,
   onProviderChange, onAnthropicKeyChange, onOpenaiKeyChange,
   onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange,
@@ -66,20 +69,28 @@ export function ResumeForm({
 
   return (
     <div className="form-panel">
-      <ProviderSelector
-        provider={provider}
-        anthropicKey={anthropicKey}
-        openaiKey={openaiKey}
-        anthropicModel={anthropicModel}
-        openaiModel={openaiModel}
-        ollamaModel={ollamaModel}
-        onProviderChange={onProviderChange}
-        onAnthropicKeyChange={onAnthropicKeyChange}
-        onOpenaiKeyChange={onOpenaiKeyChange}
-        onAnthropicModelChange={onAnthropicModelChange}
-        onOpenaiModelChange={onOpenaiModelChange}
-        onOllamaModelChange={onOllamaModelChange}
-      />
+      {/* Provider selector — locked after generation to prevent mid-session switch */}
+      <div className={`provider-lock-wrapper ${providerLocked ? 'provider-locked' : ''}`}>
+        <ProviderSelector
+          provider={provider}
+          anthropicKey={anthropicKey}
+          openaiKey={openaiKey}
+          anthropicModel={anthropicModel}
+          openaiModel={openaiModel}
+          ollamaModel={ollamaModel}
+          onProviderChange={onProviderChange}
+          onAnthropicKeyChange={onAnthropicKeyChange}
+          onOpenaiKeyChange={onOpenaiKeyChange}
+          onAnthropicModelChange={onAnthropicModelChange}
+          onOpenaiModelChange={onOpenaiModelChange}
+          onOllamaModelChange={onOllamaModelChange}
+        />
+        {providerLocked && (
+          <div className="provider-lock-overlay" title="Provider is locked for this session. Generate a new resume to switch providers.">
+            <span className="provider-lock-badge">🔒 Locked for this session</span>
+          </div>
+        )}
+      </div>
 
       {/* Base Resume */}
       <div className="card">

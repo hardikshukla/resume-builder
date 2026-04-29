@@ -15,6 +15,56 @@ function cacheKey(provider: string, apiKey = ''): string {
   return `${provider}:${apiKey.slice(0, 8)}`;
 }
 
+// ── T6.1 — SSRF guard ─────────────────────────────────────────────────────────
+// Blocks requests to internal/loopback/cloud-metadata addresses.
+// Only http and https schemes are permitted.
+const BLOCKED_PATTERNS = [
+  // Loopback — 127.x.x.x and ::1
+  /^127\.\d+\.\d+\.\d+$/,
+  /^::1$/,
+  // RFC 1918 private ranges
+  /^10\.\d+\.\d+\.\d+$/,
+  /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
+  /^192\.168\.\d+\.\d+$/,
+  // Link-local / AWS instance metadata / GCP metadata
+  /^169\.254\.\d+\.\d+$/,
+  // Unique local IPv6
+  /^f[cd][0-9a-f]{2}:/i,
+  // All-zeros and broadcast
+  /^0\.0\.0\.0$/,
+];
+
+function validateOllamaUrl(raw: string): { ok: true; url: URL } | { ok: false; reason: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, reason: 'ollamaUrl is not a valid URL.' };
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { ok: false, reason: 'ollamaUrl must use http or https.' };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block numeric IPs that match internal ranges
+  if (BLOCKED_PATTERNS.some((re) => re.test(hostname))) {
+    return { ok: false, reason: 'ollamaUrl targets a blocked internal address.' };
+  }
+
+  // Block bare "localhost" keyword
+  if (hostname === 'localhost') {
+    // Allow localhost only if explicitly enabled by the server operator
+    if (!process.env.ALLOW_LOCALHOST_OLLAMA) {
+      return { ok: false, reason: 'ollamaUrl: localhost is not permitted from the server. Set ALLOW_LOCALHOST_OLLAMA=1 to enable.' };
+    }
+  }
+
+  return { ok: true, url: parsed };
+}
+
+
 export async function POST(req: NextRequest) {
 
   try {
@@ -100,10 +150,19 @@ export async function POST(req: NextRequest) {
 
     // ── Ollama ────────────────────────────────────────────────────────────────
     if (provider === 'ollama') {
-      const baseUrl =
-        ollamaUrl?.trim() ||
-        process.env.OLLAMA_BASE_URL ||
-        'http://localhost:11434';
+      // User-supplied URL is SSRF-validated; the env-var default is operator-controlled.
+      const rawUrl = ollamaUrl?.trim();
+      let baseUrl: string;
+
+      if (rawUrl) {
+        const check = validateOllamaUrl(rawUrl);
+        if (!check.ok) {
+          return NextResponse.json({ error: check.reason }, { status: 400 });
+        }
+        baseUrl = check.url.origin; // strip any path to avoid confusion
+      } else {
+        baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      }
 
       const res = await fetch(`${baseUrl}/api/tags`).catch((e) => {
         throw new Error(
