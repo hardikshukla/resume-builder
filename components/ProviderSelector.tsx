@@ -2,7 +2,7 @@
 
 import { LLMProvider } from '@/types';
 import { Eye, EyeOff, RefreshCw, ChevronDown } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface ModelEntry { id: string; name: string; }
 
@@ -156,6 +156,42 @@ export function ProviderSelector({
   onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange,
   dropboxToken, onDropboxTokenChange,
 }: ProviderSelectorProps) {
+
+  const [dbxStatus, setDbxStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [dbxMessage, setDbxMessage] = useState<string | null>(null);
+
+  // Reset status when token changes
+  useEffect(() => {
+    if (dbxStatus !== 'idle') {
+      setDbxStatus('idle');
+      setDbxMessage(null);
+    }
+  }, [dropboxToken, dbxStatus]);
+
+  const verifyDropboxToken = async () => {
+    if (!dropboxToken) return;
+    setDbxStatus('verifying');
+    setDbxMessage(null);
+    try {
+      const res = await fetch('/api/dropbox/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: dropboxToken })
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setDbxStatus('success');
+        setDbxMessage(`Connected as ${data.account || 'User'}`);
+      } else {
+        setDbxStatus('error');
+        setDbxMessage(data.error || 'Invalid token');
+      }
+    } catch (error) {
+      setDbxStatus('error');
+      setDbxMessage('Network error during verification');
+    }
+  };
+
   return (
     <div className="card">
       <div className="card-header">
@@ -226,7 +262,33 @@ export function ProviderSelector({
       <div className="dropbox-field-wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
         <KeyField id="dropbox-key" label="Dropbox Access Token (optional)"
           placeholder="sl.B..." value={dropboxToken} onChange={onDropboxTokenChange} />
-        <p className="ollama-note" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+          <button
+            type="button"
+            className={`fetch-models-btn ${dbxStatus === 'verifying' ? 'loading' : ''}`}
+            onClick={verifyDropboxToken}
+            disabled={dbxStatus === 'verifying' || !dropboxToken}
+          >
+            {dbxStatus === 'verifying' ? (
+              <><RefreshCw size={12} className="spin" /> Verifying…</>
+            ) : dbxStatus === 'success' ? (
+              '✅ Verified'
+            ) : dbxStatus === 'error' ? (
+              '❌ Verify again'
+            ) : (
+              'Verify Connection'
+            )}
+          </button>
+          
+          {dbxMessage && (
+            <span style={{ fontSize: '0.75rem', color: dbxStatus === 'success' ? '#4ade80' : '#f87171' }}>
+              {dbxMessage}
+            </span>
+          )}
+        </div>
+
+        <p className="ollama-note" style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-dim)' }}>
           To enable &quot;Save to Dropbox&quot;, generate a Personal Access Token in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer" style={{color: 'var(--accent)'}}>Dropbox App Console</a>.
         </p>
       </div>
