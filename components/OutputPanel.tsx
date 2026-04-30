@@ -100,19 +100,33 @@ function CloudSyncButton({
   useEffect(() => { if (showPrompt) setPendingSkip(skipDropboxPrompt); }, [showPrompt, skipDropboxPrompt]);
 
   const uploadToDropbox = async (blob: Blob, path: string) => {
-    const dbxArgs = { path, mode: 'add', autorename: true, mute: false, strict_conflict: false };
+    const dbxArgs = { path, mode: { '.tag': 'add' }, autorename: true, mute: false, strict_conflict: false };
+    const argHeader = JSON.stringify(dbxArgs)
+      .replace(/[^\x20-\x7E]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+    
     const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${dropboxToken}`,
-        'Dropbox-API-Arg': JSON.stringify(dbxArgs),
+        'Dropbox-API-Arg': argHeader,
         'Content-Type': 'application/octet-stream',
       },
       body: await blob.arrayBuffer(),
     });
     if (!res.ok) {
+      const rawBody = await res.text();
       let errMsg = `Dropbox API error: ${res.status}`;
-      try { const j = await res.json(); errMsg = j.error_summary || errMsg; } catch { /* ignore */ }
+      try {
+        const json = JSON.parse(rawBody);
+        const tag = json?.error?.['.tag'] ?? '';
+        const summary = json?.error_summary ?? '';
+        const scope = json?.error?.required_scope ?? '';
+        if (tag === 'missing_scope') {
+          errMsg = `Token is missing the "${scope || 'files.content.write'}" permission. Go to Dropbox App Console -> Permissions -> enable it, then generate a new token.`;
+        } else {
+          errMsg = `Dropbox ${res.status}: ${summary || tag}`;
+        }
+      } catch { /* ignore */ }
       throw new Error(errMsg);
     }
   };
@@ -166,7 +180,12 @@ function CloudSyncButton({
         className="download-btn cloud-sync-btn"
         onClick={handleSync}
         disabled={loading}
-        style={{ background: 'var(--accent)', color: 'white', borderColor: 'var(--accent)' }}
+        style={{ 
+          background: success ? 'var(--success, #10b981)' : 'var(--accent)', 
+          color: 'white', 
+          borderColor: success ? 'var(--success, #10b981)' : 'var(--accent)',
+          transition: 'all 0.2s ease'
+        }}
       >
         {loading ? <Loader2 size={16} className="spin" /> : success ? <CheckCircle2 size={16} /> : <Cloud size={16} />}
         {loading ? 'Saving…' : success ? 'Saved to Dropbox!' : 'Save All to Dropbox'}
