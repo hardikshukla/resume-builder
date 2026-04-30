@@ -227,7 +227,7 @@ export function ProviderSelector({
         <KeyField id="dropbox-key" label="Dropbox Access Token (optional)"
           placeholder="sl.B..." value={dropboxToken} onChange={onDropboxTokenChange} />
         <p className="ollama-note" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
-          To enable "Save to Dropbox", generate a Personal Access Token in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer" style={{color: 'var(--accent)'}}>Dropbox App Console</a>.
+          To enable &quot;Save to Dropbox&quot;, generate a Personal Access Token in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer" style={{color: 'var(--accent)'}}>Dropbox App Console</a>.
         </p>
       </div>
 
