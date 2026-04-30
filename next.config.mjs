@@ -44,6 +44,15 @@ const nextConfig = {
       },
     ];
   },
+  webpack: (config) => {
+    // Suppress the @opentelemetry "Critical dependency" Webpack warnings caused by Sentry
+    config.ignoreWarnings = [
+      { module: /node_modules\/@opentelemetry/ },
+      { module: /node_modules\/@sentry/ },
+      { module: /node_modules\/@prisma\/instrumentation/ }
+    ];
+    return config;
+  },
 };
 
 export default nextConfig;
