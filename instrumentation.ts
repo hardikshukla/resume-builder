@@ -18,6 +18,7 @@ export async function register() {
           const data = event.request.data as Record<string, unknown>;
           if (data.anthropicKey) data.anthropicKey = '[REDACTED]';
           if (data.openaiKey)    data.openaiKey    = '[REDACTED]';
+          if (data.dropboxToken) data.dropboxToken = '[REDACTED]';
         }
         return event;
       },

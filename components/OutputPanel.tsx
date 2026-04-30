@@ -2,6 +2,8 @@
 
 import { CoverLetterData, GapAnalysis, MissingKeyword, ResumeBuilderOutput, ResumeData } from '@/types';
 import { DownloadButton } from './DownloadButton';
+import { generateResumeDOCX } from '@/lib/docxGenerator';
+import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { useState, useEffect, useRef } from 'react';
 import {
   CheckCircle2,
@@ -21,6 +23,8 @@ import {
   FileText,
   RotateCcw,
   Plus,
+  Cloud,
+  Loader2,
 } from 'lucide-react';
 
 interface OutputPanelProps {
@@ -39,6 +43,166 @@ interface OutputPanelProps {
   originalResume?: ResumeData;
   originalCoverLetter?: CoverLetterData;
   onRevert: () => void;
+  dropboxToken: string;
+  skipDropboxPrompt: boolean;
+  setSkipDropboxPrompt: (v: boolean) => void;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function toCamelCase(str: string): string {
+  return str.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join('');
+}
+function toPascalCase(str: string): string {
+  return str.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+}
+function sanitizeFilename(raw: string): string {
+  return raw.replace(/\.\./g, '').replace(/[/\\]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1f\x7f]/g, '').replace(/[^\w\s\-().+]/g, '')
+    .replace(/\s+/g, '_').slice(0, 80) || 'document';
+}
+function getTimestampStr() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const full = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return { date, full };
+}
+
+// ── Cloud Sync Button (client-side upload — token never leaves the browser) ───
+function CloudSyncButton({
+  data,
+  companyName,
+  dropboxToken,
+  skipDropboxPrompt,
+  setSkipDropboxPrompt,
+  onLocalDownload,
+}: {
+  data: ResumeBuilderOutput;
+  companyName?: string;
+  dropboxToken: string;
+  skipDropboxPrompt: boolean;
+  setSkipDropboxPrompt: (v: boolean) => void;
+  /** Called to fall back to local download when user declines Dropbox */
+  onLocalDownload: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Track checkbox in the modal without closing it prematurely
+  const [pendingSkip, setPendingSkip] = useState(skipDropboxPrompt);
+
+  // Sync pendingSkip whenever the modal is opened
+  useEffect(() => { if (showPrompt) setPendingSkip(skipDropboxPrompt); }, [showPrompt, skipDropboxPrompt]);
+
+  const uploadToDropbox = async (blob: Blob, path: string) => {
+    const dbxArgs = { path, mode: 'add', autorename: true, mute: false, strict_conflict: false };
+    const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${dropboxToken}`,
+        'Dropbox-API-Arg': JSON.stringify(dbxArgs),
+        'Content-Type': 'application/octet-stream',
+      },
+      body: await blob.arrayBuffer(),
+    });
+    if (!res.ok) {
+      let errMsg = `Dropbox API error: ${res.status}`;
+      try { const j = await res.json(); errMsg = j.error_summary || errMsg; } catch { /* ignore */ }
+      throw new Error(errMsg);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!dropboxToken) {
+      if (skipDropboxPrompt) { onLocalDownload(); } else { setShowPrompt(true); }
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      const { resume, coverLetter, gapAnalysis } = data;
+      const rawCompany = companyName?.trim() || gapAnalysis.extractedCompanyName?.trim();
+      const ts = getTimestampStr();
+      const folderPath = rawCompany
+        ? `/resumeBuilder/${toCamelCase(rawCompany)}`
+        : `/resumeBuilder/general/${ts.date}`;
+      const baseName = toCamelCase(resume.name || 'candidate');
+      const companySuffix = rawCompany ? `+${toPascalCase(rawCompany)}` : '';
+      const resumeFilename  = sanitizeFilename(`${baseName}Resume${companySuffix}_${ts.full}`) + '.docx';
+      const coverFilename   = sanitizeFilename(`${baseName}CoverLetter${companySuffix}_${ts.full}`) + '.docx';
+
+      // Generate entirely in-browser — token never leaves the client
+      const [resumeBlob, coverBlob] = await Promise.all([
+        generateResumeDOCX(resume),
+        generateCoverLetterDOCX(coverLetter, resume, rawCompany),
+      ]);
+
+      // Upload directly from browser to Dropbox — no backend hop
+      await Promise.all([
+        uploadToDropbox(resumeBlob, `${folderPath}/${resumeFilename}`),
+        uploadToDropbox(coverBlob,  `${folderPath}/${coverFilename}`),
+      ]);
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="download-btn-wrap" style={{ marginLeft: '12px' }}>
+      <button
+        className="download-btn cloud-sync-btn"
+        onClick={handleSync}
+        disabled={loading}
+        style={{ background: 'var(--accent)', color: 'white', borderColor: 'var(--accent)' }}
+      >
+        {loading ? <Loader2 size={16} className="spin" /> : success ? <CheckCircle2 size={16} /> : <Cloud size={16} />}
+        {loading ? 'Saving…' : success ? 'Saved to Dropbox!' : 'Save All to Dropbox'}
+      </button>
+      {error && <p className="download-error">{error}</p>}
+
+      {showPrompt && (
+        <div className="modal-overlay">
+          <div className="card prompt-modal">
+            <h3 style={{ marginTop: 0, marginBottom: '8px' }}>Save to Dropbox?</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '16px' }}>
+              To auto-sync your Resume and Cover Letter, add a Dropbox Access Token in the
+              AI Provider settings panel. Files upload directly from your browser — the token
+              never leaves your device.
+            </p>
+            <label className="refine-label" style={{ marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                defaultChecked={pendingSkip}
+                onChange={(e) => setPendingSkip(e.target.checked)}
+              />
+              <span style={{ fontSize: '13px' }}>Don’t ask me again — I prefer local downloads</span>
+            </label>
+            <div className="refine-action-row" style={{ justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="view-toggle-btn" onClick={() => setShowPrompt(false)}>Cancel</button>
+              <button className="refine-btn" onClick={() => {
+                setSkipDropboxPrompt(pendingSkip);
+                setShowPrompt(false);
+                onLocalDownload();
+              }}>Download Locally</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── View Toggle (Original | Updated) ────────────────────────────────────────────
@@ -643,6 +807,7 @@ function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'] }) {
 export function OutputPanel({
   data, companyName, onRefine, isRefining,
   hasRefined, appliedRecs, originalMatchScore, originalResume, originalCoverLetter, onRevert,
+  dropboxToken, skipDropboxPrompt, setSkipDropboxPrompt
 }: OutputPanelProps) {
   const { result, providerUsed, fallbackOccurred, fallbackReason } = data;
   const { gapAnalysis, resume, coverLetter } = result;
@@ -657,6 +822,31 @@ export function OutputPanel({
   // Active result for download (reflects the card's current toggle)
   const resumeDownloadData      = { ...result, resume:      activeResume };
   const coverLetterDownloadData = { ...result, coverLetter: activeCoverLetter };
+
+  // Fallback: trigger both standard server-side downloads without going through Dropbox
+  const handleLocalDownload = async () => {
+    const doDownload = async (type: 'resume' | 'coverLetter', data: typeof result, name: string) => {
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, data, companyName }),
+        });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') ?? '';
+        const match = disposition.match(/filename="(.+?)"/);
+        const filename = match?.[1] ?? name;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch { /* silent — network errors */ }
+    };
+    await doDownload('resume',      resumeDownloadData,      'resume.docx');
+    await doDownload('coverLetter', coverLetterDownloadData, 'coverLetter.docx');
+  };
 
   return (
     <div className="output-panel">
@@ -751,6 +941,14 @@ export function OutputPanel({
         <ResumePreview resume={activeResume} />
         <div className="download-row">
           <DownloadButton type="resume" data={resumeDownloadData} companyName={companyName} />
+          <CloudSyncButton 
+            data={result} 
+            companyName={companyName} 
+            dropboxToken={dropboxToken} 
+            skipDropboxPrompt={skipDropboxPrompt} 
+            setSkipDropboxPrompt={setSkipDropboxPrompt}
+            onLocalDownload={handleLocalDownload}
+          />
         </div>
       </div>
 

@@ -19,6 +19,8 @@ interface ProviderSelectorProps {
   onAnthropicModelChange: (m: string) => void;
   onOpenaiModelChange: (m: string) => void;
   onOllamaModelChange: (m: string) => void;
+  dropboxToken: string;
+  onDropboxTokenChange: (k: string) => void;
 }
 
 const PROVIDERS: { value: LLMProvider; label: string; badge: string; color: string }[] = [
@@ -152,6 +154,7 @@ export function ProviderSelector({
   anthropicModel, openaiModel, ollamaModel,
   onProviderChange, onAnthropicKeyChange, onOpenaiKeyChange,
   onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange,
+  dropboxToken, onDropboxTokenChange,
 }: ProviderSelectorProps) {
   return (
     <div className="card">
@@ -218,6 +221,14 @@ export function ProviderSelector({
             selectedModel={ollamaModel} onModelChange={onOllamaModelChange}
             placeholder="llama3 (or click Fetch models)" />
         </>)}
+      </div>
+
+      <div className="dropbox-field-wrap" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
+        <KeyField id="dropbox-key" label="Dropbox Access Token (optional)"
+          placeholder="sl.B..." value={dropboxToken} onChange={onDropboxTokenChange} />
+        <p className="ollama-note" style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-dim)' }}>
+          To enable "Save to Dropbox", generate a Personal Access Token in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer" style={{color: 'var(--accent)'}}>Dropbox App Console</a>.
+        </p>
       </div>
 
       <p className="key-security-note">

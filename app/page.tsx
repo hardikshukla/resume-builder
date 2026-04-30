@@ -5,9 +5,18 @@ import { useGenerate }       from '@/hooks/useGenerate';
 import { useRefine }         from '@/hooks/useRefine';
 import { ResumeForm }        from '@/components/ResumeForm';
 import { OutputPanel }       from '@/components/OutputPanel';
-import { Sparkles, ExternalLink } from 'lucide-react';
+import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
+import { Sparkles, ExternalLink, Lock } from 'lucide-react';
+import { useState } from 'react';
 
 export default function Home() {
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
+  useInactivityTimeout(20, () => {
+    sessionStorage.clear();
+    setIsSessionExpired(true);
+  });
+
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const config = useProviderConfig();
 
@@ -77,6 +86,8 @@ export default function Home() {
             onAnthropicModelChange={config.setAnthropicModel}
             onOpenaiModelChange={config.setOpenaiModel}
             onOllamaModelChange={config.setOllamaModel}
+            dropboxToken={config.dropboxToken}
+            onDropboxTokenChange={config.setDropboxToken}
             onSubmit={handleGenerate}
           />
         </section>
@@ -144,6 +155,9 @@ export default function Home() {
               originalResume={originalOutput?.result.resume}
               originalCoverLetter={originalOutput?.result.coverLetter}
               onRevert={handleRevert}
+              dropboxToken={config.dropboxToken}
+              skipDropboxPrompt={config.skipDropboxPrompt}
+              setSkipDropboxPrompt={config.setSkipDropboxPrompt}
             />
           )}
         </section>
@@ -152,6 +166,22 @@ export default function Home() {
       <footer className="app-footer">
         <p>API keys stored in session only · Never logged or persisted server-side</p>
       </footer>
+
+      {isSessionExpired && (
+        <div className="session-expired-overlay">
+          <div className="session-expired-modal card">
+            <div className="card-icon"><Lock size={32} /></div>
+            <h2>Session Expired</h2>
+            <p>
+              For your security, your session was closed due to 20 minutes of inactivity. 
+              Your API keys and data have been safely wiped from memory.
+            </p>
+            <button className="generate-btn active" onClick={() => window.location.reload()} style={{ marginTop: '20px' }}>
+              Start New Session
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

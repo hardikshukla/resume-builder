@@ -48,6 +48,7 @@ Before writing, silently extract from the job description:
 3. Role-level signals — senior, lead, architect, IC?
 4. Domain signals — industry, platform type, scale
 5. Action verbs the JD uses (design, deploy, lead, deliver)
+6. Company Name — look for the hiring company's name in the text.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — KEYWORD GAP ANALYSIS
@@ -115,6 +116,7 @@ After rewriting, populate these gapAnalysis fields:
 - missingKeywords  → structured array for all MISSING keywords (never embedded in resume):
                      { keyword, suggestedSection, suggestedBullet } per entry
 - summaryChanges   → one sentence: what changed in the summary and why
+- extractedCompanyName → the name of the hiring company extracted from the JD (or null if not found)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NON-NEGOTIABLE RULES
@@ -151,7 +153,8 @@ Write each entry ONCE. Never repeat or loop any array element.
         "suggestedBullet": "a realistic bullet the candidate could adapt if they have this experience"
       }
     ],
-    "summaryChanges": "one sentence explaining what changed in the Summary and why"
+    "summaryChanges": "one sentence explaining what changed in the Summary and why",
+    "extractedCompanyName": "name of the hiring company extracted from the JD, or null if not found"
   },
   "resume": {
     "name": string,

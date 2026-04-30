@@ -38,7 +38,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self' https://api.anthropic.com https://api.openai.com https://o1.ingest.sentry.io",
+      "connect-src 'self' https://api.anthropic.com https://api.openai.com https://o1.ingest.sentry.io https://content.dropboxapi.com https://api.dropboxapi.com",
       "worker-src blob:",
       "object-src 'none'",
       "base-uri 'self'",

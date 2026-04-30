@@ -33,8 +33,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Per-route window config
 const ROUTES: Record<string, { limit: number; windowMs: number }> = {
-  '/api/generate': { limit: 5,  windowMs: 60_000 },
-  '/api/refine':   { limit: 15, windowMs: 60_000 },
+  '/api/generate':     { limit: 5,  windowMs: 60_000 },
+  '/api/refine':       { limit: 15, windowMs: 60_000 },
+  '/api/dropbox/sync': { limit: 5,  windowMs: 60_000 },
 };
 
 interface WindowEntry {
@@ -112,5 +113,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/generate', '/api/refine'],
+  matcher: ['/api/generate', '/api/refine', '/api/dropbox/sync'],
 };

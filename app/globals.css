@@ -1428,3 +1428,47 @@ body {
     padding-right: 0;
   }
 }
+
+/* ─── Overlays & Modals ──────────────────────────────────────────────────── */
+.session-expired-overlay, .modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(13, 15, 20, 0.75);
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.session-expired-modal {
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+  animation: fade-in-up 0.3s ease-out;
+}
+
+.session-expired-modal .card-icon {
+  margin: 0 auto 16px;
+  width: 56px; height: 56px;
+  font-size: 24px;
+}
+
+.session-expired-modal p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.prompt-modal {
+  max-width: 480px;
+  width: 100%;
+  animation: fade-in-up 0.3s ease-out;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

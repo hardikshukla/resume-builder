@@ -45,6 +45,7 @@ export interface GapAnalysis {
   keywordsAdded: string[];          // Implied keywords that were woven into the rewrite
   missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
+  extractedCompanyName?: string;     // Extracted company name from the JD
 }
 
 export interface ContactInfo {
@@ -153,4 +154,10 @@ export interface RefineResponse {
     updatedMatchScore?: number; // Re-evaluated ATS score after applying improvements
   };
   error?: string;
+}
+
+export interface DropboxSyncRequest {
+  resumeData: ResumeBuilderOutput;
+  companyName?: string;
+  dropboxToken: string;
 }

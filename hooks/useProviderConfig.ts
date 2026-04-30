@@ -11,6 +11,8 @@ const KEYS = {
   anthropicModel: 'rb_model_anthropic',
   openaiModel:    'rb_model_openai',
   ollamaModel:    'rb_model_ollama',
+  dropboxToken:   'rb_dropbox_token',
+  skipDropbox:    'rb_skip_dropbox_prompt',
 };
 
 export interface ProviderConfig {
@@ -35,6 +37,11 @@ export interface ProviderConfig {
   lockProvider:           () => void;
   /** Call to unlock (e.g. user clicks "Reset" or starts a new generation) */
   unlockProvider:         () => void;
+  
+  dropboxToken:           string;
+  setDropboxToken:        (v: string) => void;
+  skipDropboxPrompt:      boolean;
+  setSkipDropboxPrompt:   (v: boolean) => void;
 }
 
 export function useProviderConfig(): ProviderConfig {
@@ -45,6 +52,8 @@ export function useProviderConfig(): ProviderConfig {
   const [openaiModel,    setOpenaiModel]   = useState('');
   const [ollamaModel,    setOllamaModel]   = useState('');
   const [isLocked,       setIsLocked]      = useState(false);
+  const [dropboxToken,   setDropboxTokenState]  = useState('');
+  const [skipDropboxPrompt, setSkipDropboxState] = useState(false);
 
   // Rehydrate from sessionStorage on mount
   useEffect(() => {
@@ -56,6 +65,8 @@ export function useProviderConfig(): ProviderConfig {
     setAnthropicModel(ss(KEYS.anthropicModel));
     setOpenaiModel(ss(KEYS.openaiModel));
     setOllamaModel(ss(KEYS.ollamaModel));
+    setDropboxTokenState(ss(KEYS.dropboxToken));
+    setSkipDropboxState(ss(KEYS.skipDropbox) === 'true');
   }, []);
 
   const setProvider = useCallback((p: LLMProvider) => {
@@ -91,6 +102,16 @@ export function useProviderConfig(): ProviderConfig {
   const lockProvider   = useCallback(() => setIsLocked(true),  []);
   const unlockProvider = useCallback(() => setIsLocked(false), []);
 
+  const setDropboxToken = useCallback((v: string) => {
+    setDropboxTokenState(v);
+    sessionStorage.setItem(KEYS.dropboxToken, v);
+  }, []);
+
+  const setSkipDropboxPrompt = useCallback((v: boolean) => {
+    setSkipDropboxState(v);
+    sessionStorage.setItem(KEYS.skipDropbox, v ? 'true' : 'false');
+  }, []);
+
   return {
     provider,
     anthropicKey,
@@ -107,5 +128,9 @@ export function useProviderConfig(): ProviderConfig {
     setOllamaModel:    handleOllamaModel,
     lockProvider,
     unlockProvider,
+    dropboxToken,
+    setDropboxToken,
+    skipDropboxPrompt,
+    setSkipDropboxPrompt,
   };
 }

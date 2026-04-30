@@ -28,6 +28,8 @@ interface ResumeFormProps {
   onAnthropicModelChange: (m: string) => void;
   onOpenaiModelChange: (m: string) => void;
   onOllamaModelChange: (m: string) => void;
+  dropboxToken: string;
+  onDropboxTokenChange: (k: string) => void;
   onSubmit: () => void;
 }
 
@@ -40,6 +42,7 @@ export function ResumeForm({
   onResumeChange, onJobDescriptionChange, onCompanyNameChange,
   onProviderChange, onAnthropicKeyChange, onOpenaiKeyChange,
   onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange,
+  dropboxToken, onDropboxTokenChange,
   onSubmit,
 }: ResumeFormProps) {
   const hasKey =
@@ -84,6 +87,8 @@ export function ResumeForm({
           onAnthropicModelChange={onAnthropicModelChange}
           onOpenaiModelChange={onOpenaiModelChange}
           onOllamaModelChange={onOllamaModelChange}
+          dropboxToken={dropboxToken}
+          onDropboxTokenChange={onDropboxTokenChange}
         />
         {providerLocked && (
           <div className="provider-lock-overlay" title="Provider is locked for this session. Generate a new resume to switch providers.">
