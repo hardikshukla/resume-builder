@@ -27,7 +27,7 @@ export async function POST(req: Request) {
         if (errorJson.error_summary) {
           errorMessage = errorJson.error_summary;
         }
-      } catch (e) {
+      } catch {
         // Fallback to text if not JSON
       }
       return NextResponse.json({ valid: false, error: errorMessage }, { status: 401 });

@@ -162,11 +162,9 @@ export function ProviderSelector({
 
   // Reset status when token changes
   useEffect(() => {
-    if (dbxStatus !== 'idle') {
-      setDbxStatus('idle');
-      setDbxMessage(null);
-    }
-  }, [dropboxToken, dbxStatus]);
+    setDbxStatus('idle');
+    setDbxMessage(null);
+  }, [dropboxToken]);
 
   const verifyDropboxToken = async () => {
     if (!dropboxToken) return;
@@ -186,7 +184,7 @@ export function ProviderSelector({
         setDbxStatus('error');
         setDbxMessage(data.error || 'Invalid token');
       }
-    } catch (error) {
+    } catch {
       setDbxStatus('error');
       setDbxMessage('Network error during verification');
     }
