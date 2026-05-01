@@ -140,16 +140,17 @@ function CloudSyncButton({
       const coverFilename   = sanitizeFilename(`${baseName}CoverLetter${companySuffix}_${ts.full}`) + '.docx';
 
       // Generate entirely in-browser — token never leaves the client
-      const [resumeBlob, coverBlob] = await Promise.all([
-        generateResumeDOCX(resume),
-        generateCoverLetterDOCX(coverLetter, resume, rawCompany),
-      ]);
+      const resumeBlob = await generateResumeDOCX(resume);
 
-      // Upload directly from browser to Dropbox — no backend hop
-      await Promise.all([
+      // Upload resume; cover letter only if it was generated
+      const uploads: Promise<void>[] = [
         uploadToDropbox(resumeBlob, `${folderPath}/${resumeFilename}`),
-        uploadToDropbox(coverBlob,  `${folderPath}/${coverFilename}`),
-      ]);
+      ];
+      if (coverLetter) {
+        const coverBlob = await generateCoverLetterDOCX(coverLetter, resume, rawCompany);
+        uploads.push(uploadToDropbox(coverBlob, `${folderPath}/${coverFilename}`));
+      }
+      await Promise.all(uploads);
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -821,7 +822,7 @@ export function OutputPanel({
   const activeCoverLetter = coverLetterView === 'original' && originalCoverLetter ? originalCoverLetter : coverLetter;
   // Active result for download (reflects the card's current toggle)
   const resumeDownloadData      = { ...result, resume:      activeResume };
-  const coverLetterDownloadData = { ...result, coverLetter: activeCoverLetter };
+  const coverLetterDownloadData = { ...result, coverLetter: activeCoverLetter ?? { subject: '', body: '' } };
 
   // Fallback: trigger both standard server-side downloads without going through Dropbox
   const handleLocalDownload = async () => {
@@ -961,21 +962,30 @@ export function OutputPanel({
             <ViewToggle view={coverLetterView} onChange={(v) => { setCoverLetterView(v); }} />
           )}
         </div>
-        <div className="cover-preview">
-          <div className="cover-subject">Re: {activeCoverLetter.subject}</div>
-          <div className="cover-body">
-            {activeCoverLetter.body.split('\n').filter(Boolean).map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
+        {activeCoverLetter ? (
+          <>
+            <div className="cover-preview">
+              <div className="cover-subject">Re: {activeCoverLetter.subject}</div>
+              <div className="cover-body">
+                {activeCoverLetter.body.split('\n').filter(Boolean).map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+            </div>
+            <div className="download-row">
+              <DownloadButton
+                type="coverLetter"
+                data={coverLetterDownloadData}
+                companyName={companyName}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="cover-missing-notice">
+            ⚠️ Cover letter was not generated this time (the resume was too long for one pass).
+            Use <strong>Apply &amp; Refine</strong> with a recommendation selected to generate it.
           </div>
-        </div>
-        <div className="download-row">
-          <DownloadButton
-            type="coverLetter"
-            data={coverLetterDownloadData}
-            companyName={companyName}
-          />
-        </div>
+        )}
       </div>
     </div>
   );

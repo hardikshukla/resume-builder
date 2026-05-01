@@ -106,7 +106,7 @@ export interface CoverLetterData {
 export interface ResumeBuilderOutput {
   gapAnalysis: GapAnalysis;
   resume: ResumeData;
-  coverLetter: CoverLetterData;
+  coverLetter?: CoverLetterData;  // optional — present in normal generation, may be absent if truncated
 }
 
 // ── API Types ─────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ export async function callAnthropic(
   try {
     response = await client.messages.create({
       model,
-      max_tokens: 8192,
+      max_tokens: 16000,   // increased from 8192 — long resumes + cover letter need headroom
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     });

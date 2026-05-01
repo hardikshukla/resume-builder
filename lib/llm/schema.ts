@@ -85,7 +85,7 @@ export const ResumeBuilderOutputSchema = z.object({
   coverLetter: z.object({
     subject: z.string(),
     body:    z.string(),
-  }),
+  }).optional(),
 });
 
 export type ValidatedResumeBuilderOutput = z.infer<typeof ResumeBuilderOutputSchema>;

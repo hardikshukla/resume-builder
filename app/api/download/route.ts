@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
     if (body.type === 'resume') {
       blob = await generateResumeDOCX(body.data.resume);
     } else {
+      if (!body.data.coverLetter) {
+        return NextResponse.json(
+          { error: 'Cover letter was not generated. Please generate the resume again.' },
+          { status: 400 }
+        );
+      }
       blob = await generateCoverLetterDOCX(
         body.data.coverLetter,
         body.data.resume,
