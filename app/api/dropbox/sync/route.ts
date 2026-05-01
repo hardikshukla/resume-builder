@@ -90,7 +90,6 @@ export async function POST(req: NextRequest) {
 
     // 4. Generate DOCX Blobs in-memory
     const resumeBlob = await generateResumeDOCX(resume);
-    const coverBlob = await generateCoverLetterDOCX(coverLetter, resume, rawCompany);
 
     console.log('[dropbox/sync] Upload plan:', {
       folderPath,
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
       coverFilename,
       tokenPrefix: dropboxToken.slice(0, 12) + '...',
       resumeBytes: (await resumeBlob.arrayBuffer()).byteLength,
-      coverBytes:  (await coverBlob.arrayBuffer()).byteLength,
+      hasCoverLetter: !!coverLetter,
     });
 
     // 5. Upload to Dropbox
@@ -162,11 +161,13 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Upload both files simultaneously
-    await Promise.all([
-      uploadToDropbox(resumeBlob, resumeFilename),
-      uploadToDropbox(coverBlob, coverFilename)
-    ]);
+    // Upload resume always; cover letter only if generated
+    const uploads: Promise<void>[] = [uploadToDropbox(resumeBlob, resumeFilename)];
+    if (coverLetter) {
+      const coverBlob = await generateCoverLetterDOCX(coverLetter, resume, rawCompany);
+      uploads.push(uploadToDropbox(coverBlob, coverFilename));
+    }
+    await Promise.all(uploads);
 
     return NextResponse.json({ success: true, folder: folderPath });
 

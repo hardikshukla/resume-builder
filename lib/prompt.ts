@@ -119,6 +119,16 @@ After rewriting, populate these gapAnalysis fields:
 - extractedCompanyName → the name of the hiring company extracted from the JD (or null if not found)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — COVER LETTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Write a highly compelling, JD-tailored cover letter that:
+- Highlights the candidate's most relevant achievements based on the JD
+- Demonstrates how their specific experience solves the hiring manager's problem
+- Keeps a professional, direct tone
+- Uses 3-4 paragraphs
+- Does NOT include a salutation (e.g. no "Dear Hiring Manager" — that is handled by the UI)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 NON-NEGOTIABLE RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Truthful only — no fabrication of experience, titles, metrics, or results
@@ -135,8 +145,11 @@ NON-NEGOTIABLE RULES
 OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Return a single valid JSON object with this exact structure.
-Write each entry ONCE. Never repeat or loop any array element.
+CRITICAL — ALL THREE TOP-LEVEL KEYS ARE MANDATORY: "gapAnalysis", "coverLetter", AND "resume".
+You MUST output all three. Do not skip or omit any of them.
+Write each array element ONCE. Never repeat or loop.
+
+Return a single valid JSON object in this EXACT key order:
 
 {
   "gapAnalysis": {
@@ -155,6 +168,10 @@ Write each entry ONCE. Never repeat or loop any array element.
     ],
     "summaryChanges": "one sentence explaining what changed in the Summary and why",
     "extractedCompanyName": "name of the hiring company extracted from the JD, or null if not found"
+  },
+  "coverLetter": {
+    "subject": string — e.g. "Application for [Role] at [Company]",
+    "body": string — 3-4 paragraphs of plain text, NO salutation line (no "Dear Hiring Manager") — start directly with the opening paragraph
   },
   "resume": {
     "name": string,
@@ -188,10 +205,6 @@ Write each entry ONCE. Never repeat or loop any array element.
     "publications": array of strings or omit key entirely — journal papers, books, conference proceedings; include ONLY if present in original resume
     "awards": array of strings or omit key entirely — honours, prizes, fellowships; include ONLY if present in original resume
     "languages": array of strings or omit key entirely — spoken/written languages + proficiency; include ONLY if present in original resume
-  },
-  "coverLetter": {
-    "subject": string,
-    "body": string — 3-4 paragraphs, NO salutation (e.g. no "Dear Hiring Manager") — that is added separately
   }
 }
 
@@ -217,7 +230,7 @@ export function buildUserMessage(
   jd: string,
   companyName?: string
 ): string {
-  return `Please follow the 5-step ATS methodology and return the structured JSON output as specified.
+  return `Please follow the 6-step ATS methodology and return the structured JSON output as specified.
 
 CANDIDATE RESUME:
 ${resume}

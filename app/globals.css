@@ -1206,6 +1206,17 @@ body {
 .cover-body { display: flex; flex-direction: column; gap: 12px; }
 .cover-body p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; }
 
+.cover-missing-notice {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fbbf24;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
 /* ─── Download Button ────────────────────────────────────────────────────── */
 .download-btn-wrap { display: flex; flex-direction: column; gap: 6px; }
 
