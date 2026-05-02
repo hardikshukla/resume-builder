@@ -59,6 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       anthropicModel: body.anthropicModel,
       openaiModel: body.openaiModel,
       ollamaModel: body.ollamaModel,
+      sections: body.sections,
     });
 
     return NextResponse.json({ success: true, data: llmResponse });

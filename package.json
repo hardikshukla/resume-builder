@@ -11,7 +11,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.24.3",
+    "@anthropic-ai/sdk": "^0.92.0",
     "@sentry/nextjs": "^10.51.0",
     "abort-controller": "^3.0.0",
     "docx": "^8.5.0",

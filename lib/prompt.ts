@@ -228,16 +228,16 @@ CRITICAL: Return ONLY the raw JSON object. No explanation, no markdown, no code 
 export function buildUserMessage(
   resume: string,
   jd: string,
-  companyName?: string
+  companyName?: string,
+  sections: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all' = 'all'
 ): string {
-  return `Please follow the 6-step ATS methodology and return the structured JSON output as specified.
+  let msg = `Please follow the 6-step ATS methodology and return the structured JSON output as specified.\n\nJOB DESCRIPTION:\n${jd}\n${companyName ? `COMPANY NAME: ${companyName}` : ''}\n\nCANDIDATE RESUME:\n${resume}`;
 
-CANDIDATE RESUME:
-${resume}
-
-JOB DESCRIPTION:
-${jd}
-${companyName ? `\nCOMPANY NAME: ${companyName}` : ''}`;
+  if (sections !== 'all') {
+    msg += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
+  }
+  
+  return msg;
 }
 
 /**
@@ -246,9 +246,10 @@ ${companyName ? `\nCOMPANY NAME: ${companyName}` : ''}`;
 export function buildPrompt(
   resume: string,
   jd: string,
-  companyName?: string
+  companyName?: string,
+  sections: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all' = 'all'
 ): string {
-  return `${buildSystemPrompt()}\n\n${buildUserMessage(resume, jd, companyName)}`;
+  return `${buildSystemPrompt()}\n\n${buildUserMessage(resume, jd, companyName, sections)}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

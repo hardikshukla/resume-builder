@@ -31,14 +31,14 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
       )}
 
       {/* Skills — categorized */}
-      {resume.skills?.length > 0 && (
+      {(resume.skills || []).length > 0 && (
         <div className="rp-section">
           <div className="rp-section-header">
             <Zap size={14} />
             CORE COMPETENCIES
           </div>
           <div className="rp-skill-categories">
-            {resume.skills.map((group, i) => (
+            {(resume.skills || []).map((group, i) => (
               <div key={i} className="rp-skill-row">
                 <span className="rp-skill-cat">{group.category}:</span>
                 <span className="rp-skill-items">{group.items.join(', ')}</span>
@@ -49,13 +49,13 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
       )}
 
       {/* Experience + nested Projects */}
-      {resume.experience?.length > 0 && (
+      {(resume.experience || []).length > 0 && (
         <div className="rp-section">
           <div className="rp-section-header">
             <Briefcase size={14} />
             EXPERIENCE
           </div>
-          {resume.experience.map((exp, i) => (
+          {(resume.experience || []).map((exp, i) => (
             <div key={i} className="rp-exp-block">
               <div className="rp-exp-meta">
                 <span className="rp-exp-title">{exp.title}</span>
@@ -129,13 +129,13 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
 
 
       {/* Education */}
-      {resume.education?.length > 0 && (
+      {(resume.education || []).length > 0 && (
         <div className="rp-section">
           <div className="rp-section-header">
             <GraduationCap size={14} />
             EDUCATION
           </div>
-          {resume.education.map((edu, i) => (
+          {(resume.education || []).map((edu, i) => (
             <div key={i} className="rp-edu-block">
               <span className="rp-edu-degree">{edu.degree}</span>
               <span className="rp-edu-inst">
@@ -148,14 +148,14 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
       )}
 
       {/* Certifications */}
-      {resume.certifications?.length > 0 && (
+      {(resume.certifications || []).length > 0 && (
         <div className="rp-section">
           <div className="rp-section-header">
             <Award size={14} />
             CERTIFICATIONS
           </div>
           <ul className="rp-bullets">
-            {resume.certifications.map((c, i) => (
+            {(resume.certifications || []).map((c, i) => (
               <li key={i}>{c}</li>
             ))}
           </ul>
