@@ -65,7 +65,7 @@ function validateOllamaUrl(raw: string): { ok: true; url: URL } | { ok: false; r
 }
 
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const { provider, anthropicKey, openaiKey, ollamaUrl } =

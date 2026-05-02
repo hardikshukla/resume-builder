@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import mammoth from 'mammoth';
 import { MAX_FILE_BYTES } from '@/lib/constants';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;

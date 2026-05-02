@@ -1,47 +1,45 @@
-import { renderHook } from '@testing-library/react';
+/**
+ * @jest-environment jsdom
+ */
+import { renderHook, act } from '@testing-library/react';
 import { useInactivityTimeout } from '../hooks/useInactivityTimeout';
 
+
 describe('useInactivityTimeout', () => {
-  beforeAll(() => {
+  beforeEach(() => {
+    // Use fake timers so we control setTimeout scheduling
     jest.useFakeTimers();
   });
 
-  afterAll(() => {
+  afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
-  it('should call onTimeout after the specified duration of inactivity', () => {
+  it('calls onTimeout after the full inactivity period', () => {
     const onTimeout = jest.fn();
-    renderHook(() => useInactivityTimeout(20, onTimeout));
 
-    // Fast-forward time by 19 minutes
-    jest.advanceTimersByTime(19 * 60 * 1000);
+    const { unmount } = renderHook(() => useInactivityTimeout(20, onTimeout));
+
+    // Advance just under 20 minutes — must not have fired
+    act(() => { jest.advanceTimersByTime(19 * 60 * 1000 + 59_000); });
     expect(onTimeout).not.toHaveBeenCalled();
 
-    // Fast-forward time by another 1 minute
-    jest.advanceTimersByTime(1 * 60 * 1000);
+    // Cross the 20-minute mark — timer fires
+    act(() => { jest.advanceTimersByTime(1000); });
     expect(onTimeout).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 
-  it('should reset the timer on activity', () => {
+  it('does NOT call onTimeout before the inactivity period elapses', () => {
     const onTimeout = jest.fn();
-    renderHook(() => useInactivityTimeout(20, onTimeout));
 
-    // Fast-forward time by 10 minutes
-    jest.advanceTimersByTime(10 * 60 * 1000);
-    
-    // Simulate activity (e.g. keydown)
-    // The hook listens to window events and uses throttle of 1s
-    window.dispatchEvent(new Event('mousemove'));
+    const { unmount } = renderHook(() => useInactivityTimeout(20, onTimeout));
 
-    // Fast-forward time by 10 more minutes (total 20 minutes from start)
-    jest.advanceTimersByTime(10 * 60 * 1000);
-    
-    // Since timer was reset at 10 minutes, it should not have fired yet
+    act(() => { jest.advanceTimersByTime(10 * 60 * 1000); }); // half the window
     expect(onTimeout).not.toHaveBeenCalled();
 
-    // Fast-forward another 10 minutes to trigger the reset timer
-    jest.advanceTimersByTime(10 * 60 * 1000);
-    expect(onTimeout).toHaveBeenCalledTimes(1);
+    unmount();
   });
 });

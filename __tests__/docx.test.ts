@@ -28,21 +28,24 @@ const mockResume: ResumeData = {
   summary: 'Experienced software engineer with 8 years in cloud infrastructure.',
   experience: [
     {
-      company:   'Acme Corp',
       title:     'Senior Engineer',
-      dates:     '2020–Present',
+      company:   'Acme Corp',
       location:  'New York, NY',
+      startDate: 'Jan 2020',
+      endDate:   'Present',
       bullets:   [
         'Led migration of monolith to microservices, reducing deployment time by 40%.',
         'Owned AWS infrastructure costing $2M/year.',
       ],
+      tech:     ['AWS', 'Kubernetes', 'TypeScript'],
+      projects: [],
     },
   ],
   education: [
     {
       institution: 'State University',
       degree:      'B.S. Computer Science',
-      dates:       '2012–2016',
+      year:        '2016',
     },
   ],
   skills: [
@@ -53,10 +56,10 @@ const mockResume: ResumeData = {
 };
 
 const mockCoverLetter: CoverLetterData = {
-  salutation: 'Dear Hiring Manager,',
-  body:       'I am excited to apply for the Senior Engineer role at Acme Corp. My experience in cloud infrastructure aligns closely with your requirements.',
-  closing:    'Sincerely,',
+  subject: 'Application for Senior Engineer at Acme Corp',
+  body:    'I am excited to apply for the Senior Engineer role at Acme Corp. My experience in cloud infrastructure aligns closely with your requirements.',
 };
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ export function useInactivityTimeout(timeoutMinutes: number, onTimeout: () => vo
 
   // Use a ref to throttle the event listeners so we don't reset the timer
   // on every single mousemove pixel.
-  const lastActivity = useRef<number>(Date.now());
+  const lastActivity = useRef<number>(0);
   const throttleMs = 1000; // only reset if 1 second has passed since last activity
 
   // To avoid stale closures, keep a fresh ref to onTimeout
