@@ -1,16 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RefineRequest, RefineResponse, ResumeData, CoverLetterData } from '@/types';
+import { RefineResponse, ResumeData, CoverLetterData } from '@/types';
 import { buildRefinePrompt } from '@/lib/prompt';
 import { dispatchRaw } from '@/lib/llm/dispatch';
 import { MAX_RESUME_CHARS } from '@/lib/constants';
 import { guardOutput } from '@/lib/llm/guard';
 import '@/lib/env'; // T7.5 — fail fast if required env vars are missing
 
+import { z } from 'zod';
+
 export const maxDuration = 120;
+
+const RefineBodySchema = z.object({
+  currentOutput: z.any(), // Further validated by JSON size guard
+  selectedRecommendations: z.array(z.string().max(500)).min(1).max(20),
+  provider: z.enum(['anthropic', 'openai', 'ollama']),
+  anthropicKey: z.string().optional(),
+  openaiKey: z.string().optional(),
+  anthropicModel: z.string().optional(),
+  openaiModel: z.string().optional(),
+  ollamaModel: z.string().optional(),
+});
 
 export async function POST(req: NextRequest): Promise<NextResponse<RefineResponse>> {
   try {
-    const body = (await req.json()) as RefineRequest;
+    const rawBody = await req.json();
+    const parsedBody = RefineBodySchema.safeParse(rawBody);
+
+    if (!parsedBody.success) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid request payload. Please ensure recommendations are selected.',
+      }, { status: 400 });
+    }
+
     const {
       currentOutput,
       selectedRecommendations,
@@ -20,11 +42,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
       anthropicModel,
       openaiModel,
       ollamaModel,
-    } = body;
-
-    if (!selectedRecommendations?.length) {
-      return NextResponse.json({ success: false, error: 'No recommendations selected.' });
-    }
+    } = parsedBody.data;
 
     // Guard: serialised resume JSON can be large
     const resumeJson = JSON.stringify(currentOutput?.resume ?? '');

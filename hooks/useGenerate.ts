@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ResumeBuilderOutput } from '@/types';
 import { ProviderConfig } from './useProviderConfig';
 
@@ -38,9 +38,12 @@ export interface UseGenerateReturn {
 }
 
 export function useGenerate(config: ProviderConfig): UseGenerateReturn {
-  const [resume,         setResume]          = useState(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(LOCAL_RESUME) ?? '' : ''
-  );
+  const [resume,         setResume]          = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCAL_RESUME);
+    if (saved) setResume(saved);
+  }, []);
   const [jobDescription, setJD]             = useState('');
   const [companyName,    setCompany]         = useState('');
   const [output,         setOutput]          = useState<GenerationResult | null>(null);

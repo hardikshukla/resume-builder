@@ -6,7 +6,7 @@ import '@/lib/env'; // T7.5 — fail fast if required env vars are missing
 
 export const maxDuration = 180; // match LLM timeout — large prompts can take 90-120s
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as GenerateRequest;
 
