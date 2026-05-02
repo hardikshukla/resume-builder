@@ -87,8 +87,8 @@ export interface SkillCategory {
 }
 
 export interface ResumeData {
-  name: string;
-  contact: ContactInfo;
+  name?: string;
+  contact?: ContactInfo;
   summary?: string;
   skills?: SkillCategory[];           // grouped: { category, items }
   experience?: ExperienceEntry[];     // projects nested inside each entry

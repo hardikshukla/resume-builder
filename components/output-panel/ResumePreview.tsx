@@ -9,10 +9,10 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
         <div className="rp-name">{resume.name}</div>
         <div className="rp-contact">
           {[
-            resume.contact.email,
-            resume.contact.phone,
-            resume.contact.linkedin,
-            resume.contact.location,
+            resume.contact?.email,
+            resume.contact?.phone,
+            resume.contact?.linkedin,
+            resume.contact?.location,
           ]
             .filter(Boolean)
             .join('  ·  ')}

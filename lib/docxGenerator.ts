@@ -78,10 +78,10 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
 
   // Contact line
   const contactParts: string[] = [];
-  if (resume.contact.email) contactParts.push(resume.contact.email);
-  if (resume.contact.phone) contactParts.push(resume.contact.phone);
-  if (resume.contact.linkedin) contactParts.push(resume.contact.linkedin);
-  if (resume.contact.location) contactParts.push(resume.contact.location);
+  if (resume.contact?.email) contactParts.push(resume.contact.email);
+  if (resume.contact?.phone) contactParts.push(resume.contact.phone);
+  if (resume.contact?.linkedin) contactParts.push(resume.contact.linkedin);
+  if (resume.contact?.location) contactParts.push(resume.contact.location);
 
   children.push(
     new Paragraph({

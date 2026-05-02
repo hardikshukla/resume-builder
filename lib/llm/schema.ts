@@ -65,13 +65,13 @@ export const ResumeBuilderOutputSchema = z.object({
   }),
 
   resume: z.object({
-    name:    z.string(),
+    name:    z.string().optional(),
     contact: z.object({
       email:    z.string(),
       phone:    z.string().nullable(),
       linkedin: z.string().nullable(),
       location: z.string().nullable(),
-    }),
+    }).optional(),
     summary:         z.string().optional(),
     skills:          z.array(SkillGroupSchema).optional(),
     experience:      z.array(ExperienceSchema).optional(),
