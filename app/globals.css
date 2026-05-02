@@ -1,5 +1,5 @@
 /* ─── Fonts ──────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+/* Font is now loaded via next/font/google in layout.tsx */
 
 /* ─── Reset & Base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +28,7 @@
   --shadow:       0 4px 24px rgba(0,0,0,0.4);
   --shadow-lg:    0 8px 40px rgba(0,0,0,0.5);
   --transition:   0.18s ease;
-  --font:         'Inter', system-ui, sans-serif;
+  --font:         var(--font-inter), system-ui, sans-serif;
 }
 
 html { scroll-behavior: smooth; }
@@ -1205,6 +1205,17 @@ body {
 }
 .cover-body { display: flex; flex-direction: column; gap: 12px; }
 .cover-body p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; }
+
+.cover-missing-notice {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  color: #fbbf24;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
 
 /* ─── Download Button ────────────────────────────────────────────────────── */
 .download-btn-wrap { display: flex; flex-direction: column; gap: 6px; }

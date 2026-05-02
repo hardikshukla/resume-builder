@@ -19,6 +19,8 @@ One click generates a tailored resume, gap analysis, cover letter — all downlo
 | **Cover Letter** | 3–4 paragraph letter tailored to the JD and company |
 | **`.docx` Download** | ATS-clean Word files; Download respects the active Original/Updated view |
 | **Multi-Provider LLM** | Anthropic → OpenAI → Ollama with auto-fallback and banner notification |
+| **Cost & Latency Optimized** | Native Prompt Caching (Anthropic) and automatic message caching (OpenAI) for efficient token usage and multi-turn refinement |
+| **Dropbox Sync** | Zero-Data-Liability integration to securely save generated `.docx` files directly to your Dropbox |
 | **Your key, your data** | API keys in `sessionStorage` only — never logged or persisted server-side |
 | **Rate Limiting** | 5 generates / min · 15 refines / min per IP — friendly 429 countdown message |
 
@@ -75,6 +77,8 @@ Copy `.env.example` → `.env.local`. All values are optional with sensible defa
 | `/api/download` | `POST` | Streams a `.docx` blob for resume or cover letter |
 | `/api/parse-resume` | `POST` | Extracts plain text from an uploaded PDF or DOCX |
 | `/api/models` | `POST` | Lists available models for the selected provider (cached 60s per user) |
+| `/api/dropbox/verify` | `POST` | Validates the user's Dropbox personal access token |
+| `/api/dropbox/sync` | `POST` | Uploads the generated `.docx` files directly to the user's Dropbox |
 
 ### Rate Limits (middleware.ts)
 
@@ -87,19 +91,73 @@ Returns `429` with `Retry-After` header and a `retryAfterSeconds` field in the J
 
 ---
 
-## 🔀 LLM Fallback Chain
+## 🔄 System Workflows
 
-```
-User selects provider (e.g. Anthropic)
-  ↓ fails (timeout / auth error / rate limit)
-OpenAI GPT-4o
-  ↓ fails
-Ollama (local)
-  ↓ fails
-Error shown with details
+### Core Generation & Refinement Flow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Browser UI
+    participant API as Next.js API
+    participant LLM as AI Provider
+    participant DBX as Dropbox API
+
+    opt Resume Upload (Optional)
+        U->>UI: Upload PDF or DOCX
+        UI->>API: POST /api/parse-resume
+        API-->>UI: Return Extracted Text
+    end
+
+    U->>UI: Input JD & Resume text
+    UI->>API: POST /api/generate
+    API->>LLM: Analyze & Generate (Prompt Cached)
+    LLM-->>API: Return Structured JSON
+    API-->>UI: Display Resume, Cover Letter & Gap Analysis
+    
+    opt Selective Refinement
+        U->>UI: Select specific Gap Recommendations
+        UI->>API: POST /api/refine (Sends original data)
+        API->>LLM: Target specific section (Message Cached)
+        LLM-->>API: Return Updated Section
+        API-->>UI: Seamlessly update UI component
+    end
+    
+    opt Local Download
+        U->>UI: Click Download
+        UI->>API: POST /api/download
+        API->>API: Generate `.docx` (Resume or Cover Letter)
+        API-->>UI: Stream `.docx` file
+    end
+
+    opt Zero-Data-Liability Sync
+        U->>UI: Provide Dropbox PAT & Click Sync
+        UI->>API: POST /api/dropbox/verify (Validate Token)
+        API-->>UI: Token Valid
+        UI->>API: POST /api/dropbox/sync
+        API->>API: Generate `.docx` files in-memory
+        API->>DBX: Direct Upload (No server storage)
+        DBX-->>API: OK
+        API-->>UI: Show Success Banner
+    end
 ```
 
-A banner appears in the UI whenever a fallback provider was used.
+### LLM Fallback Chain
+```mermaid
+graph TD
+    Start([Generate Request]) --> Router{Primary Provider}
+    Router -->|Anthropic| Claude[Claude (e.g. Haiku)]
+    Router -->|OpenAI| GPT[OpenAI (e.g. GPT-4o)]
+    Router -->|Ollama| Local[Local Ollama]
+
+    Claude -- API Error/Rate Limit --> GPT
+    GPT -- API Error/Rate Limit --> Local
+    Local -- Error --> Err([Throw Detailed Error])
+
+    Claude -- Success --> Done([Return Data])
+    GPT -- Success --> Done
+    Local -- Success --> Done
+```
+*A banner automatically appears in the UI whenever a fallback provider was used.*
 
 ---
 
@@ -121,6 +179,8 @@ app/
     download/route.ts     ← DOCX streaming with sanitized filename
     parse-resume/route.ts ← PDF/DOCX text extraction
     models/route.ts       ← Provider model list (SSRF-validated for Ollama)
+    dropbox/verify/route.ts ← Token validation for Dropbox integration
+    dropbox/sync/route.ts ← Secure DOCX upload to Dropbox
 
 components/
   ResumeForm.tsx          ← Left panel: inputs, provider selector (lockable), generate button

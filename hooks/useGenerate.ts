@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSectionCache } from './useSectionCache';
+import { parseSections, SectionKey } from '@/lib/sectionParser';
 import { ResumeBuilderOutput } from '@/types';
 import { ProviderConfig } from './useProviderConfig';
 
@@ -38,9 +40,12 @@ export interface UseGenerateReturn {
 }
 
 export function useGenerate(config: ProviderConfig): UseGenerateReturn {
-  const [resume,         setResume]          = useState(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(LOCAL_RESUME) ?? '' : ''
-  );
+  const [resume,         setResume]          = useState('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem(LOCAL_RESUME);
+    if (saved) setResume(saved);
+  }, []);
   const [jobDescription, setJD]             = useState('');
   const [companyName,    setCompany]         = useState('');
   const [output,         setOutput]          = useState<GenerationResult | null>(null);
@@ -53,6 +58,8 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
     localStorage.setItem(LOCAL_RESUME, v);
   }, []);
 
+  const { getCachedSection, setCachedSection, invalidateSummary } = useSectionCache();
+
   const handleGenerate = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -60,6 +67,29 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
     setOriginalOutput(null);
     config.unlockProvider(); // reset lock so provider can't be changed mid-gen
     try {
+      const parsedSections = parseSections(resume);
+      const sectionsToGenerate: SectionKey[] = [];
+      const cachedData: Partial<Record<SectionKey, any>> = {};
+
+      // 1. Check Cache for all sections
+      for (const [key, text] of Object.entries(parsedSections)) {
+        if (!text) continue;
+        const cached = await getCachedSection(key, text, jobDescription);
+        if (cached) {
+          cachedData[key as SectionKey] = cached;
+        } else {
+          sectionsToGenerate.push(key as SectionKey);
+        }
+      }
+
+      // 2. Summary Invalidation Rule: Always regenerate summary if any other section is regenerating
+      if (sectionsToGenerate.length > 0 && !sectionsToGenerate.includes('summary')) {
+        sectionsToGenerate.push('summary');
+        delete cachedData['summary'];
+        invalidateSummary();
+      }
+
+      // 3. Request API
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +103,7 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
           anthropicModel: config.anthropicModel || undefined,
           openaiModel:    config.openaiModel    || undefined,
           ollamaModel:    config.ollamaModel    || undefined,
+          sections:       sectionsToGenerate.length === 0 ? 'all' : sectionsToGenerate,
         }),
       });
 
@@ -85,8 +116,27 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Generation failed');
 
-      setOutput(json.data);
-      setOriginalOutput(json.data); // locked — never overwritten by refine
+      const data = json.data as GenerationResult;
+
+      // 4. Update Cache with freshly generated sections
+      for (const key of sectionsToGenerate) {
+        const text = parsedSections[key as SectionKey];
+        const freshSectionData = data.result.resume[key as keyof typeof data.result.resume];
+        if (text && freshSectionData) {
+          await setCachedSection(key, text, jobDescription, freshSectionData);
+        }
+      }
+
+      // 5. Merge Cached Data back into the result
+      if (sectionsToGenerate.length > 0) {
+        for (const [key, cachedContent] of Object.entries(cachedData)) {
+           // We cast heavily here since the structure matches the resume object
+           (data.result.resume as any)[key] = cachedContent;
+        }
+      }
+
+      setOutput(data);
+      setOriginalOutput(data); // locked — never overwritten by refine
       setJD('');
       config.lockProvider();        // T5.4: lock provider after successful generation
     } catch (e) {

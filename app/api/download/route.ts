@@ -3,46 +3,9 @@ import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { DownloadRequest } from '@/types';
 
-/**
- * Sanitize a string for safe use in a Content-Disposition filename.
- * - Strips path traversal sequences (.. / \)
- * - Removes non-ASCII and control characters
- * - Collapses whitespace to underscores
- * - Caps length at 80 chars to avoid header size limits
- */
-function sanitizeFilename(raw: string): string {
-  return raw
-    .replace(/\.\./g, '')          // block path traversal
-    .replace(/[/\\]/g, '')         // block directory separators
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1f\x7f]/g, '') // strip control chars
-    .replace(/[^\w\s\-().+]/g, '') // only safe ASCII chars (now allowing '+')
-    .replace(/\s+/g, '_')          // spaces → underscores
-    .slice(0, 80)                  // cap length
-    || 'document';                 // fallback if empty after sanitising
-}
+import { toCamelCase, toPascalCase, sanitizeFilename } from '@/lib/utils/string';
 
-function toCamelCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map((word, index) => {
-      const lower = word.toLowerCase();
-      if (index === 0) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join('');
-}
-
-function toPascalCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('');
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as DownloadRequest;
 
@@ -69,6 +32,12 @@ export async function POST(req: NextRequest) {
     if (body.type === 'resume') {
       blob = await generateResumeDOCX(body.data.resume);
     } else {
+      if (!body.data.coverLetter) {
+        return NextResponse.json(
+          { error: 'Cover letter was not generated. Please generate the resume again.' },
+          { status: 400 }
+        );
+      }
       blob = await generateCoverLetterDOCX(
         body.data.coverLetter,
         body.data.resume,

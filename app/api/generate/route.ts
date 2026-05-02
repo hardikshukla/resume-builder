@@ -6,7 +6,7 @@ import '@/lib/env'; // T7.5 — fail fast if required env vars are missing
 
 export const maxDuration = 180; // match LLM timeout — large prompts can take 90-120s
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as GenerateRequest;
 
@@ -31,13 +31,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!body.anthropicKey && !body.openaiKey) {
-
+    if (body.provider !== 'ollama' && !body.anthropicKey && !body.openaiKey) {
       return NextResponse.json(
         {
           success: false,
           error:
-            'At least one API key is required (Anthropic or OpenAI). Ollama needs no key.',
+            'At least one API key is required for Anthropic or OpenAI. Ollama needs no key.',
         },
         { status: 400 }
       );
@@ -59,6 +58,7 @@ export async function POST(req: NextRequest) {
       anthropicModel: body.anthropicModel,
       openaiModel: body.openaiModel,
       ollamaModel: body.ollamaModel,
+      sections: body.sections,
     });
 
     return NextResponse.json({ success: true, data: llmResponse });

@@ -1,6 +1,6 @@
 {
   "name": "resume-builder",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,7 +11,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.24.3",
+    "@anthropic-ai/sdk": "^0.92.0",
     "@sentry/nextjs": "^10.51.0",
     "abort-controller": "^3.0.0",
     "docx": "^8.5.0",
@@ -35,6 +35,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
     "jest-environment-node": "^30.3.0",
     "postcss": "^8",
     "ts-jest": "^29.4.9",

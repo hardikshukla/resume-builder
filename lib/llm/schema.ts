@@ -65,18 +65,18 @@ export const ResumeBuilderOutputSchema = z.object({
   }),
 
   resume: z.object({
-    name:    z.string(),
+    name:    z.string().optional(),
     contact: z.object({
       email:    z.string(),
       phone:    z.string().nullable(),
       linkedin: z.string().nullable(),
       location: z.string().nullable(),
-    }),
-    summary:         z.string(),
-    skills:          z.array(SkillGroupSchema),
-    experience:      z.array(ExperienceSchema),
-    education:       z.array(EducationSchema),
-    certifications:  z.array(z.string()),
+    }).optional(),
+    summary:         z.string().optional(),
+    skills:          z.array(SkillGroupSchema).optional(),
+    experience:      z.array(ExperienceSchema).optional(),
+    education:       z.array(EducationSchema).optional(),
+    certifications:  z.array(z.string()).optional(),
     publications:    z.array(z.string()).optional(),
     awards:          z.array(z.string()).optional(),
     languages:       z.array(z.string()).optional(),
@@ -85,7 +85,7 @@ export const ResumeBuilderOutputSchema = z.object({
   coverLetter: z.object({
     subject: z.string(),
     body:    z.string(),
-  }),
+  }).optional(),
 });
 
 export type ValidatedResumeBuilderOutput = z.infer<typeof ResumeBuilderOutputSchema>;

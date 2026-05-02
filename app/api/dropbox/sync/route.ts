@@ -2,54 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { DropboxSyncRequest } from '@/types';
+import { toCamelCase, toPascalCase, sanitizeFilename, getTimestampStr } from '@/lib/utils/string';
 
-function sanitizeFilename(raw: string): string {
-  return raw
-    .replace(/\.\./g, '')          // block path traversal
-    .replace(/[/\\]/g, '')         // block directory separators
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1f\x7f]/g, '') // strip control chars
-    .replace(/[^\w\s\-().+]/g, '') // only safe ASCII chars (allowing '+')
-    .replace(/\s+/g, '_')          // spaces → underscores
-    .slice(0, 80)                  // cap length
-    || 'document';                 // fallback if empty after sanitising
-}
-
-function toCamelCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map((word, index) => {
-      const lower = word.toLowerCase();
-      if (index === 0) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join('');
-}
-
-function toPascalCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('');
-}
-
-function getTimestampStr() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  return {
-    date: `${year}-${month}-${day}`,
-    full: `${year}${month}${day}_${hours}${minutes}${seconds}`
-  };
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body = (await req.json()) as DropboxSyncRequest;
 
@@ -90,7 +45,6 @@ export async function POST(req: NextRequest) {
 
     // 4. Generate DOCX Blobs in-memory
     const resumeBlob = await generateResumeDOCX(resume);
-    const coverBlob = await generateCoverLetterDOCX(coverLetter, resume, rawCompany);
 
     console.log('[dropbox/sync] Upload plan:', {
       folderPath,
@@ -98,7 +52,7 @@ export async function POST(req: NextRequest) {
       coverFilename,
       tokenPrefix: dropboxToken.slice(0, 12) + '...',
       resumeBytes: (await resumeBlob.arrayBuffer()).byteLength,
-      coverBytes:  (await coverBlob.arrayBuffer()).byteLength,
+      hasCoverLetter: !!coverLetter,
     });
 
     // 5. Upload to Dropbox
@@ -162,11 +116,13 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Upload both files simultaneously
-    await Promise.all([
-      uploadToDropbox(resumeBlob, resumeFilename),
-      uploadToDropbox(coverBlob, coverFilename)
-    ]);
+    // Upload resume always; cover letter only if generated
+    const uploads: Promise<void>[] = [uploadToDropbox(resumeBlob, resumeFilename)];
+    if (coverLetter) {
+      const coverBlob = await generateCoverLetterDOCX(coverLetter, resume, rawCompany);
+      uploads.push(uploadToDropbox(coverBlob, coverFilename));
+    }
+    await Promise.all(uploads);
 
     return NextResponse.json({ success: true, folder: folderPath });
 

@@ -12,6 +12,7 @@ export interface LLMRequest {
   anthropicModel?: string;  // overrides ANTHROPIC_MODEL env var
   openaiModel?: string;     // overrides OPENAI_MODEL env var
   ollamaModel?: string;     // overrides OLLAMA_MODEL env var
+  sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
 }
 
 export interface LLMResponse {
@@ -86,13 +87,13 @@ export interface SkillCategory {
 }
 
 export interface ResumeData {
-  name: string;
-  contact: ContactInfo;
-  summary: string;
-  skills: SkillCategory[];           // grouped: { category, items }
-  experience: ExperienceEntry[];     // projects nested inside each entry
-  education: EducationEntry[];
-  certifications: string[];
+  name?: string;
+  contact?: ContactInfo;
+  summary?: string;
+  skills?: SkillCategory[];           // grouped: { category, items }
+  experience?: ExperienceEntry[];     // projects nested inside each entry
+  education?: EducationEntry[];
+  certifications?: string[];
   publications?: string[];           // journal papers, books, conference proceedings
   awards?: string[];                 // honours, prizes, fellowships
   languages?: string[];              // spoken/written languages + proficiency
@@ -106,7 +107,7 @@ export interface CoverLetterData {
 export interface ResumeBuilderOutput {
   gapAnalysis: GapAnalysis;
   resume: ResumeData;
-  coverLetter: CoverLetterData;
+  coverLetter?: CoverLetterData;  // optional — present in normal generation, may be absent if truncated
 }
 
 // ── API Types ─────────────────────────────────────────────────────────────────
@@ -121,6 +122,7 @@ export interface GenerateRequest {
   anthropicModel?: string;
   openaiModel?: string;
   ollamaModel?: string;
+  sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
 }
 
 export interface GenerateResponse {
