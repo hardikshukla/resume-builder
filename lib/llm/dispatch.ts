@@ -45,7 +45,7 @@ export async function dispatchRaw(
     const response = await client.messages.create({
       model,
       max_tokens: 8000,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] }],
     });
 
     if (response.stop_reason === 'max_tokens') {

@@ -31,13 +31,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (!body.anthropicKey && !body.openaiKey) {
-
+    if (body.provider !== 'ollama' && !body.anthropicKey && !body.openaiKey) {
       return NextResponse.json(
         {
           success: false,
           error:
-            'At least one API key is required (Anthropic or OpenAI). Ollama needs no key.',
+            'At least one API key is required for Anthropic or OpenAI. Ollama needs no key.',
         },
         { status: 400 }
       );
@@ -59,6 +58,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       anthropicModel: body.anthropicModel,
       openaiModel: body.openaiModel,
       ollamaModel: body.ollamaModel,
+      sections: body.sections,
     });
 
     return NextResponse.json({ success: true, data: llmResponse });

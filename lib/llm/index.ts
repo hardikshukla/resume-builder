@@ -47,7 +47,8 @@ async function callProvider(
   // Structured args passed separately to Anthropic for system/user split
   resume?: string,
   jd?: string,
-  companyName?: string
+  companyName?: string,
+  sections: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all' = 'all'
 ): Promise<ResumeBuilderOutput> {
   const key = getKey(provider, anthropicKey, openaiKey);
 
@@ -55,7 +56,7 @@ async function callProvider(
     case 'anthropic':
       if (!key) throw new Error('No Anthropic API key provided');
       return withTimeout(
-        callAnthropic(prompt, key, anthropicModel, resume, jd, companyName),
+        callAnthropic(prompt, key, anthropicModel, resume, jd, companyName, sections),
         TIMEOUT_MS
       );
 
@@ -72,7 +73,8 @@ export async function runLLM(request: LLMRequest): Promise<LLMResponse> {
   const prompt = buildPrompt(
     request.resume,
     request.jobDescription,
-    request.companyName
+    request.companyName,
+    request.sections
   );
 
   // Build fallback chain: requested provider first, then rest in order
@@ -109,7 +111,8 @@ export async function runLLM(request: LLMRequest): Promise<LLMResponse> {
         request.ollamaModel,
         request.resume,
         request.jobDescription,
-        request.companyName
+        request.companyName,
+        request.sections
       );
       return {
         result,
