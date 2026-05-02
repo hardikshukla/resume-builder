@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ResumeBuilderOutput } from '@/types';
-import { buildSystemPrompt, buildUserMessage } from '@/lib/prompt';
+import { buildSystemPrompt } from '@/lib/prompt';
 import { guardOutput } from '@/lib/llm/guard';
 import { ResumeBuilderOutputSchema } from '@/lib/llm/schema';
 
@@ -34,7 +34,7 @@ export async function callAnthropic(
     jdText += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
   }
 
-  const messagesContent: any[] = resume && jd
+  const messagesContent: Array<Anthropic.TextBlockParam> = resume && jd
     ? [
         {
           type: 'text',
