@@ -55,8 +55,8 @@ STEP 2 — KEYWORD GAP ANALYSIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Categorise each JD keyword as exactly one of:
 - PRESENT   — already in the resume → add to strongMatches
-- IMPLIED   — experience clearly exists but the exact term is missing → add the term to the resume, add to gaps array, add to keywordsAdded
-- MISSING   — no evidence in the candidate's background → do NOT add to the resume at all; add to missingKeywords array with keyword, suggestedSection, and suggestedBullet
+- IMPLIED   — experience clearly and undeniably exists in the original resume but the exact term is missing → add the term to the resume, add to gaps array, add to keywordsAdded
+- MISSING   — no explicit evidence in the candidate's background  → DO NOT add to the resume AT ALL under ANY circumstances; add to missingKeywords array with keyword, suggestedSection, and suggestedBullet
 
 CRITICAL: Never embed placeholder text like "[PLACEHOLDER: ...]" anywhere in the resume.
 MISSING keywords are reported ONLY in the missingKeywords array so the user can decide which ones actually apply to their experience.
@@ -88,11 +88,11 @@ EXPERIENCE
 - Do NOT rename job titles — only reframe bullet language
 - Lead every bullet with a strong action verb mirroring JD language
 - Focus on impact, not responsibilities
-- Quantify only where the original resume supports it
+- Quantify only where the original resume supports it. NEVER invent metrics.
 - Use scope context when no number exists: "enterprise-grade," "government-scale," "production-level"
 - Max 1-2 lines per bullet
 - No em dashes in bullets
-- Weave JD keywords naturally — max 3 uses of any single keyword across all bullets
+- Weave JD keywords naturally — max 3 uses of any single keyword across all bullets. DO NOT force keywords if the experience does not support them.
 - Retain stack lines per project; add JD tools only if bullets support their use
 
 EDUCATION & CERTIFICATIONS
@@ -129,17 +129,18 @@ Write a highly compelling, JD-tailored cover letter that:
 - Does NOT include a salutation (e.g. no "Dear Hiring Manager" — that is handled by the UI)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NON-NEGOTIABLE RULES
+NON-NEGOTIABLE RULES (FAILURE WILL RESULT IN REJECTION)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Truthful only — no fabrication of experience, titles, metrics, or results
-- No overbranding or unrealistic positioning
-- Do not rename job titles
-- Do not reorder, merge, or remove any roles
-- Do not omit any project that appears in the original resume
-- If something cannot be quantified honestly, describe it with context and scope
-- No hollow buzzwords, no em dashes, max 1-2 lines per bullet
-- Write each array element ONCE — never repeat or loop
-- ADAPTIVE SECTIONS: If the original resume has Publications, Awards, or Languages sections, preserve them as separate sections — NEVER merge publications into certifications
+- Truthful only — ABSOLUTELY NO FABRICATION of experience, skills, titles, metrics, or results. If the candidate did not do it in the original resume, DO NOT ADD IT.
+- Do not hallucinate functional areas (e.g., adding "security", "devops", etc. if the candidate has no background in it).
+- No overbranding or unrealistic positioning.
+- Do not rename job titles.
+- Do not reorder, merge, or remove any roles.
+- Do not omit any project that appears in the original resume.
+- If something cannot be quantified honestly, describe it with context and scope.
+- No hollow buzzwords, no em dashes, max 1-2 lines per bullet.
+- Write each array element ONCE — never repeat or loop.
+- ADAPTIVE SECTIONS: If the original resume has Publications, Awards, or Languages sections, preserve them as separate sections — NEVER merge publications into certifications.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
@@ -236,7 +237,7 @@ export function buildUserMessage(
   if (sections !== 'all') {
     msg += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
   }
-  
+
   return msg;
 }
 
