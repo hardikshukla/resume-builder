@@ -38,12 +38,12 @@ export async function callAnthropic(
     ? [
         {
           type: 'text',
-          text: jdText,
+          text: `CANDIDATE RESUME:\n${resume}`,
           cache_control: { type: 'ephemeral' }
         },
         {
           type: 'text',
-          text: `\nCANDIDATE RESUME:\n${resume}`
+          text: `\n\n${jdText}`
         }
       ]
     : [{ type: 'text', text: prompt }];

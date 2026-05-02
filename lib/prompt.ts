@@ -55,7 +55,7 @@ STEP 2 — KEYWORD GAP ANALYSIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Categorise each JD keyword as exactly one of:
 - PRESENT   — already in the resume → add to strongMatches
-- IMPLIED   — experience clearly and undeniably exists in the original resume but the exact term is missing → add the term to the resume, add to gaps array, add to keywordsAdded
+- IMPLIED   — experience clearly exists but the exact term is missing → add the term to the resume, add to gaps array, add to keywordsAdded
 - MISSING   — no explicit evidence in the candidate's background  → DO NOT add to the resume AT ALL under ANY circumstances; add to missingKeywords array with keyword, suggestedSection, and suggestedBullet
 
 CRITICAL: Never embed placeholder text like "[PLACEHOLDER: ...]" anywhere in the resume.
@@ -75,10 +75,10 @@ SUMMARY
 - Record what changed and why in summaryChanges (one sentence)
 
 CORE COMPETENCIES
-- Keep ALL existing skills from the candidate's resume
-- Add IMPLIED keywords (experience exists, term was missing) — record each in keywordsAdded
-- Do NOT add skills with no basis in the candidate's background
-- Do NOT add placeholder text of any kind. If a skill is MISSING, report it in missingKeywords only — never in the resume body
+- Keep ALL existing skills from the candidate's resume.
+- DO NOT ADD ANY NEW SKILLS TO THIS SECTION. YOU MAY ONLY EXTRACT SKILLS THAT ALREADY EXIST IN THE RESUME TEXT.
+- Implied keywords must be woven naturally into the SUMMARY or EXPERIENCE bullets instead. Do not add them as raw items here.
+- Do NOT add placeholder text of any kind. If a skill is MISSING, report it in missingKeywords only — never in the resume body.
 
 
 EXPERIENCE
@@ -132,7 +132,7 @@ Write a highly compelling, JD-tailored cover letter that:
 NON-NEGOTIABLE RULES (FAILURE WILL RESULT IN REJECTION)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Truthful only — ABSOLUTELY NO FABRICATION of experience, skills, titles, metrics, or results. If the candidate did not do it in the original resume, DO NOT ADD IT.
-- Do not hallucinate functional areas (e.g., adding "security", "devops", etc. if the candidate has no background in it).
+- Do not hallucinate functional areas.
 - No overbranding or unrealistic positioning.
 - Do not rename job titles.
 - Do not reorder, merge, or remove any roles.
