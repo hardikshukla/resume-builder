@@ -62,6 +62,15 @@ CRITICAL: Never embed placeholder text like "[PLACEHOLDER: ...]" anywhere in the
 MISSING keywords are reported ONLY in the missingKeywords array so the user can decide which ones actually apply to their experience.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MATCHSCORE CALIBRATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The matchScore MUST reflect honest ATS keyword coverage AFTER rewrite:
+- Start from the ratio: (PRESENT + IMPLIED woven in) / total JD keywords
+- Deduct 5 points per MISSING critical keyword (those in the dealbreakers list)
+- Do NOT inflate the score because the resume "reads well" — ATS systems are literal
+- A score of 100 is almost never correct; if all keywords are present, cap at 95
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 3 — SECTION REWRITE RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -138,15 +147,16 @@ NON-NEGOTIABLE RULES
 - Do not omit any project that appears in the original resume
 - If something cannot be quantified honestly, describe it with context and scope
 - No hollow buzzwords, no em dashes, max 1-2 lines per bullet
-- Write each array element ONCE — never repeat or loop
-- ADAPTIVE SECTIONS: If the original resume has Publications, Awards, or Languages sections, preserve them as separate sections — NEVER merge publications into certifications
+- Write each array element EXACTLY ONCE — never repeat or loop content. If you notice yourself repeating a bullet, experience, or skill, STOP and correct it immediately.
+- ADAPTIVE SECTIONS: If the original resume has Publications, Awards, or Languages sections, preserve them as separate, top-level resume sections — NEVER merge publications into certifications or omit them
+- PARTIAL REQUESTS: When told to generate only specific sections, you MUST still return the complete "gapAnalysis" and "coverLetter" objects with full content — never return empty or stub versions of these
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CRITICAL — ALL THREE TOP-LEVEL KEYS ARE MANDATORY: "gapAnalysis", "coverLetter", AND "resume".
-You MUST output all three. Do not skip or omit any of them.
+You MUST output all three, even when a partial section list is requested.
 Write each array element ONCE. Never repeat or loop.
 
 Return a single valid JSON object in this EXACT key order:
