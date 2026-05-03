@@ -37,18 +37,20 @@ export async function callAnthropic(
   }
 
   // client.beta.messages supports cache_control on text blocks (prompt caching)
+  // Block 1: JD + instructions (cached) — same across repeat generations with same JD
+  // Block 2: candidate resume (not cached — changes per user)
   const messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = resume && jd
     ? [
-      {
-        type: 'text',
-        text: `CANDIDATE RESUME:\n${resume}`,
-        cache_control: { type: 'ephemeral' }
-      } as Anthropic.Beta.Messages.BetaTextBlockParam,
-      {
-        type: 'text',
-        text: `\nCANDIDATE RESUME:\n${resume}`
-      } as Anthropic.Beta.Messages.BetaTextBlockParam
-    ]
+        {
+          type: 'text',
+          text: jdText,
+          cache_control: { type: 'ephemeral' }
+        } as Anthropic.Beta.Messages.BetaTextBlockParam,
+        {
+          type: 'text',
+          text: `\nCANDIDATE RESUME:\n${resume}`
+        } as Anthropic.Beta.Messages.BetaTextBlockParam
+      ]
     : [{ type: 'text', text: prompt } as Anthropic.Beta.Messages.BetaTextBlockParam];
 
   // ── System prompt block with cache_control ────────────────────────────────
