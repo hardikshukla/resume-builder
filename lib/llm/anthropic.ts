@@ -37,6 +37,8 @@ export async function callAnthropic(
   }
 
   // client.beta.messages supports cache_control on text blocks (prompt caching)
+  // Block 1: JD + instructions (cached) — same across repeat generations with same JD
+  // Block 2: candidate resume (not cached — changes per user)
   const messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = resume && jd
     ? [
         {
@@ -98,7 +100,7 @@ export async function callAnthropic(
     const result = ResumeBuilderOutputSchema.safeParse(raw_parsed);
     if (!result.success) {
       const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
-      const msg   = result.error.issues[0]?.message ?? 'schema mismatch';
+      const msg = result.error.issues[0]?.message ?? 'schema mismatch';
       throw new Error(`Claude response failed validation at "${field}": ${msg}. Try again.`);
     }
     parsed = result.data;

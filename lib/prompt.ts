@@ -56,7 +56,7 @@ STEP 2 — KEYWORD GAP ANALYSIS
 Categorise each JD keyword as exactly one of:
 - PRESENT   — already in the resume → add to strongMatches
 - IMPLIED   — experience clearly exists but the exact term is missing → add the term to the resume, add to gaps array, add to keywordsAdded
-- MISSING   — no evidence in the candidate's background → do NOT add to the resume at all; add to missingKeywords array with keyword, suggestedSection, and suggestedBullet
+- MISSING   — no explicit evidence in the candidate's background  → DO NOT add to the resume AT ALL under ANY circumstances; add to missingKeywords array with keyword, suggestedSection, and suggestedBullet
 
 CRITICAL: Never embed placeholder text like "[PLACEHOLDER: ...]" anywhere in the resume.
 MISSING keywords are reported ONLY in the missingKeywords array so the user can decide which ones actually apply to their experience.
@@ -84,10 +84,10 @@ SUMMARY
 - Record what changed and why in summaryChanges (one sentence)
 
 CORE COMPETENCIES
-- Keep ALL existing skills from the candidate's resume
-- Add IMPLIED keywords (experience exists, term was missing) — record each in keywordsAdded
-- Do NOT add skills with no basis in the candidate's background
-- Do NOT add placeholder text of any kind. If a skill is MISSING, report it in missingKeywords only — never in the resume body
+- Keep ALL existing skills from the candidate's resume.
+- DO NOT ADD ANY NEW SKILLS TO THIS SECTION. YOU MAY ONLY EXTRACT SKILLS THAT ALREADY EXIST IN THE RESUME TEXT.
+- Implied keywords must be woven naturally into the SUMMARY or EXPERIENCE bullets instead. Do not add them as raw items here.
+- Do NOT add placeholder text of any kind. If a skill is MISSING, report it in missingKeywords only — never in the resume body.
 
 
 EXPERIENCE
@@ -97,11 +97,11 @@ EXPERIENCE
 - Do NOT rename job titles — only reframe bullet language
 - Lead every bullet with a strong action verb mirroring JD language
 - Focus on impact, not responsibilities
-- Quantify only where the original resume supports it
+- Quantify only where the original resume supports it. NEVER invent metrics.
 - Use scope context when no number exists: "enterprise-grade," "government-scale," "production-level"
 - Max 1-2 lines per bullet
 - No em dashes in bullets
-- Weave JD keywords naturally — max 3 uses of any single keyword across all bullets
+- Weave JD keywords naturally — max 3 uses of any single keyword across all bullets. DO NOT force keywords if the experience does not support them.
 - Retain stack lines per project; add JD tools only if bullets support their use
 
 EDUCATION & CERTIFICATIONS
@@ -138,7 +138,7 @@ Write a highly compelling, JD-tailored cover letter that:
 - Does NOT include a salutation (e.g. no "Dear Hiring Manager" — that is handled by the UI)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NON-NEGOTIABLE RULES
+NON-NEGOTIABLE RULES (FAILURE WILL RESULT IN REJECTION)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Truthful only — no fabrication of experience, titles, metrics, or results
 - No overbranding or unrealistic positioning
@@ -246,7 +246,7 @@ export function buildUserMessage(
   if (sections !== 'all') {
     msg += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
   }
-  
+
   return msg;
 }
 
