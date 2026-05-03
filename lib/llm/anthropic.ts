@@ -6,11 +6,13 @@ import { ResumeBuilderOutputSchema } from '@/lib/llm/schema';
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 
+type SectionKey = 'summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other';
+
 export async function callAnthropic(
   /**
-   * \`prompt\` is used as the user message when resume/jd are not provided
+   * `prompt` is used as the user message when resume/jd are not provided
    * (e.g. future callers that pre-build the full prompt). When resume + jd
-   * are both present, buildUserMessage() is used instead and prompt is ignored.
+   * are both present, the structured user content is built inline and prompt is ignored.
    */
   prompt: string,
   apiKey: string,
@@ -18,43 +20,51 @@ export async function callAnthropic(
   resume?: string,
   jd?: string,
   companyName?: string,
-  sections: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all' = 'all'
+  sections: SectionKey[] | 'all' = 'all'
 ): Promise<ResumeBuilderOutput> {
   const client = new Anthropic({ apiKey });
   const model = modelOverride || DEFAULT_MODEL;
 
-  // System/user separation prevents Anthropic's loop detector from
-  // triggering on the JSON schema template embedded in a user message.
+  // ── System prompt (cached — reused across all requests) ───────────────────
   const systemPrompt = buildSystemPrompt();
-  
-  // Use Anthropic's structured content array to enable Prompt Caching.
-  // By caching the system prompt and JD, we save ~45% of input tokens on repeat runs.
+
+  // ── User message content ──────────────────────────────────────────────────
+  // Structured as two blocks so Anthropic can cache the JD independently of
+  // the candidate resume. Saves ~45% of input tokens on repeat runs.
   let jdText = `Please follow the 6-step ATS methodology and return the structured JSON output as specified.\n\nJOB DESCRIPTION:\n${jd}\n${companyName ? `COMPANY NAME: ${companyName}\n` : ''}`;
   if (sections !== 'all') {
     jdText += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
   }
 
-  const messagesContent: Array<Anthropic.TextBlockParam> = resume && jd
+  // client.beta.messages supports cache_control on text blocks (prompt caching)
+  const messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = resume && jd
     ? [
-        {
-          type: 'text',
-          text: `CANDIDATE RESUME:\n${resume}`,
-          cache_control: { type: 'ephemeral' }
-        },
-        {
-          type: 'text',
-          text: `\n\n${jdText}`
-        }
-      ]
-    : [{ type: 'text', text: prompt }];
+      {
+        type: 'text',
+        text: `CANDIDATE RESUME:\n${resume}`,
+        cache_control: { type: 'ephemeral' }
+      } as Anthropic.Beta.Messages.BetaTextBlockParam,
+      {
+        type: 'text',
+        text: `\nCANDIDATE RESUME:\n${resume}`
+      } as Anthropic.Beta.Messages.BetaTextBlockParam
+    ]
+    : [{ type: 'text', text: prompt } as Anthropic.Beta.Messages.BetaTextBlockParam];
 
-  let response;
+  // ── System prompt block with cache_control ────────────────────────────────
+  const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
+    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }
+  ];
+
+  // ── API call ──────────────────────────────────────────────────────────────
+  let response: Anthropic.Beta.BetaMessage;
   try {
-    response = await client.messages.create({
+    response = await client.beta.messages.create({
       model,
-      max_tokens: 16000,   // increased from 8192 — long resumes + cover letter need headroom
-      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+      max_tokens: 16000,   // large resumes + cover letter need headroom
+      system: systemBlocks,
       messages: [{ role: 'user', content: messagesContent }],
+      betas: ['prompt-caching-2024-07-31'],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -88,7 +98,7 @@ export async function callAnthropic(
     const result = ResumeBuilderOutputSchema.safeParse(raw_parsed);
     if (!result.success) {
       const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
-      const msg   = result.error.issues[0]?.message ?? 'schema mismatch';
+      const msg = result.error.issues[0]?.message ?? 'schema mismatch';
       throw new Error(`Claude response failed validation at "${field}": ${msg}. Try again.`);
     }
     parsed = result.data;
@@ -100,4 +110,3 @@ export async function callAnthropic(
   guardOutput(parsed);
   return parsed;
 }
-

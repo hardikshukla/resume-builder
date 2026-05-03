@@ -56,14 +56,14 @@ export function OutputPanel({
   const { gapAnalysis, resume, coverLetter } = result;
 
   // Independent view toggles for Resume and Cover Letter cards
-  const [resumeView,      setResumeView]      = useState<'original' | 'updated'>('updated');
+  const [resumeView, setResumeView] = useState<'original' | 'updated'>('updated');
   const [coverLetterView, setCoverLetterView] = useState<'original' | 'updated'>('updated');
 
   // Active content to render
-  const activeResume      = resumeView === 'original'      && originalResume      ? originalResume      : resume;
+  const activeResume = resumeView === 'original' && originalResume ? originalResume : resume;
   const activeCoverLetter = coverLetterView === 'original' && originalCoverLetter ? originalCoverLetter : coverLetter;
   // Active result for download (reflects the card's current toggle)
-  const resumeDownloadData      = { ...result, resume:      activeResume };
+  const resumeDownloadData = { ...result, resume: activeResume };
   const coverLetterDownloadData = { ...result, coverLetter: activeCoverLetter ?? { subject: '', body: '' } };
 
   // Fallback: trigger both standard server-side downloads without going through Dropbox
@@ -87,7 +87,7 @@ export function OutputPanel({
         URL.revokeObjectURL(url);
       } catch { /* silent — network errors */ }
     };
-    await doDownload('resume',      resumeDownloadData,      'resume.docx');
+    await doDownload('resume', resumeDownloadData, 'resume.docx');
     await doDownload('coverLetter', coverLetterDownloadData, 'coverLetter.docx');
   };
 
@@ -102,7 +102,7 @@ export function OutputPanel({
               Viewing refined version
               {originalMatchScore != null && originalMatchScore !== gapAnalysis.matchScore && (
                 <> · Score: <span className="revert-score-before">{originalMatchScore}%</span>
-                {' → '}<span className="revert-score-after">{gapAnalysis.matchScore}%</span></>
+                  {' → '}<span className="revert-score-after">{gapAnalysis.matchScore}%</span></>
               )}
             </span>
           </div>
@@ -184,11 +184,11 @@ export function OutputPanel({
         <ResumePreview resume={activeResume} />
         <div className="download-row">
           <DownloadButton type="resume" data={resumeDownloadData} companyName={companyName} />
-          <CloudSyncButton 
-            data={result} 
-            companyName={companyName} 
-            dropboxToken={dropboxToken} 
-            skipDropboxPrompt={skipDropboxPrompt} 
+          <CloudSyncButton
+            data={result}
+            companyName={companyName}
+            dropboxToken={dropboxToken}
+            skipDropboxPrompt={skipDropboxPrompt}
             setSkipDropboxPrompt={setSkipDropboxPrompt}
             onLocalDownload={handleLocalDownload}
           />

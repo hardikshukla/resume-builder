@@ -54,7 +54,7 @@ Copy `.env.example` → `.env.local`. All values are optional with sensible defa
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEFAULT_LLM_PROVIDER` | `anthropic` | Provider to show by default in the UI |
-| `ANTHROPIC_MODEL` | `claude-haiku-4-5` | Claude model ID (user can override in UI) |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Claude model ID (user can override in UI) |
 | `OPENAI_MODEL` | `gpt-4o` | OpenAI model ID (user can override in UI) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server base URL |
 | `OLLAMA_MODEL` | `llama3` | Ollama model name |
@@ -86,6 +86,7 @@ Copy `.env.example` → `.env.local`. All values are optional with sensible defa
 |-------|-------|--------|
 | `/api/generate` | 5 requests | 60 seconds per IP |
 | `/api/refine` | 15 requests | 60 seconds per IP |
+| `/api/dropbox/sync` | 5 requests | 60 seconds per IP |
 
 Returns `429` with `Retry-After` header and a `retryAfterSeconds` field in the JSON body.
 
@@ -133,11 +134,10 @@ sequenceDiagram
         U->>UI: Provide Dropbox PAT & Click Sync
         UI->>API: POST /api/dropbox/verify (Validate Token)
         API-->>UI: Token Valid
-        UI->>API: POST /api/dropbox/sync
-        API->>API: Generate `.docx` files in-memory
-        API->>DBX: Direct Upload (No server storage)
-        DBX-->>API: OK
-        API-->>UI: Show Success Banner
+        UI->>UI: Generate .docx files in-browser (CloudSyncButton)
+        UI->>DBX: Direct Upload from browser — token never reaches server
+        DBX-->>UI: Upload OK
+        UI-->>U: Green "Saved to Dropbox!" confirmation
     end
 ```
 
@@ -166,43 +166,57 @@ graph TD
 ```
 hooks/
   useProviderConfig.ts    ← Provider/API-key state + sessionStorage persistence + lock flag
-  useGenerate.ts          ← Generation inputs, output, originalOutput, handleGenerate
+  useGenerate.ts          ← Generation inputs, section caching, output, handleGenerate
   useRefine.ts            ← Refine state, handleRefine (always-from-original), handleRevert
+  useSectionCache.ts      ← SHA-256 keyed sessionStorage cache for resume section results
+  useInactivityTimeout.ts ← Clears sessionStorage after 20 min of inactivity
 
 app/
   page.tsx                ← 120-line orchestrator — composes the three hooks + layout
   globals.css             ← Design tokens, component styles (pure CSS, no Tailwind)
   layout.tsx              ← Root layout + SEO metadata
   api/
-    generate/route.ts     ← Full generation endpoint
+    generate/route.ts     ← Full generation endpoint (60 s SSRF-validated, section-aware)
     refine/route.ts       ← Selective improvement endpoint
     download/route.ts     ← DOCX streaming with sanitized filename
     parse-resume/route.ts ← PDF/DOCX text extraction
-    models/route.ts       ← Provider model list (SSRF-validated for Ollama)
+    models/route.ts       ← Provider model list (SSRF-validated for Ollama, 60 s cache)
     dropbox/verify/route.ts ← Token validation for Dropbox integration
     dropbox/sync/route.ts ← Secure DOCX upload to Dropbox
 
 components/
   ResumeForm.tsx          ← Left panel: inputs, provider selector (lockable), generate button
-  OutputPanel.tsx         ← Right panel: keyword coverage, gap analysis, refine controls,
-                            Original/Updated toggle, revert banner, missing keywords panel
+  OutputPanel.tsx         ← Thin orchestrator — composes all output-panel sub-components
   ProviderSelector.tsx    ← Provider + API key + model override inputs
   DownloadButton.tsx      ← Triggers /api/download for resume or cover letter
   ResumeUploader.tsx      ← Drag-and-drop resume file upload → text extraction
+  output-panel/
+    CloudSyncButton.tsx         ← Browser-direct Dropbox upload (token never reaches server)
+    ViewToggle.tsx              ← Original / Updated tab switcher
+    ScoreBadge.tsx              ← Keyword coverage % with colour band
+    CollapsibleSection.tsx      ← Generic collapsible list
+    ATSOptimizationSummary.tsx  ← Keywords added + summary rewrite explanation
+    MissingKeywordsPanel.tsx    ← Select missing keywords → trigger targeted refine
+    RefineableRecommendations.tsx ← Checkbox list: select recommendations → Apply & Refine
+    ResumePreview.tsx           ← Structured HTML preview of the generated resume JSON
 
 lib/
   env.ts                  ← Startup env-var validation (fail-fast on missing required vars)
   prompt.ts               ← buildSystemPrompt() + buildUserMessage() + buildRefinePrompt()
+  sectionParser.ts        ← Splits raw resume text into named sections for cache keying
   docxGenerator.ts        ← ATS-clean resume DOCX (Times New Roman, adaptive sections)
   coverLetterGenerator.ts ← Cover letter DOCX (matching header, dedup salutation)
   constants.ts            ← MAX_RESUME_CHARS, MAX_JD_CHARS, warn thresholds
+  utils/
+    string.ts             ← toCamelCase, toPascalCase, sanitizeFilename, getTimestampStr
   llm/
     index.ts              ← Fallback-chain router
-    anthropic.ts          ← Claude handler (with native prompt caching)
-    openai.ts             ← GPT-4o handler (with automatic message caching)
+    anthropic.ts          ← Claude handler (beta.messages — native prompt caching)
+    openai.ts             ← GPT-4o handler (automatic message caching)
     ollama.ts             ← Ollama handler
     dispatch.ts           ← Raw dispatch for refine route
-    guard.ts              ← Output schema validator
+    schema.ts             ← Zod schema for LLM output validation
+    guard.ts              ← Post-parse placeholder guard
 
 middleware.ts             ← Rate limiting (sliding window per IP, 429 + Retry-After)
 types/index.ts            ← All shared TypeScript types
@@ -261,7 +275,7 @@ Set these in Vercel Dashboard → Project → Settings → Environment Variables
 
 ```
 DEFAULT_LLM_PROVIDER=anthropic
-ANTHROPIC_MODEL=claude-haiku-4-5
+ANTHROPIC_MODEL=claude-sonnet-4-6
 OPENAI_MODEL=gpt-4o
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3
