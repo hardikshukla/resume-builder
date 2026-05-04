@@ -22,6 +22,14 @@ function stripLeadingSalutation(body: string): string {
     .replace(/^\n+/, ''); // drop any leading blank lines that remain
 }
 
+/**
+ * Strips protocol, www, and trailing slash so URLs display cleanly
+ * on the letter header, e.g. "linkedin.com/in/username".
+ */
+function shortenUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
+
 export async function generateCoverLetterDOCX(
   coverLetter: CoverLetterData,
   resume: ResumeData,
@@ -51,7 +59,8 @@ export async function generateCoverLetterDOCX(
   const contactParts: string[] = [];
   if (resume.contact?.email)    contactParts.push(resume.contact.email);
   if (resume.contact?.phone)    contactParts.push(resume.contact.phone);
-  if (resume.contact?.linkedin) contactParts.push(resume.contact.linkedin);
+  if (resume.contact?.linkedin) contactParts.push(shortenUrl(resume.contact.linkedin));
+  if (resume.contact?.github)   contactParts.push(shortenUrl(resume.contact.github));
   if (resume.contact?.location) contactParts.push(resume.contact.location);
 
   if (contactParts.length > 0) {
