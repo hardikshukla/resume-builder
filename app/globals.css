@@ -1101,6 +1101,13 @@ body {
 .rp-header { text-align: center; margin-bottom: 20px; }
 .rp-name   { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .rp-contact { font-size: 0.78rem; color: var(--text-muted); }
+.rp-contact-sep { user-select: none; }
+.rp-contact-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.rp-contact-link:hover { color: #a78bfa; text-decoration: underline; }
 
 .rp-section { margin-bottom: 20px; }
 .rp-section-header {

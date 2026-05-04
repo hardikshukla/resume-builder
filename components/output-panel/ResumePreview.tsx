@@ -1,21 +1,39 @@
 import { User, Briefcase, GraduationCap, Award, Zap, FileText } from 'lucide-react';
 import { ResumeBuilderOutput } from '@/types';
 
+/** Strips protocol, www, and trailing slash for clean display (e.g. linkedin.com/in/user) */
+function shortenUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
+
 export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'] }) {
+  // Build contact parts: plain strings for email/phone/location, {href, label} for links
+  type ContactItem = string | { href: string; label: string };
+  const contactItems: ContactItem[] = [];
+  if (resume.contact?.email) contactItems.push(resume.contact.email);
+  if (resume.contact?.phone) contactItems.push(resume.contact.phone);
+  if (resume.contact?.linkedin) contactItems.push({ href: resume.contact.linkedin, label: shortenUrl(resume.contact.linkedin) });
+  if (resume.contact?.github) contactItems.push({ href: resume.contact.github, label: shortenUrl(resume.contact.github) });
+  if (resume.contact?.location) contactItems.push(resume.contact.location);
+
   return (
     <div className="resume-preview">
       {/* Header */}
       <div className="rp-header">
         <div className="rp-name">{resume.name}</div>
         <div className="rp-contact">
-          {[
-            resume.contact?.email,
-            resume.contact?.phone,
-            resume.contact?.linkedin,
-            resume.contact?.location,
-          ]
-            .filter(Boolean)
-            .join('  ·  ')}
+          {contactItems.map((item, i) => (
+            <span key={i}>
+              {i > 0 && <span className="rp-contact-sep">  ·  </span>}
+              {typeof item === 'string' ? (
+                item
+              ) : (
+                <a href={item.href} target="_blank" rel="noopener noreferrer" className="rp-contact-link">
+                  {item.label}
+                </a>
+              )}
+            </span>
+          ))}
         </div>
       </div>
 

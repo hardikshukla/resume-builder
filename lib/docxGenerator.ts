@@ -9,6 +9,14 @@ import {
   BorderStyle,
 } from 'docx';
 
+/**
+ * Strips protocol, www, and trailing slash from a URL so it displays
+ * cleanly on the resume, e.g. "linkedin.com/in/username".
+ * ATS systems still detect these as URLs via the domain pattern.
+ */
+function shortenUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
 export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
   const JUSTIFY = AlignmentType.BOTH; // justified alignment throughout
 
@@ -80,7 +88,8 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
   const contactParts: string[] = [];
   if (resume.contact?.email) contactParts.push(resume.contact.email);
   if (resume.contact?.phone) contactParts.push(resume.contact.phone);
-  if (resume.contact?.linkedin) contactParts.push(resume.contact.linkedin);
+  if (resume.contact?.linkedin) contactParts.push(shortenUrl(resume.contact.linkedin));
+  if (resume.contact?.github) contactParts.push(shortenUrl(resume.contact.github));
   if (resume.contact?.location) contactParts.push(resume.contact.location);
 
   children.push(

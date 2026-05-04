@@ -23,6 +23,7 @@ const mockResume: ResumeData = {
     email:    'jane@example.com',
     phone:    '555-0100',
     linkedin: 'linkedin.com/in/janesmith',
+    github:   null,
     location: 'New York, NY',
   },
   summary: 'Experienced software engineer with 8 years in cloud infrastructure.',

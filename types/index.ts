@@ -53,6 +53,7 @@ export interface ContactInfo {
   email: string;
   phone: string | null;
   linkedin: string | null;
+  github: string | null;
   location: string | null;
 }
 

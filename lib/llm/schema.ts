@@ -70,6 +70,7 @@ export const ResumeBuilderOutputSchema = z.object({
       email:    z.string(),
       phone:    z.string().nullable(),
       linkedin: z.string().nullable(),
+      github:   z.string().nullable(),
       location: z.string().nullable(),
     }).optional(),
     summary:         z.string().optional(),
