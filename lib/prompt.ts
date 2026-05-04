@@ -102,7 +102,7 @@ EXPERIENCE
 - Max 1-2 lines per bullet
 - No em dashes in bullets
 - Weave JD keywords naturally — max 3 uses of any single keyword across all bullets. DO NOT force keywords if the experience does not support them.
-- Retain stack lines per project; add JD tools only if bullets support their use
+- Retain stack lines per project. STRICT RULE: The "tech" array must ONLY include tools that are already present in the original resume for that role. DO NOT add tools from the JD that were not in the original stack line.
 
 EDUCATION & CERTIFICATIONS
 - Reproduce exactly, no changes
@@ -195,7 +195,7 @@ Return a single valid JSON object in this EXACT key order:
     "summary": string — 2-4 sentences, JD-tailored,
     "skills": array of skill category objects, each with:
       - "category": string (e.g. "Languages & Frameworks", "Databases", "DevOps & Cloud", "Messaging", "Frontend", "Security", "Testing", "Reporting", "Tools")
-      - "items": array of strings
+      - "items": array of strings. STRICT RULE: YOU MUST ONLY INCLUDE SKILLS ALREADY WRITTEN IN THE ORIGINAL RESUME. NEVER ADD IMPLIED OR JD-SPECIFIC SKILLS TO THIS ARRAY.
       Group all skills into logical categories. Use only categories that have at least one item.
     "experience": array of experience objects, each with:
       - "title": string, exact job title — do not rename
@@ -203,14 +203,14 @@ Return a single valid JSON object in this EXACT key order:
       - "location": string or null
       - "startDate": string (Mon YYYY format)
       - "endDate": string (Mon YYYY or "Present")
-      - "tech": array of strings — ALL tools/languages/frameworks used in this role
+      - "tech": array of strings. STRICT RULE: Only include tools/languages/frameworks that were already listed in the original resume for this role. Do NOT add tools from the JD.
       - "bullets": array of strings — EMPTY if role has projects; otherwise 3-5 impact bullets
       - "projects": array of project objects, each with:
           - "name": string
           - "description": string — one sentence
           - "bullets": array of 2-4 impact strings
           - "link": string or null
-          - "tech": array of strings
+          - "tech": array of strings. STRICT RULE: Only include tools that were already listed in the original resume for this project.
     "education": array of objects, each with "degree", "institution", "year"
     "certifications": array of strings — professional licences and certificates ONLY
     "publications": array of strings or omit key entirely — journal papers, books, conference proceedings; include ONLY if present in original resume
