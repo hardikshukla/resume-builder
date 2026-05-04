@@ -7,7 +7,7 @@ import { ResumeForm }        from '@/components/ResumeForm';
 import { OutputPanel }       from '@/components/OutputPanel';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { Sparkles, ExternalLink, Lock } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const [isSessionExpired, setIsSessionExpired] = useState(false);
@@ -16,6 +16,15 @@ export default function Home() {
     sessionStorage.clear();
     setIsSessionExpired(true);
   });
+
+  // Clear sessionStorage on every page unload (reload or tab close).
+  // This ensures that removing the privacy screen overlay via DevTools
+  // yields nothing on the next page load — the resume cache is always gone.
+  useEffect(() => {
+    const clearOnUnload = () => sessionStorage.clear();
+    window.addEventListener('beforeunload', clearOnUnload);
+    return () => window.removeEventListener('beforeunload', clearOnUnload);
+  }, []);
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const config = useProviderConfig();

@@ -115,7 +115,7 @@ STEP 4 — ATS FORMAT (NON-NEGOTIABLE)
 - No tables, columns, graphics, text boxes, or icons
 - Standard headers only: SUMMARY, CORE COMPETENCIES, EXPERIENCE, EDUCATION, CERTIFICATIONS
 - Dates: Mon YYYY – Mon YYYY format
-- Contact line: Email | Phone | LinkedIn | Location (single line, pipe-separated)
+- Contact line: Email | Phone | LinkedIn | GitHub | Location (single line, pipe-separated)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 5 — ATS OPTIMIZATION SUMMARY (populate in gapAnalysis)
@@ -189,6 +189,7 @@ Return a single valid JSON object in this EXACT key order:
       "email": string,
       "phone": string or null,
       "linkedin": string or null,
+      "github": string or null,
       "location": string or null
     },
     "summary": string — 2-4 sentences, JD-tailored,
