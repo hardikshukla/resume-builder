@@ -145,6 +145,47 @@ export function ResumePreview({ resume }: { resume: ResumeBuilderOutput['resume'
         </div>
       )}
 
+      {/* Standalone Projects */}
+      {(resume.projects || []).length > 0 && (
+        <div className="rp-section">
+          <div className="rp-section-header">
+            <FileText size={14} />
+            PROJECTS
+          </div>
+          <div className="rp-nested-projects">
+            {(resume.projects || []).map((proj, i) => (
+              <div key={i} className="rp-proj-nested">
+                <div className="rp-proj-nested-name">{proj.name}</div>
+                {proj.bullets?.length > 0 && (
+                  <ul className="rp-bullets">
+                    {proj.bullets.map((b, j) => (
+                      <li key={j}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+                {proj.tech?.length > 0 && (
+                  <p className="rp-proj-stack">
+                    Stack: {proj.tech.join(', ')}
+                    {proj.link && (
+                      <>
+                        {' · '}
+                        <a
+                          href={proj.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rp-proj-link"
+                        >
+                          {proj.link}
+                        </a>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Education */}
       {(resume.education || []).length > 0 && (

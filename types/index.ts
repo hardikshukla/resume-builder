@@ -93,6 +93,7 @@ export interface ResumeData {
   summary?: string;
   skills?: SkillCategory[];           // grouped: { category, items }
   experience?: ExperienceEntry[];     // projects nested inside each entry
+  projects?: ProjectEntry[];          // standalone projects (e.g. GitHub, open source)
   education?: EducationEntry[];
   certifications?: string[];
   publications?: string[];           // journal papers, books, conference proceedings

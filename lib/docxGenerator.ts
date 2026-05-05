@@ -291,6 +291,71 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
     }
   }
 
+  // ── PROJECTS ───────────────────────────────────────────────────────────────
+  if (resume.projects && resume.projects.length > 0) {
+    children.push(sectionHeader('PROJECTS'));
+
+    for (const project of resume.projects) {
+      children.push(
+        new Paragraph({
+          alignment: JUSTIFY,
+          spacing: { before: 100, after: 20 },
+          children: [
+            new TextRun({
+              text: project.name,
+              font: 'Times New Roman',
+              size: 22,
+              bold: true,
+            }),
+          ],
+        })
+      );
+
+      for (const bullet of project.bullets ?? []) {
+        children.push(
+          new Paragraph({
+            numbering: { reference: 'resume-bullets', level: 0 },
+            children: [
+              new TextRun({
+                text: bullet,
+                font: 'Times New Roman',
+                size: 20,
+              }),
+            ],
+          })
+        );
+      }
+
+      if (project.tech && project.tech.length > 0) {
+        children.push(
+          new Paragraph({
+            alignment: JUSTIFY,
+            spacing: { before: 40, after: 20 },
+            children: [
+              new TextRun({
+                text: `Stack: ${project.tech.join(', ')}`,
+                font: 'Times New Roman',
+                size: 18,
+                italics: true,
+              }),
+              ...(project.link
+                ? [
+                    new TextRun({
+                      text: `  |  ${project.link}`,
+                      font: 'Times New Roman',
+                      size: 16,
+                      color: '2563EB',
+                      italics: true,
+                    }),
+                  ]
+                : []),
+            ],
+          })
+        );
+      }
+    }
+  }
+
   // ── EDUCATION ──────────────────────────────────────────────────────────────
   if (resume.education && resume.education.length > 0) {
     children.push(sectionHeader('EDUCATION'));

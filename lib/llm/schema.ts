@@ -76,6 +76,7 @@ export const ResumeBuilderOutputSchema = z.object({
     summary:         z.string().optional(),
     skills:          z.array(SkillGroupSchema).optional(),
     experience:      z.array(ExperienceSchema).optional(),
+    projects:        z.array(ProjectSchema).optional(),
     education:       z.array(EducationSchema).optional(),
     certifications:  z.array(z.string()).optional(),
     publications:    z.array(z.string()).optional(),

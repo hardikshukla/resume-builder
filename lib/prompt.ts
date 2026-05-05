@@ -92,8 +92,8 @@ CORE COMPETENCIES
 
 EXPERIENCE
 - Preserve ALL jobs, projects, and exact date ranges — no reordering, merging, or removal
-- Every project stays nested under the job where it was built
-- No standalone Projects section
+- If a project was built at a specific job, nest it under that job.
+- If a project is standalone (e.g. personal GitHub project, open source, hackathon) and not tied to a specific job, it MUST be extracted into the top-level "projects" section.
 - Do NOT rename job titles — only reframe bullet language
 - Lead every bullet with a strong action verb mirroring JD language
 - Focus on impact, not responsibilities
@@ -133,6 +133,7 @@ STEP 6 — COVER LETTER
 Write a highly compelling, JD-tailored cover letter that:
 - Highlights the candidate's most relevant achievements based on the JD
 - Demonstrates how their specific experience solves the hiring manager's problem
+- MUST highlight relevant personal/GitHub projects if they demonstrate skills asked for in the JD that are not present in the formal work experience
 - Keeps a professional, direct tone
 - Uses 3-4 paragraphs
 - Does NOT include a salutation (e.g. no "Dear Hiring Manager" — that is handled by the UI)
@@ -211,6 +212,12 @@ Return a single valid JSON object in this EXACT key order:
           - "bullets": array of 2-4 impact strings
           - "link": string or null
           - "tech": array of strings. STRICT RULE: Only include tools that were already listed in the original resume for this project.
+    "projects": array of standalone project objects (e.g. GitHub/personal projects NOT tied to a job), each with:
+        - "name": string
+        - "description": string — one sentence
+        - "bullets": array of 2-4 impact strings
+        - "link": string or null
+        - "tech": array of strings
     "education": array of objects, each with "degree", "institution", "year"
     "certifications": array of strings — professional licences and certificates ONLY
     "publications": array of strings or omit key entirely — journal papers, books, conference proceedings; include ONLY if present in original resume
@@ -220,7 +227,7 @@ Return a single valid JSON object in this EXACT key order:
 }
 
 RULES FOR EXPERIENCE / PROJECTS:
-- Projects are always nested inside their parent experience entry
+- Projects built at a job are nested inside their parent experience entry. Standalone projects (e.g. GitHub) go in the top-level "projects" array.
 - Each experience entry must have both "projects" ([] if none) and "tech" keys
 - If a role has projects: set "bullets" to [] and put all content in project entries
 - If a role has no projects: write 3-5 role-level bullets and populate "tech"
