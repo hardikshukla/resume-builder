@@ -1,8 +1,20 @@
-# Resume Builder — AI-Powered ATS Resume Optimizer
+# Resume Builder v2.0 — AI-Powered ATS Resume Optimizer
 
 Transform your resume to match any job description using Claude, GPT-4o, or a local Ollama model. One click generates a tailored resume, gap analysis, and cover letter — all downloadable as `.docx`.
 
 **Live demo:** [resume-builder-phi-wine.vercel.app](https://resume-builder-phi-wine.vercel.app)
+
+---
+
+## What's New in v2.0
+
+Version 2.0 introduces major architectural hardening, security enhancements, and cost-optimization strategies for production-grade resume tailoring.
+
+- **Security Hardening**: Built-in SSRF protection for local LLMs, sliding-window rate limiting, and zero-data-liability `sessionStorage` management.
+- **Cost & Latency Optimized**: Support for Anthropic's native Prompt Caching and OpenAI's automatic message caching to reduce API costs by up to 90% on repeated runs.
+- **Multi-Provider Resilience**: Dynamic fallback chain (Anthropic → OpenAI → Ollama) with automatic provider locking and banner notifications.
+- **Architectural Excellence**: Fully modular React hook architecture, Zod-validated API responses, and comprehensive CSP security headers.
+- **Dropbox Cloud Sync**: Secure, browser-direct DOCX upload to Dropbox without sharing your token with our servers.
 
 ---
 

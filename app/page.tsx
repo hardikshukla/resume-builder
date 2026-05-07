@@ -57,7 +57,7 @@ export default function Home() {
             </div>
           </div>
           <div className="header-meta">
-            <span className="version-badge">v1.0</span>
+            <span className="version-badge">v2.0</span>
             <a
               href="https://github.com/hardikshukla/resume-builder"
               target="_blank"
