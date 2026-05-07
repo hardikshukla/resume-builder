@@ -46,7 +46,7 @@ export interface GapAnalysis {
   keywordsAdded: string[];          // Implied keywords that were woven into the rewrite
   missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
-  extractedCompanyName?: string;     // Extracted company name from the JD
+  extractedCompanyName?: string | null; // Extracted company name from the JD
 }
 
 export interface ContactInfo {

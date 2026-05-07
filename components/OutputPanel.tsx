@@ -46,6 +46,7 @@ import { ATSOptimizationSummary } from './output-panel/ATSOptimizationSummary';
 import { MissingKeywordsPanel } from './output-panel/MissingKeywordsPanel';
 import { RefineableRecommendations } from './output-panel/RefineableRecommendations';
 import { ResumePreview } from './output-panel/ResumePreview';
+import { RefinementChanges } from './output-panel/RefinementChanges';
 
 export function OutputPanel({
   data, companyName, onRefine, isRefining,
@@ -120,6 +121,16 @@ export function OutputPanel({
             <small>Used: {providerUsed}</small>
           </div>
         </div>
+      )}
+
+      {hasRefined && originalResume && (
+        <RefinementChanges
+          originalResume={originalResume}
+          updatedResume={resume}
+          originalCoverLetter={originalCoverLetter}
+          updatedCoverLetter={coverLetter}
+          appliedRecs={appliedRecs}
+        />
       )}
 
       {/* Keyword Coverage card */}

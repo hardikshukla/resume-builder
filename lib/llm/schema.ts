@@ -62,6 +62,7 @@ export const ResumeBuilderOutputSchema = z.object({
     keywordsAdded:   z.array(z.string()),
     missingKeywords: z.array(MissingKeywordSchema),
     summaryChanges:  z.string(),
+    extractedCompanyName: z.string().nullable().optional(),
   }),
 
   resume: z.object({

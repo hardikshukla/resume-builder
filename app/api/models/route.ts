@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 
 export interface ModelEntry {
   id: string;
@@ -11,8 +14,24 @@ export interface ModelEntry {
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { ts: number; models: ModelEntry[] }>();
 
-function cacheKey(provider: string, apiKey = ''): string {
-  return `${provider}:${apiKey.slice(0, 8)}`;
+function hashIdentity(value = ''): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function cacheKey(provider: string, identity = ''): string {
+  return `${provider}:${hashIdentity(identity)}`;
+}
+
+function getCachedModels(key: string): ModelEntry[] | null {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+    return hit.models;
+  }
+  return null;
+}
+
+function setCachedModels(key: string, models: ModelEntry[]): void {
+  cache.set(key, { ts: Date.now(), models });
 }
 
 // ── T6.1 — SSRF guard ─────────────────────────────────────────────────────────
@@ -34,7 +53,40 @@ const BLOCKED_PATTERNS = [
   /^0\.0\.0\.0$/,
 ];
 
-function validateOllamaUrl(raw: string): { ok: true; url: URL } | { ok: false; reason: string } {
+function isBlockedIp(address: string): boolean {
+  const normalized = address.toLowerCase();
+  const ipv4Mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  const candidate = ipv4Mapped?.[1] ?? normalized;
+  const version = net.isIP(candidate);
+
+  if (version === 4) {
+    const [a, b] = candidate.split('.').map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+
+  if (version === 6) {
+    return (
+      normalized === '::' ||
+      normalized === '::1' ||
+      normalized.startsWith('fc') ||
+      normalized.startsWith('fd') ||
+      normalized.startsWith('fe80:')
+    );
+  }
+
+  return false;
+}
+
+async function validateOllamaUrl(raw: string): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -49,7 +101,7 @@ function validateOllamaUrl(raw: string): { ok: true; url: URL } | { ok: false; r
   const hostname = parsed.hostname.toLowerCase();
 
   // Block numeric IPs that match internal ranges
-  if (BLOCKED_PATTERNS.some((re) => re.test(hostname))) {
+  if (BLOCKED_PATTERNS.some((re) => re.test(hostname)) || isBlockedIp(hostname)) {
     return { ok: false, reason: 'ollamaUrl targets a blocked internal address.' };
   }
 
@@ -58,6 +110,20 @@ function validateOllamaUrl(raw: string): { ok: true; url: URL } | { ok: false; r
     // Allow localhost only if explicitly enabled by the server operator
     if (!process.env.ALLOW_LOCALHOST_OLLAMA) {
       return { ok: false, reason: 'ollamaUrl: localhost is not permitted from the server. Set ALLOW_LOCALHOST_OLLAMA=1 to enable.' };
+    }
+    return { ok: true, url: parsed };
+  }
+
+  if (!net.isIP(hostname)) {
+    let addresses: { address: string; family: number }[];
+    try {
+      addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+    } catch {
+      return { ok: false, reason: 'ollamaUrl hostname could not be resolved.' };
+    }
+
+    if (addresses.some((entry) => isBlockedIp(entry.address))) {
+      return { ok: false, reason: 'ollamaUrl resolves to a blocked internal address.' };
     }
   }
 
@@ -76,13 +142,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         ollamaUrl?: string;
       };
 
-    // ── Cache lookup ─────────────────────────────────────────────────────────
-    const ck = cacheKey(provider, anthropicKey ?? openaiKey ?? '');
-    const hit = cache.get(ck);
-    if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
-      return NextResponse.json({ models: hit.models, cached: true });
-    }
-
     // ── Anthropic ─────────────────────────────────────────────────────────────
     if (provider === 'anthropic') {
       if (!anthropicKey) {
@@ -90,6 +149,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { error: 'Anthropic API key required to fetch models.' },
           { status: 400 }
         );
+      }
+
+      const ck = cacheKey(provider, anthropicKey);
+      const hit = getCachedModels(ck);
+      if (hit) {
+        return NextResponse.json({ models: hit, cached: true });
       }
 
       const res = await fetch('https://api.anthropic.com/v1/models', {
@@ -113,7 +178,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         name: m.display_name ?? m.id,
       }));
 
-      cache.set(ck, { ts: Date.now(), models });
+      setCachedModels(ck, models);
       return NextResponse.json({ models });
     }
 
@@ -124,6 +189,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { error: 'OpenAI API key required to fetch models.' },
           { status: 400 }
         );
+      }
+
+      const ck = cacheKey(provider, openaiKey);
+      const hit = getCachedModels(ck);
+      if (hit) {
+        return NextResponse.json({ models: hit, cached: true });
       }
 
       const res = await fetch('https://api.openai.com/v1/models', {
@@ -144,7 +215,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .sort((a, b) => b.id.localeCompare(a.id))
         .map((m) => ({ id: m.id, name: m.id }));
 
-      cache.set(ck, { ts: Date.now(), models });
+      setCachedModels(ck, models);
       return NextResponse.json({ models });
     }
 
@@ -155,13 +226,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       let baseUrl: string;
 
       if (rawUrl) {
-        const check = validateOllamaUrl(rawUrl);
+        const check = await validateOllamaUrl(rawUrl);
         if (!check.ok) {
           return NextResponse.json({ error: check.reason }, { status: 400 });
         }
         baseUrl = check.url.origin; // strip any path to avoid confusion
       } else {
         baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      }
+
+      const ck = cacheKey(provider, baseUrl);
+      const hit = getCachedModels(ck);
+      if (hit) {
+        return NextResponse.json({ models: hit, cached: true });
       }
 
       const res = await fetch(`${baseUrl}/api/tags`).catch((e) => {
@@ -191,7 +268,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
       }
 
-      cache.set(ck, { ts: Date.now(), models });
+      setCachedModels(ck, models);
       return NextResponse.json({ models });
     }
 

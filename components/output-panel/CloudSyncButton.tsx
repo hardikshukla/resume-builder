@@ -35,12 +35,21 @@ export function CloudSyncButton({
   }, [showPrompt, skipDropboxPrompt]);
 
   const uploadToDropbox = async (blob: Blob, path: string) => {
-    const dbxArgs = { path, mode: 'add', autorename: true, mute: false, strict_conflict: false };
+    const dbxArgs = {
+      path,
+      mode: { '.tag': 'add' },
+      autorename: true,
+      mute: false,
+      strict_conflict: false,
+    };
+    const argHeader = JSON.stringify(dbxArgs)
+      .replace(/[^\x20-\x7E]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
     const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${dropboxToken}`,
-        'Dropbox-API-Arg': JSON.stringify(dbxArgs),
+        'Dropbox-API-Arg': argHeader,
         'Content-Type': 'application/octet-stream',
       },
       body: await blob.arrayBuffer(),

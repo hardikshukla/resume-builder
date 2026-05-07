@@ -7,6 +7,7 @@ import { ResumeBuilderOutput } from '@/types';
 import { ProviderConfig } from './useProviderConfig';
 
 const LOCAL_RESUME = 'rb_resume';
+const FULL_GENERATION_CACHE = 'rb_cache_full_generation';
 
 export type GenerationResult = {
   result: ResumeBuilderOutput;
@@ -14,6 +15,14 @@ export type GenerationResult = {
   fallbackOccurred: boolean;
   fallbackReason?: string;
 };
+
+async function computeHash(content: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export interface UseGenerateReturn {
   // Content inputs
@@ -67,6 +76,35 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
     setOriginalOutput(null);
     config.unlockProvider(); // reset lock so provider can't be changed mid-gen
     try {
+      const selectedModel =
+        config.provider === 'anthropic' ? config.anthropicModel :
+        config.provider === 'openai'    ? config.openaiModel :
+        config.ollamaModel;
+      const fullCacheHash = await computeHash(JSON.stringify({
+        resume,
+        jobDescription,
+        companyName,
+        provider: config.provider,
+        selectedModel,
+        hasAnthropicFallback: config.anthropicKey.trim().length > 0,
+        hasOpenAIFallback: config.openaiKey.trim().length > 0,
+      }));
+      const cachedFull = sessionStorage.getItem(FULL_GENERATION_CACHE);
+      if (cachedFull) {
+        try {
+          const parsed = JSON.parse(cachedFull) as { hash?: string; data?: GenerationResult };
+          if (parsed.hash === fullCacheHash && parsed.data) {
+            setOutput(parsed.data);
+            setOriginalOutput(parsed.data);
+            setJD('');
+            config.lockProvider();
+            return;
+          }
+        } catch {
+          sessionStorage.removeItem(FULL_GENERATION_CACHE);
+        }
+      }
+
       const parsedSections = parseSections(resume);
       const sectionsToGenerate: SectionKey[] = [];
       const cachedData: Partial<Record<SectionKey, any>> = {};
@@ -137,6 +175,14 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
 
       setOutput(data);
       setOriginalOutput(data); // locked — never overwritten by refine
+      try {
+        sessionStorage.setItem(
+          FULL_GENERATION_CACHE,
+          JSON.stringify({ hash: fullCacheHash, data })
+        );
+      } catch {
+        sessionStorage.removeItem(FULL_GENERATION_CACHE);
+      }
       setJD('');
       config.lockProvider();        // T5.4: lock provider after successful generation
     } catch (e) {
