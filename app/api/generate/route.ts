@@ -31,18 +31,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    if (body.provider !== 'ollama' && !body.anthropicKey && !body.openaiKey) {
+    const hasAnyKey =
+      body.provider === 'ollama' ||
+      !!body.anthropicKey ||
+      !!body.openaiKey ||
+      !!body.openrouterKey;
+
+    if (!hasAnyKey) {
       return NextResponse.json(
         {
           success: false,
-          error:
-            'At least one API key is required for Anthropic or OpenAI. Ollama needs no key.',
+          error: 'At least one API key is required. Ollama needs no key.',
         },
         { status: 400 }
       );
     }
 
-    const validProviders: LLMProvider[] = ['anthropic', 'openai', 'ollama'];
+    const validProviders: LLMProvider[] = ['anthropic', 'openai', 'ollama', 'openrouter'];
     const provider: LLMProvider = validProviders.includes(body.provider)
       ? body.provider
       : ((process.env.DEFAULT_LLM_PROVIDER as LLMProvider) ?? 'anthropic');
@@ -53,11 +58,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       jobDescription: body.jobDescription,
       companyName: body.companyName,
       provider,
-      anthropicKey: body.anthropicKey,
-      openaiKey: body.openaiKey,
-      anthropicModel: body.anthropicModel,
-      openaiModel: body.openaiModel,
-      ollamaModel: body.ollamaModel,
+      anthropicKey:    body.anthropicKey,
+      openaiKey:       body.openaiKey,
+      openrouterKey:   body.openrouterKey,
+      anthropicModel:  body.anthropicModel,
+      openaiModel:     body.openaiModel,
+      ollamaModel:     body.ollamaModel,
+      openrouterModel: body.openrouterModel,
       sections: body.sections,
     });
 

@@ -13,9 +13,11 @@ interface ResumeFormProps {
   provider: LLMProvider;
   anthropicKey: string;
   openaiKey: string;
+  openrouterKey: string;
   anthropicModel: string;
   openaiModel: string;
   ollamaModel: string;
+  openrouterModel: string;
   isLoading: boolean;
   /** When true the provider selector is disabled — prevents mid-session provider switch */
   providerLocked?: boolean;
@@ -23,11 +25,13 @@ interface ResumeFormProps {
   onJobDescriptionChange: (v: string) => void;
   onCompanyNameChange: (v: string) => void;
   onProviderChange: (p: LLMProvider) => void;
-  onAnthropicKeyChange: (k: string) => void;
-  onOpenaiKeyChange: (k: string) => void;
-  onAnthropicModelChange: (m: string) => void;
-  onOpenaiModelChange: (m: string) => void;
-  onOllamaModelChange: (m: string) => void;
+  onAnthropicKeyChange:     (k: string) => void;
+  onOpenaiKeyChange:        (k: string) => void;
+  onOpenrouterKeyChange:    (k: string) => void;
+  onAnthropicModelChange:   (m: string) => void;
+  onOpenaiModelChange:      (m: string) => void;
+  onOllamaModelChange:      (m: string) => void;
+  onOpenrouterModelChange:  (m: string) => void;
   dropboxToken: string;
   onDropboxTokenChange: (k: string) => void;
   onSubmit: () => void;
@@ -35,20 +39,22 @@ interface ResumeFormProps {
 
 export function ResumeForm({
   resume, jobDescription, companyName,
-  provider, anthropicKey, openaiKey,
-  anthropicModel, openaiModel, ollamaModel,
+  provider, anthropicKey, openaiKey, openrouterKey,
+  anthropicModel, openaiModel, ollamaModel, openrouterModel,
   isLoading,
   providerLocked = false,
   onResumeChange, onJobDescriptionChange, onCompanyNameChange,
-  onProviderChange, onAnthropicKeyChange, onOpenaiKeyChange,
-  onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange,
+  onProviderChange,
+  onAnthropicKeyChange, onOpenaiKeyChange, onOpenrouterKeyChange,
+  onAnthropicModelChange, onOpenaiModelChange, onOllamaModelChange, onOpenrouterModelChange,
   dropboxToken, onDropboxTokenChange,
   onSubmit,
 }: ResumeFormProps) {
   const hasKey =
     provider === 'ollama' ||
     anthropicKey.trim().length > 0 ||
-    openaiKey.trim().length > 0;
+    openaiKey.trim().length > 0 ||
+    openrouterKey.trim().length > 0;
 
   // Derive char-count status for colour coding
   const resumeStatus =
@@ -78,15 +84,19 @@ export function ResumeForm({
           provider={provider}
           anthropicKey={anthropicKey}
           openaiKey={openaiKey}
+          openrouterKey={openrouterKey}
           anthropicModel={anthropicModel}
           openaiModel={openaiModel}
           ollamaModel={ollamaModel}
+          openrouterModel={openrouterModel}
           onProviderChange={onProviderChange}
           onAnthropicKeyChange={onAnthropicKeyChange}
           onOpenaiKeyChange={onOpenaiKeyChange}
+          onOpenrouterKeyChange={onOpenrouterKeyChange}
           onAnthropicModelChange={onAnthropicModelChange}
           onOpenaiModelChange={onOpenaiModelChange}
           onOllamaModelChange={onOllamaModelChange}
+          onOpenrouterModelChange={onOpenrouterModelChange}
           dropboxToken={dropboxToken}
           onDropboxTokenChange={onDropboxTokenChange}
         />
@@ -112,7 +122,7 @@ export function ResumeForm({
           id="resume-input"
           className="textarea"
           rows={12}
-          placeholder="Paste your full resume here…&#10;&#10;Include work experience, education, skills, certifications, and contact info."
+          placeholder={"Paste your full resume here…\n\nInclude work experience, education, skills, certifications, and contact info."}
           value={resume}
           onChange={(e) => onResumeChange(e.target.value)}
           spellCheck={false}
@@ -137,7 +147,7 @@ export function ResumeForm({
           id="jd-input"
           className="textarea"
           rows={12}
-          placeholder="Paste the full job description here…&#10;&#10;Include responsibilities, requirements, and preferred qualifications."
+          placeholder={"Paste the full job description here…\n\nInclude responsibilities, requirements, and preferred qualifications."}
           value={jobDescription}
           onChange={(e) => onJobDescriptionChange(e.target.value)}
           spellCheck={false}

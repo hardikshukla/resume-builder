@@ -1,6 +1,6 @@
 // ── LLM Provider Types ────────────────────────────────────────────────────────
 
-export type LLMProvider = 'anthropic' | 'openai' | 'ollama';
+export type LLMProvider = 'anthropic' | 'openai' | 'ollama' | 'openrouter';
 
 export interface LLMRequest {
   resume: string;
@@ -9,9 +9,11 @@ export interface LLMRequest {
   provider: LLMProvider;
   anthropicKey?: string;
   openaiKey?: string;
+  openrouterKey?: string;
   anthropicModel?: string;  // overrides ANTHROPIC_MODEL env var
   openaiModel?: string;     // overrides OPENAI_MODEL env var
   ollamaModel?: string;     // overrides OLLAMA_MODEL env var
+  openrouterModel?: string; // overrides OPENROUTER_MODEL env var
   sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
 }
 
@@ -121,9 +123,11 @@ export interface GenerateRequest {
   provider: LLMProvider;
   anthropicKey?: string;
   openaiKey?: string;
+  openrouterKey?: string;
   anthropicModel?: string;
   openaiModel?: string;
   ollamaModel?: string;
+  openrouterModel?: string;
   sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
 }
 
@@ -145,9 +149,11 @@ export interface RefineRequest {
   provider: LLMProvider;
   anthropicKey?: string;
   openaiKey?: string;
+  openrouterKey?: string;
   anthropicModel?: string;
   openaiModel?: string;
   ollamaModel?: string;
+  openrouterModel?: string;
 }
 
 export interface RefineResponse {

@@ -81,9 +81,11 @@ export default function Home() {
             provider={config.provider}
             anthropicKey={config.anthropicKey}
             openaiKey={config.openaiKey}
+            openrouterKey={config.openrouterKey}
             anthropicModel={config.anthropicModel}
             openaiModel={config.openaiModel}
             ollamaModel={config.ollamaModel}
+            openrouterModel={config.openrouterModel}
             isLoading={isLoading}
             providerLocked={config.isLocked}
             onResumeChange={handleResumeChange}
@@ -92,9 +94,11 @@ export default function Home() {
             onProviderChange={config.setProvider}
             onAnthropicKeyChange={config.setAnthropicKey}
             onOpenaiKeyChange={config.setOpenaiKey}
+            onOpenrouterKeyChange={config.setOpenrouterKey}
             onAnthropicModelChange={config.setAnthropicModel}
             onOpenaiModelChange={config.setOpenaiModel}
             onOllamaModelChange={config.setOllamaModel}
+            onOpenrouterModelChange={config.setOpenrouterModel}
             dropboxToken={config.dropboxToken}
             onDropboxTokenChange={config.setDropboxToken}
             onSubmit={handleGenerate}

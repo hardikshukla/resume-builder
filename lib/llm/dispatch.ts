@@ -13,18 +13,22 @@ import { LLMProvider } from '@/types';
 import Anthropic from '@anthropic-ai/sdk';
 
 export interface DispatchConfig {
-  provider:       LLMProvider;
-  anthropicKey?:  string;
-  openaiKey?:     string;
+  provider:        LLMProvider;
+  anthropicKey?:   string;
+  openaiKey?:      string;
+  openrouterKey?:  string;
   anthropicModel?: string;
-  openaiModel?:   string;
-  ollamaModel?:   string;
+  openaiModel?:    string;
+  ollamaModel?:    string;
+  openrouterModel?: string;
 }
 
-const ANTHROPIC_DEFAULT = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
-const OPENAI_DEFAULT    = process.env.OPENAI_MODEL    ?? 'gpt-4o';
-const OLLAMA_DEFAULT    = process.env.OLLAMA_MODEL    ?? 'llama3';
-const OLLAMA_BASE_URL   = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
+const ANTHROPIC_DEFAULT  = process.env.ANTHROPIC_MODEL  ?? 'claude-sonnet-4-6';
+const OPENAI_DEFAULT     = process.env.OPENAI_MODEL     ?? 'gpt-4o';
+const OLLAMA_DEFAULT     = process.env.OLLAMA_MODEL     ?? 'llama3';
+const OPENROUTER_DEFAULT = process.env.OPENROUTER_MODEL ?? 'google/gemma-3-27b-it:free';
+const OLLAMA_BASE_URL    = process.env.OLLAMA_BASE_URL  ?? 'http://localhost:11434';
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
  * Route a prompt to a provider and return the raw response text.
@@ -34,7 +38,10 @@ export async function dispatchRaw(
   prompt: string,
   config: DispatchConfig
 ): Promise<string> {
-  const { provider, anthropicKey, openaiKey, anthropicModel, openaiModel, ollamaModel } = config;
+  const {
+    provider, anthropicKey, openaiKey, openrouterKey,
+    anthropicModel, openaiModel, ollamaModel, openrouterModel,
+  } = config;
 
   // ── Anthropic ──────────────────────────────────────────────────────────────
   if (provider === 'anthropic') {
@@ -79,6 +86,35 @@ export async function dispatchRaw(
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`OpenAI error ${res.status}: ${err}`);
+    }
+
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    return data.choices?.[0]?.message?.content?.trim() ?? '';
+  }
+
+  // ── OpenRouter ─────────────────────────────────────────────────────────────
+  if (provider === 'openrouter') {
+    if (!openrouterKey) throw new Error('No OpenRouter API key provided.');
+    const model = openrouterModel || OPENROUTER_DEFAULT;
+
+    const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openrouterKey}`,
+        'HTTP-Referer': 'https://github.com/hardikshukla/resume-builder',
+        'X-Title': 'AI Resume Builder',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenRouter error ${res.status}: ${err}`);
     }
 
     const data = await res.json() as { choices: { message: { content: string } }[] };

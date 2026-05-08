@@ -4,7 +4,7 @@ import { callAnthropic } from './anthropic';
 import { callOpenAI } from './openai';
 import { callOllama } from './ollama';
 
-const FALLBACK_ORDER: LLMProvider[] = ['anthropic', 'openai', 'ollama'];
+const FALLBACK_ORDER: LLMProvider[] = ['anthropic', 'openai', 'openrouter', 'ollama'];
 const TIMEOUT_MS = 180_000; // 3 minutes — large prompts can take 90-120s
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -19,38 +19,45 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 function getKey(
   provider: LLMProvider,
   anthropicKey?: string,
-  openaiKey?: string
+  openaiKey?: string,
+  openrouterKey?: string
 ): string | undefined {
-  if (provider === 'anthropic') return anthropicKey;
-  if (provider === 'openai') return openaiKey;
+  if (provider === 'anthropic')  return anthropicKey;
+  if (provider === 'openai')     return openaiKey;
+  if (provider === 'openrouter') return openrouterKey;
   return undefined; // Ollama needs no key
 }
 
 function hasKey(
   provider: LLMProvider,
   anthropicKey?: string,
-  openaiKey?: string
+  openaiKey?: string,
+  openrouterKey?: string
 ): boolean {
   if (provider === 'ollama') return true; // always available if server is running
-  const key = getKey(provider, anthropicKey, openaiKey);
+  const key = getKey(provider, anthropicKey, openaiKey, openrouterKey);
   return !!key && key.trim().length > 0;
 }
+
+type SectionKey = 'summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other';
 
 async function callProvider(
   provider: LLMProvider,
   prompt: string,
   anthropicKey?: string,
   openaiKey?: string,
+  openrouterKey?: string,
   anthropicModel?: string,
   openaiModel?: string,
   ollamaModel?: string,
+  openrouterModel?: string,
   // Structured args passed separately to Anthropic for system/user split
   resume?: string,
   jd?: string,
   companyName?: string,
-  sections: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all' = 'all'
+  sections: SectionKey[] | 'all' = 'all'
 ): Promise<ResumeBuilderOutput> {
-  const key = getKey(provider, anthropicKey, openaiKey);
+  const key = getKey(provider, anthropicKey, openaiKey, openrouterKey);
 
   switch (provider) {
     case 'anthropic':
@@ -62,7 +69,11 @@ async function callProvider(
 
     case 'openai':
       if (!key) throw new Error('No OpenAI API key provided');
-      return withTimeout(callOpenAI(prompt, key, openaiModel), TIMEOUT_MS);
+      return withTimeout(callOpenAI(prompt, key, openaiModel, 'openai'), TIMEOUT_MS);
+
+    case 'openrouter':
+      if (!key) throw new Error('No OpenRouter API key provided');
+      return withTimeout(callOpenAI(prompt, key, openrouterModel, 'openrouter'), TIMEOUT_MS);
 
     case 'ollama':
       return withTimeout(callOllama(prompt, ollamaModel), TIMEOUT_MS);
@@ -85,7 +96,7 @@ export async function runLLM(request: LLMRequest): Promise<LLMResponse> {
   ];
 
   const chain = allProviders.filter((p) =>
-    hasKey(p, request.anthropicKey, request.openaiKey)
+    hasKey(p, request.anthropicKey, request.openaiKey, request.openrouterKey)
   );
 
   if (chain.length === 0) {
@@ -106,9 +117,11 @@ export async function runLLM(request: LLMRequest): Promise<LLMResponse> {
         prompt,
         request.anthropicKey,
         request.openaiKey,
+        request.openrouterKey,
         request.anthropicModel,
         request.openaiModel,
         request.ollamaModel,
+        request.openrouterModel,
         request.resume,
         request.jobDescription,
         request.companyName,

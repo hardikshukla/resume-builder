@@ -77,8 +77,9 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
     config.unlockProvider(); // reset lock so provider can't be changed mid-gen
     try {
       const selectedModel =
-        config.provider === 'anthropic' ? config.anthropicModel :
-        config.provider === 'openai'    ? config.openaiModel :
+        config.provider === 'anthropic'  ? config.anthropicModel :
+        config.provider === 'openai'     ? config.openaiModel :
+        config.provider === 'openrouter' ? config.openrouterModel :
         config.ollamaModel;
       const fullCacheHash = await computeHash(JSON.stringify({
         resume,
@@ -86,8 +87,9 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
         companyName,
         provider: config.provider,
         selectedModel,
-        hasAnthropicFallback: config.anthropicKey.trim().length > 0,
-        hasOpenAIFallback: config.openaiKey.trim().length > 0,
+        hasAnthropicFallback:  config.anthropicKey.trim().length > 0,
+        hasOpenAIFallback:     config.openaiKey.trim().length > 0,
+        hasOpenRouterFallback: config.openrouterKey.trim().length > 0,
       }));
       const cachedFull = sessionStorage.getItem(FULL_GENERATION_CACHE);
       if (cachedFull) {
@@ -134,14 +136,16 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
         body: JSON.stringify({
           resume,
           jobDescription,
-          companyName: companyName || undefined,
-          provider:       config.provider,
-          anthropicKey:   config.anthropicKey   || undefined,
-          openaiKey:      config.openaiKey      || undefined,
-          anthropicModel: config.anthropicModel || undefined,
-          openaiModel:    config.openaiModel    || undefined,
-          ollamaModel:    config.ollamaModel    || undefined,
-          sections:       sectionsToGenerate.length === 0 ? 'all' : sectionsToGenerate,
+          companyName:     companyName || undefined,
+          provider:        config.provider,
+          anthropicKey:    config.anthropicKey    || undefined,
+          openaiKey:       config.openaiKey       || undefined,
+          openrouterKey:   config.openrouterKey   || undefined,
+          anthropicModel:  config.anthropicModel  || undefined,
+          openaiModel:     config.openaiModel     || undefined,
+          ollamaModel:     config.ollamaModel     || undefined,
+          openrouterModel: config.openrouterModel || undefined,
+          sections:        sectionsToGenerate.length === 0 ? 'all' : sectionsToGenerate,
         }),
       });
 

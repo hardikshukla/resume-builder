@@ -134,11 +134,12 @@ async function validateOllamaUrl(raw: string): Promise<{ ok: true; url: URL } | 
 export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
-    const { provider, anthropicKey, openaiKey, ollamaUrl } =
+    const { provider, anthropicKey, openaiKey, openrouterKey, ollamaUrl } =
       (await req.json()) as {
         provider: string;
         anthropicKey?: string;
         openaiKey?: string;
+        openrouterKey?: string;
         ollamaUrl?: string;
       };
 
@@ -267,6 +268,50 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { status: 404 }
         );
       }
+
+      setCachedModels(ck, models);
+      return NextResponse.json({ models });
+    }
+
+    // ── OpenRouter ────────────────────────────────────────────────────────────
+    if (provider === 'openrouter') {
+      if (!openrouterKey) {
+        return NextResponse.json(
+          { error: 'OpenRouter API key required to fetch models.' },
+          { status: 400 }
+        );
+      }
+
+      const ck = cacheKey(provider, openrouterKey);
+      const hit = getCachedModels(ck);
+      if (hit) {
+        return NextResponse.json({ models: hit, cached: true });
+      }
+
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: { Authorization: `Bearer ${openrouterKey}` },
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`OpenRouter ${res.status}: ${body}`);
+      }
+
+      const data = (await res.json()) as {
+        data: {
+          id: string;
+          name?: string;
+          pricing?: { prompt?: string };
+        }[];
+      };
+
+      const models: (ModelEntry & { isFree?: boolean })[] = data.data
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((m) => ({
+          id: m.id,
+          name: m.name ?? m.id,
+          isFree: m.pricing?.prompt === '0',
+        }));
 
       setCachedModels(ck, models);
       return NextResponse.json({ models });

@@ -13,12 +13,14 @@ export const maxDuration = 120;
 const RefineBodySchema = z.object({
   currentOutput: z.any(), // Further validated by JSON size guard
   selectedRecommendations: z.array(z.string().max(500)).min(1).max(20),
-  provider: z.enum(['anthropic', 'openai', 'ollama']),
-  anthropicKey: z.string().optional(),
-  openaiKey: z.string().optional(),
-  anthropicModel: z.string().optional(),
-  openaiModel: z.string().optional(),
-  ollamaModel: z.string().optional(),
+  provider: z.enum(['anthropic', 'openai', 'ollama', 'openrouter']),
+  anthropicKey:    z.string().optional(),
+  openaiKey:       z.string().optional(),
+  openrouterKey:   z.string().optional(),
+  anthropicModel:  z.string().optional(),
+  openaiModel:     z.string().optional(),
+  ollamaModel:     z.string().optional(),
+  openrouterModel: z.string().optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse<RefineResponse>> {
@@ -39,9 +41,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
       provider,
       anthropicKey,
       openaiKey,
+      openrouterKey,
       anthropicModel,
       openaiModel,
       ollamaModel,
+      openrouterModel,
     } = parsedBody.data;
 
     // Guard: serialised resume JSON can be large
@@ -65,9 +69,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<RefineRespons
         provider,
         anthropicKey,
         openaiKey,
+        openrouterKey,
         anthropicModel,
         openaiModel,
         ollamaModel,
+        openrouterModel,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown provider error';

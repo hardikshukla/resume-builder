@@ -39,14 +39,16 @@ export function useRefine(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          currentOutput:           originalOutput.result, // ← always the original
+          currentOutput:           originalOutput.result,
           selectedRecommendations: selectedRecs,
-          provider:       config.provider,
-          anthropicKey:   config.anthropicKey   || undefined,
-          openaiKey:      config.openaiKey      || undefined,
-          anthropicModel: config.anthropicModel || undefined,
-          openaiModel:    config.openaiModel    || undefined,
-          ollamaModel:    config.ollamaModel    || undefined,
+          provider:        config.provider,
+          anthropicKey:    config.anthropicKey    || undefined,
+          openaiKey:       config.openaiKey       || undefined,
+          openrouterKey:   config.openrouterKey   || undefined,
+          anthropicModel:  config.anthropicModel  || undefined,
+          openaiModel:     config.openaiModel     || undefined,
+          ollamaModel:     config.ollamaModel     || undefined,
+          openrouterModel: config.openrouterModel || undefined,
         }),
       });
 
