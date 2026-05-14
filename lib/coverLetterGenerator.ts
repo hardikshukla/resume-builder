@@ -164,12 +164,18 @@ export async function generateCoverLetterDOCX(
     })
   );
 
+  const titleCasedName = (resume.name || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
   children.push(
     new Paragraph({
       alignment: JUSTIFY,
       spacing: { before: 0, after: 0 },
       children: [
-        new TextRun({ text: resume.name, font: 'Times New Roman', size: 20, bold: true }),
+        new TextRun({ text: titleCasedName, font: 'Times New Roman', size: 20, bold: true }),
       ],
     })
   );
