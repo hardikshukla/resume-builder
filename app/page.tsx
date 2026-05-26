@@ -135,7 +135,7 @@ export default function Home() {
       timer = setTimeout(() => {
         sessionStorage.clear();
         setIsSessionExpired(true);
-      }, 20 * 60 * 1000);
+      }, 40 * 60 * 1000);
     };
     window.addEventListener('mousemove', resetTimer);
     window.addEventListener('keydown', resetTimer);
@@ -874,7 +874,7 @@ export default function Home() {
             <LockIcon color="error" sx={{ fontSize: 40, mx: 'auto' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Session Expired</Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              For your security, your session closed after 20 minutes of inactivity. API keys and data have been wiped.
+              For your security, your session closed after 40 minutes of inactivity. API keys and data have been wiped.
             </Typography>
             <Button variant="contained" fullWidth onClick={() => window.location.reload()} sx={{ mt: 1 }}>
               Start New Session
