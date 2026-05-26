@@ -767,7 +767,12 @@ export default function Home() {
                           });
                           const success = await handleRefine(recTexts, anthropicKey);
                           if (success) {
-                            setAppliedRecs(prev => new Set([...prev, ...selectedRecs]));
+                            setAppliedRecs(prev => {
+                              const next = new Set<string>();
+                              prev.forEach(id => next.add(id));
+                              selectedRecs.forEach(id => next.add(id));
+                              return next;
+                            });
                             setSelectedRecs([]);
                           }
                         }}
@@ -1046,7 +1051,7 @@ export default function Home() {
                       <Box sx={A4_STYLES}>
                         {/* Header */}
                         <Box sx={{ textAlign: 'center', mb: 2 }}>
-                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>
+                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt' }}>
                             {output.resume.name || 'Candidate Name'}
                           </Typography>
                           <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>

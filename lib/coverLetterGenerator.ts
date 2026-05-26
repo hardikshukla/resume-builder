@@ -28,7 +28,7 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
       spacing: { before: 0, after: 60 },
       children: [
         new TextRun({
-          text: name || 'FIRST LAST',
+          text: name || 'First Last',
           font: 'Times New Roman',
           size: 28, // 14pt (half-points)
           bold: true,
