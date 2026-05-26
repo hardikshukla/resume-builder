@@ -44,7 +44,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useGenerate } from '@/hooks/useGenerate';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
-import { buildDownloadFilename } from '@/lib/utils/string';
+import { buildDownloadFilename, capitalizeName } from '@/lib/utils/string';
 import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS } from '@/lib/constants';
 
 // ── Simple word-level diff for highlights ────────────────────────────────────
@@ -1052,7 +1052,7 @@ export default function Home() {
                         {/* Header */}
                         <Box sx={{ textAlign: 'center', mb: 2 }}>
                           <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt' }}>
-                            {output.resume.name || 'Candidate Name'}
+                            {output.resume.name ? capitalizeName(output.resume.name) : 'Candidate Name'}
                           </Typography>
                           <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>
                             {[output.resume.contact?.email, output.resume.contact?.phone, output.resume.contact?.linkedin, output.resume.contact?.github, output.resume.contact?.location].filter(Boolean).join('  |  ')}
@@ -1072,8 +1072,8 @@ export default function Home() {
                           </Typography>
                         ))}
                         <Typography sx={{ ...BODY_TEXT_SX, mt: 3 }}>Sincerely,</Typography>
-                        <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, mt: 3 }}>
-                          {output.resume.name || 'Candidate Name'}
+                         <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, mt: 3 }}>
+                          {output.resume.name ? capitalizeName(output.resume.name) : 'Candidate Name'}
                         </Typography>
                       </Box>
                     ) : (

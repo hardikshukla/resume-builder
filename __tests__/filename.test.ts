@@ -3,6 +3,7 @@ import {
   toCamelCase,
   toPascalCase,
   buildDownloadFilename,
+  capitalizeName,
 } from '../lib/utils/string';
 
 describe('Filename and Path Helpers', () => {
@@ -25,6 +26,14 @@ describe('Filename and Path Helpers', () => {
     expect(toPascalCase('OpenAI Inc.')).toBe('OpenaiInc');
     expect(toPascalCase('google')).toBe('Google');
     expect(toPascalCase('General Motors')).toBe('GeneralMotors');
+  });
+
+  it('capitalizeName should format names to Title Case', () => {
+    expect(capitalizeName('MITAVA THAKER')).toBe('Mitava Thaker');
+    expect(capitalizeName('mitava thaker')).toBe('Mitava Thaker');
+    expect(capitalizeName('Mitava Thaker')).toBe('Mitava Thaker');
+    expect(capitalizeName('john-david o\'connor')).toBe('John-David O\'connor');
+    expect(capitalizeName('')).toBe('');
   });
 
   it('buildDownloadFilename should build PascalCase FirstnameLastname_Company[_CoverLetter].docx', () => {

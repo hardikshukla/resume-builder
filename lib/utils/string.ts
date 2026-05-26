@@ -13,6 +13,22 @@ export function toPascalCase(str: string): string {
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
 }
 
+export function capitalizeName(name: string): string {
+  if (!name) return '';
+  return name
+    .split(/\s+/)
+    .map(word => {
+      if (word.includes('-')) {
+        return word
+          .split('-')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join('-');
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
 export function sanitizeFilename(raw: string): string {
   return raw.replace(/\.\./g, '').replace(/[/\\]/g, '')
     // eslint-disable-next-line no-control-regex

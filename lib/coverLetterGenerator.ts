@@ -1,4 +1,5 @@
 import { ResumeData, CoverLetterData } from '@/types';
+import { capitalizeName } from '@/lib/utils/string';
 import {
   Document,
   Packer,
@@ -21,6 +22,8 @@ function shortenUrl(url: string): string {
 function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): Paragraph[] {
   const children: Paragraph[] = [];
 
+  const formattedName = name ? capitalizeName(name) : 'First Last';
+
   // Name (Bold, 14pt, centered)
   children.push(
     new Paragraph({
@@ -28,7 +31,7 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
       spacing: { before: 0, after: 60 },
       children: [
         new TextRun({
-          text: name || 'First Last',
+          text: formattedName,
           font: 'Times New Roman',
           size: 28, // 14pt (half-points)
           bold: true,
@@ -173,7 +176,7 @@ export async function generateCoverLetterDOCX(
       spacing: { before: 200, after: 0 },
       children: [
         new TextRun({
-          text: resume.name || 'Candidate Name',
+          text: resume.name ? capitalizeName(resume.name) : 'Candidate Name',
           font: 'Times New Roman',
           size: 22,
           bold: true,
