@@ -136,6 +136,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState(0);
   const [showHighlights, setShowHighlights] = useState(true);
   const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
+  const [appliedRecs, setAppliedRecs] = useState<Set<string>>(new Set());
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showDropboxToken, setShowDropboxToken] = useState(false);
   const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -713,18 +714,43 @@ export default function Home() {
                         <AccordionDetails>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             {uniqueRecommendations.map((rec) => {
+                              const applied = appliedRecs.has(rec.id);
                               const checked = selectedRecs.includes(rec.id);
                               return (
                                 <FormControlLabel key={rec.id}
-                                  control={<Checkbox checked={checked} onChange={() => handleRecToggle(rec.id)} color="warning" />}
+                                  control={
+                                    <Checkbox
+                                      checked={checked}
+                                      onChange={() => !applied && handleRecToggle(rec.id)}
+                                      color="warning"
+                                      disabled={applied}
+                                    />
+                                  }
                                   label={
-                                    <Typography variant="body2" sx={{
-                                      textDecoration: checked ? 'line-through' : 'none',
-                                      color: checked ? 'text.secondary' : 'warning.main',
-                                      fontWeight: checked ? 400 : 500,
-                                    }}>
-                                      {rec.text}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Typography variant="body2" sx={{
+                                        textDecoration: applied || checked ? 'line-through' : 'none',
+                                        color: applied ? 'success.main' : checked ? 'text.secondary' : 'warning.main',
+                                        fontWeight: applied ? 400 : checked ? 400 : 500,
+                                        opacity: applied ? 0.7 : 1,
+                                      }}>
+                                        {rec.text}
+                                      </Typography>
+                                      {applied && (
+                                        <Typography variant="caption" sx={{
+                                          color: 'success.main',
+                                          fontWeight: 700,
+                                          fontSize: '0.65rem',
+                                          backgroundColor: 'rgba(46,160,67,0.12)',
+                                          px: 0.8,
+                                          py: 0.2,
+                                          borderRadius: 1,
+                                          whiteSpace: 'nowrap',
+                                        }}>
+                                          ✓ Applied
+                                        </Typography>
+                                      )}
+                                    </Box>
                                   }
                                 />
                               );
@@ -740,7 +766,10 @@ export default function Home() {
                             return rec?.text ?? id;
                           });
                           const success = await handleRefine(recTexts, anthropicKey);
-                          if (success) setSelectedRecs([]);
+                          if (success) {
+                            setAppliedRecs(prev => new Set([...prev, ...selectedRecs]));
+                            setSelectedRecs([]);
+                          }
                         }}
                         disabled={selectedRecs.length === 0 || isLoading || (!hasServerKey && !anthropicKey)}
                         sx={{ py: 1.2, fontWeight: 700 }}>
