@@ -1,4 +1,4 @@
-import { ResumeData, CoverLetterData } from '@/types';
+import { ResumeData } from '@/types';
 import {
   Document,
   Packer,
@@ -8,6 +8,10 @@ import {
   LevelFormat,
   BorderStyle,
 } from 'docx';
+
+// Re-export cover letter generator so existing callers stay valid
+export { generateCoverLetterDOCX } from './coverLetterGenerator';
+
 
 /**
  * Strips protocol, www, and trailing slash from a URL so it displays cleanly.
@@ -268,6 +272,25 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
             })
           );
 
+          // Project description (italic), if present
+          if (project.description) {
+            children.push(
+              new Paragraph({
+                alignment: JUSTIFY,
+                spacing: { before: 0, after: 40 },
+                indent: { left: 180 },
+                children: [
+                  new TextRun({
+                    text: project.description,
+                    font: 'Times New Roman',
+                    size: 22,
+                    italics: true,
+                  }),
+                ],
+              })
+            );
+          }
+
           for (const bullet of project.bullets ?? []) {
             children.push(
               new Paragraph({
@@ -334,6 +357,24 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
           ],
         })
       );
+
+      // Project description (italic), if present
+      if (project.description) {
+        children.push(
+          new Paragraph({
+            alignment: JUSTIFY,
+            spacing: { before: 0, after: 40 },
+            children: [
+              new TextRun({
+                text: project.description,
+                font: 'Times New Roman',
+                size: 22,
+                italics: true,
+              }),
+            ],
+          })
+        );
+      }
 
       for (const bullet of project.bullets ?? []) {
         children.push(

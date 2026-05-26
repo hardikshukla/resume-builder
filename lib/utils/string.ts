@@ -27,3 +27,29 @@ export function getTimestampStr() {
   const full = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   return { date, full };
 }
+
+/**
+ * Builds a download filename in the format: FirstnameLastname_Company[_CoverLetter].docx
+ *
+ * - candidateName: raw string from the AI, e.g. "John A. Smith"
+ * - company: raw company name, e.g. "Google LLC"
+ * - type: 'resume' | 'coverLetter'
+ *
+ * Both name and company are converted to PascalCase tokens joined without separator.
+ * Fallbacks: 'Candidate' for name, 'Tailored' for company.
+ *
+ * Examples:
+ *   buildDownloadFilename('John Smith', 'Google')             → 'JohnSmith_Google.docx'
+ *   buildDownloadFilename('John Smith', 'Google', 'coverLetter') → 'JohnSmith_Google_CoverLetter.docx'
+ *   buildDownloadFilename('', '')                              → 'Candidate_Tailored.docx'
+ */
+export function buildDownloadFilename(
+  candidateName: string,
+  company: string,
+  type: 'resume' | 'coverLetter' = 'resume'
+): string {
+  const namePart = toPascalCase(candidateName.trim()) || 'Candidate';
+  const companyPart = toPascalCase(company.trim()) || 'Tailored';
+  const suffix = type === 'coverLetter' ? '_CoverLetter' : '';
+  return `${namePart}_${companyPart}${suffix}.docx`;
+}

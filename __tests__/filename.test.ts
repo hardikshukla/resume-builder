@@ -1,35 +1,9 @@
-// Simulating the functions from app/api/dropbox/sync/route.ts
-function sanitizeFilename(raw: string): string {
-  return raw
-    .replace(/\.\./g, '')
-    .replace(/[/\\]/g, '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1f\x7f]/g, '')
-    .replace(/[^\w\s\-().+]/g, '')
-    .replace(/\s+/g, '_')
-    .slice(0, 80)
-    || 'document';
-}
-
-function toCamelCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map((word, index) => {
-      const lower = word.toLowerCase();
-      if (index === 0) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join('');
-}
-
-function toPascalCase(str: string): string {
-  return str
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('');
-}
+import {
+  sanitizeFilename,
+  toCamelCase,
+  toPascalCase,
+  buildDownloadFilename,
+} from '../lib/utils/string';
 
 describe('Filename and Path Helpers', () => {
   it('sanitizeFilename should remove directory traversals', () => {
@@ -51,5 +25,20 @@ describe('Filename and Path Helpers', () => {
     expect(toPascalCase('OpenAI Inc.')).toBe('OpenaiInc');
     expect(toPascalCase('google')).toBe('Google');
     expect(toPascalCase('General Motors')).toBe('GeneralMotors');
+  });
+
+  it('buildDownloadFilename should build PascalCase FirstnameLastname_Company[_CoverLetter].docx', () => {
+    // Normal cases
+    expect(buildDownloadFilename('John Smith', 'Google')).toBe('JohnSmith_Google.docx');
+    expect(buildDownloadFilename('John Smith', 'Google', 'coverLetter')).toBe('JohnSmith_Google_CoverLetter.docx');
+    
+    // Spaces, special characters, multi-word
+    expect(buildDownloadFilename('John A. Smith', 'Google LLC')).toBe('JohnASmith_GoogleLlc.docx');
+    expect(buildDownloadFilename('Jane-Doe', 'Yahoo! Inc.')).toBe('JaneDoe_YahooInc.docx');
+    
+    // Empty inputs / fallbacks
+    expect(buildDownloadFilename('', '')).toBe('Candidate_Tailored.docx');
+    expect(buildDownloadFilename('', 'Google')).toBe('Candidate_Google.docx');
+    expect(buildDownloadFilename('John Smith', '')).toBe('JohnSmith_Tailored.docx');
   });
 });

@@ -111,8 +111,8 @@ export function useGenerate() {
   );
 
   const handleRefine = useCallback(
-    async (selectedRecommendations: string[], anthropicKey?: string) => {
-      if (!originalOutput) return;
+    async (selectedRecommendations: string[], anthropicKey?: string): Promise<boolean> => {
+      if (!originalOutput) return false;
       setIsLoading(true);
       setError(null);
 
@@ -153,8 +153,10 @@ export function useGenerate() {
             },
           };
         });
+        return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error');
+        return false;
       } finally {
         setIsLoading(false);
       }

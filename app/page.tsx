@@ -42,7 +42,9 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 import { useApiKey } from '@/hooks/useApiKey';
 import { useGenerate } from '@/hooks/useGenerate';
-import { generateResumeDOCX, generateCoverLetterDOCX } from '@/lib/docxGenerator';
+import { generateResumeDOCX } from '@/lib/docxGenerator';
+import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
+import { buildDownloadFilename } from '@/lib/utils/string';
 import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS } from '@/lib/constants';
 
 // ── Simple word-level diff for highlights ────────────────────────────────────
@@ -284,30 +286,32 @@ export default function Home() {
     ? Array.from(new Map(output.gapAnalysis.recommendations.map((r) => [r.text, r])).values())
     : [];
 
-  const getSanitizedCompany = () =>
-    (companyName || output?.gapAnalysis.extractedCompanyName || 'Tailored').replace(/[^a-z0-9]/gi, '_');
+  const getCompanyStr = () =>
+    (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
+
+  const getFilename = (type: 'resume' | 'coverLetter') =>
+    buildDownloadFilename(
+      output?.resume.name ?? '',
+      getCompanyStr(),
+      type
+    );
 
   const handleDownload = async (type: 'resume' | 'coverLetter') => {
     if (!output) return;
     try {
       let blob: Blob;
-      const co = getSanitizedCompany();
+      const filename = getFilename(type);
       if (type === 'resume') {
         blob = await generateResumeDOCX(output.resume);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `resume_${co}.docx`;
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.resume.name || 'Candidate', output.resume.contact, output.coverLetter);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = `coverletter_${co}.docx`;
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, getCompanyStr());
       }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert(`Download failed: ${err}`);
     }
@@ -317,18 +321,17 @@ export default function Home() {
     if (!output || !dropboxToken) return;
     setDropboxStatus(null);
     try {
-      const co = getSanitizedCompany();
+      const co = getCompanyStr();
+      const filename = getFilename(type);
       let blob: Blob;
-      let filename: string;
       if (type === 'resume') {
         blob = await generateResumeDOCX(output.resume);
-        filename = `resume_${co}.docx`;
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.resume.name || 'Candidate', output.resume.contact, output.coverLetter);
-        filename = `coverletter_${co}.docx`;
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co);
       }
-      const path = `/Resume Builder/${co}/${filename}`;
+      const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
+      const path = `/Resume Builder/${folderName}/${filename}`;
       const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
         method: 'POST',
         headers: {
@@ -731,10 +734,14 @@ export default function Home() {
                       </Accordion>
 
                       <Button variant="contained" color="warning" fullWidth
-                        onClick={() => handleRefine(selectedRecs.map(id => {
-                          const rec = uniqueRecommendations.find(r => r.id === id);
-                          return rec?.text ?? id;
-                        }), anthropicKey)}
+                        onClick={async () => {
+                          const recTexts = selectedRecs.map(id => {
+                            const rec = uniqueRecommendations.find(r => r.id === id);
+                            return rec?.text ?? id;
+                          });
+                          const success = await handleRefine(recTexts, anthropicKey);
+                          if (success) setSelectedRecs([]);
+                        }}
                         disabled={selectedRecs.length === 0 || isLoading || (!hasServerKey && !anthropicKey)}
                         sx={{ py: 1.2, fontWeight: 700 }}>
                         {isLoading ? <CircularProgress size={20} /> : `Apply Selected Suggestions (${selectedRecs.length})`}
