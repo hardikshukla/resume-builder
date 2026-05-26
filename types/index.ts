@@ -104,6 +104,7 @@ export interface GenerateRequest {
   jobDescription: string;
   companyName?: string;
   anthropicKey?: string;     // falls back to ANTHROPIC_API_KEY env var
+  model?: string;            // Claude model override
   mode: GenerationMode;
   currentOutput?: ResumeBuilderOutput;   // refine mode only
   selectedRecommendations?: string[];    // refine mode only

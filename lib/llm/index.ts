@@ -13,5 +13,6 @@ export async function runLLM(request: GenerateRequest): Promise<unknown> {
     companyName: request.companyName,
     currentOutput: request.currentOutput,
     selectedRecommendations: request.selectedRecommendations,
+    modelOverride: request.model,
   });
 }

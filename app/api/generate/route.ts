@@ -66,6 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       jobDescription: body.jobDescription,
       companyName: body.companyName,
       anthropicKey: body.anthropicKey,
+      model: body.model,
       mode: body.mode,
       currentOutput: body.currentOutput,
       selectedRecommendations: body.selectedRecommendations,

@@ -8,6 +8,10 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -107,6 +111,8 @@ export default function Home() {
     resume,
     jobDescription,
     companyName,
+    selectedModel,
+    setSelectedModel,
     setJD,
     setCompany,
     handleResumeChange,
@@ -429,6 +435,21 @@ export default function Home() {
                     ),
                   }}}
                 />
+
+                {/* Claude Model Selection */}
+                <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
+                  <InputLabel id="model-select-label">Claude Model</InputLabel>
+                  <Select
+                    labelId="model-select-label"
+                    value={selectedModel}
+                    label="Claude Model"
+                    onChange={(e) => setSelectedModel(e.target.value as string)}
+                  >
+                    <MenuItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</MenuItem>
+                    <MenuItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</MenuItem>
+                    <MenuItem value="claude-3-opus-20240229">Claude 3 Opus (Advanced)</MenuItem>
+                  </Select>
+                </FormControl>
 
                 {/* Dropbox Token */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

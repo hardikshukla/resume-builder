@@ -18,6 +18,7 @@ export function useGenerate() {
   const [resume, setResume] = useState('');
   const [jobDescription, setJD] = useState('');
   const [companyName, setCompany] = useState('');
+  const [selectedModel, setSelectedModel] = useState('claude-3-5-sonnet-20241022');
   const [output, setOutput] = useState<ResumeBuilderOutput | null>(null);
   const [originalOutput, setOriginalOutput] = useState<ResumeBuilderOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +47,7 @@ export function useGenerate() {
 
       try {
         const fullCacheHash = await computeHash(
-          JSON.stringify({ resume, jobDescription, companyName })
+          JSON.stringify({ resume, jobDescription, companyName, model: selectedModel })
         );
 
         if (typeof window !== 'undefined') {
@@ -77,6 +78,7 @@ export function useGenerate() {
             jobDescription,
             companyName: companyName || undefined,
             anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
             mode: 'generate',
           }),
         });
@@ -105,7 +107,7 @@ export function useGenerate() {
         setIsLoading(false);
       }
     },
-    [resume, jobDescription, companyName]
+    [resume, jobDescription, companyName, selectedModel]
   );
 
   const handleRefine = useCallback(
@@ -123,6 +125,7 @@ export function useGenerate() {
             jobDescription,
             companyName: companyName || undefined,
             anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
             mode: 'refine',
             currentOutput: {
               resume: output?.resume ?? originalOutput.resume,
@@ -156,7 +159,7 @@ export function useGenerate() {
         setIsLoading(false);
       }
     },
-    [resume, jobDescription, companyName, originalOutput, output]
+    [resume, jobDescription, companyName, originalOutput, output, selectedModel]
   );
 
   const handleRevert = useCallback(() => {
@@ -169,6 +172,8 @@ export function useGenerate() {
     resume,
     jobDescription,
     companyName,
+    selectedModel,
+    setSelectedModel,
     setResume,
     setJD,
     setCompany,
