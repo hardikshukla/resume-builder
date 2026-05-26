@@ -105,6 +105,12 @@ const BODY_TEXT_SX = {
   fontSize: '11pt',
 };
 
+const DEFAULT_MODELS = [
+  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)' },
+  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast)' },
+  { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus (Advanced)' },
+];
+
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
   const {
@@ -148,6 +154,33 @@ export default function Home() {
       })
       .catch((err) => console.error('Failed to load server config:', err));
   }, []);
+
+  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>(DEFAULT_MODELS);
+
+  useEffect(() => {
+    const key = anthropicKey || (hasServerKey ? 'server' : '');
+    if (!key) {
+      setAvailableModels(DEFAULT_MODELS);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anthropicKey: anthropicKey || undefined }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.models && data.models.length > 0) {
+            setAvailableModels(data.models);
+          }
+        })
+        .catch((err) => console.error('Failed to fetch models:', err));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [anthropicKey, hasServerKey]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -445,9 +478,16 @@ export default function Home() {
                     label="Claude Model"
                     onChange={(e) => setSelectedModel(e.target.value as string)}
                   >
-                    <MenuItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Recommended)</MenuItem>
-                    <MenuItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</MenuItem>
-                    <MenuItem value="claude-3-opus-20240229">Claude 3 Opus (Advanced)</MenuItem>
+                    {availableModels.map((m) => (
+                      <MenuItem key={m.id} value={m.id}>
+                        {m.name}
+                      </MenuItem>
+                    ))}
+                    {!availableModels.some((m) => m.id === selectedModel) && (
+                      <MenuItem value={selectedModel}>
+                        {selectedModel}
+                      </MenuItem>
+                    )}
                   </Select>
                 </FormControl>
 
