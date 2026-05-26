@@ -39,6 +39,7 @@ You are an expert technical resume writer and ATS specialist with 15+ years of e
 4. If a role has projects, set bullets to [] and nest project objects. If no projects, use 3-5 bullets.
 5. Write each array element exactly once. No loop/repetition.
 6. Keep publications, awards, and languages as separate sections if they exist in the original resume.
+7. Do not use placeholders. Never embed placeholder text in the output.
 </rules>
 
 <output_format>
@@ -164,6 +165,14 @@ ${companyName ? `COMPANY NAME: ${companyName}` : ''}
 
 CANDIDATE RESUME:
 ${resume}`;
+}
+
+export function buildPrompt(
+  resume: string,
+  jd: string,
+  companyName?: string
+): string {
+  return `${buildSystemPrompt()}\n\n${buildUserMessage(resume, jd, companyName)}`;
 }
 
 export function buildRefinePrompt(

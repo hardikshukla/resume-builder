@@ -1051,8 +1051,8 @@ export default function Home() {
                       <Box sx={A4_STYLES}>
                         {/* Header */}
                         <Box sx={{ textAlign: 'center', mb: 2 }}>
-                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt' }}>
-                            {output.resume.name ? capitalizeName(output.resume.name) : 'Candidate Name'}
+                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>
+                            {output.resume.name || 'Candidate Name'}
                           </Typography>
                           <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>
                             {[output.resume.contact?.email, output.resume.contact?.phone, output.resume.contact?.linkedin, output.resume.contact?.github, output.resume.contact?.location].filter(Boolean).join('  |  ')}

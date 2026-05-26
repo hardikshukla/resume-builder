@@ -22,7 +22,7 @@ function shortenUrl(url: string): string {
 function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): Paragraph[] {
   const children: Paragraph[] = [];
 
-  const formattedName = name ? capitalizeName(name) : 'First Last';
+  const formattedName = name ? name.toUpperCase() : 'FIRST LAST';
 
   // Name (Bold, 14pt, centered)
   children.push(

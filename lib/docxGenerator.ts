@@ -24,6 +24,8 @@ function shortenUrl(url: string): string {
 function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): Paragraph[] {
   const children: Paragraph[] = [];
 
+  const formattedName = name ? name.toUpperCase() : 'FIRST LAST';
+
   // Name (Bold, 14pt, centered)
   children.push(
     new Paragraph({
@@ -31,7 +33,7 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
       spacing: { before: 0, after: 60 },
       children: [
         new TextRun({
-          text: name || 'FIRST LAST',
+          text: formattedName,
           font: 'Times New Roman',
           size: 28, // 14pt (specified in half-points)
           bold: true,
