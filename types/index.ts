@@ -65,7 +65,7 @@ export interface EducationEntry {
 
 export interface ProjectEntry {
   name: string;
-  description: string;
+  description: string | null;
   bullets: string[];
   link: string | null;
   tech: string[];

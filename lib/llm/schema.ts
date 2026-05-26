@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 const ProjectSchema = z.object({
   name:        z.string(),
-  description: z.string(),
+  description: z.string().nullable(),
   bullets:     z.array(z.string()),
   link:        z.string().nullable(),
   tech:        z.array(z.string()),
