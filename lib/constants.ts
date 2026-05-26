@@ -16,3 +16,7 @@ export const JD_WARN_CHARS = 6_000;
 
 /** Default Anthropic model name. */
 export const ANTHROPIC_DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
+
+/** Maximum file upload size in bytes (5 MB). */
+export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+

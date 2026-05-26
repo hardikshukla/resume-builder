@@ -126,6 +126,76 @@ export default function Home() {
   const [showDropboxToken, setShowDropboxToken] = useState(false);
   const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [hasServerKey, setHasServerKey] = useState(false);
+  const [isVerifyingDropbox, setIsVerifyingDropbox] = useState(false);
+  const [dropboxVerifyStatus, setDropboxVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
+  const [parseError, setParseError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.hasServerKey) {
+          setHasServerKey(true);
+        }
+      })
+      .catch((err) => console.error('Failed to load server config:', err));
+  }, []);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingFile(true);
+    setParseError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/parse-resume', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to parse resume file.');
+      }
+
+      handleResumeChange(data.text);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Failed to parse resume.');
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  const handleVerifyDropboxToken = async () => {
+    if (!dropboxToken) return;
+    setIsVerifyingDropbox(true);
+    setDropboxVerifyStatus(null);
+    try {
+      const res = await fetch('/api/dropbox/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: dropboxToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setDropboxVerifyStatus({ success: true, message: `Connected: ${data.account}` });
+      } else {
+        setDropboxVerifyStatus({ success: false, message: data.error || 'Verification failed.' });
+      }
+    } catch (err) {
+      console.error('Dropbox token verification error:', err);
+      setDropboxVerifyStatus({ success: false, message: 'Server verification failed.' });
+    } finally {
+      setIsVerifyingDropbox(false);
+    }
+  };
+
 
   // Inactivity session lock (20 min)
   useEffect(() => {
@@ -287,10 +357,36 @@ export default function Home() {
 
                 {/* Resume */}
                 <Box>
-                  <TextField label="Candidate Resume" multiline rows={8} fullWidth value={resume}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      Candidate Resume
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      size="small"
+                      startIcon={isParsingFile ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+                      disabled={isParsingFile}
+                      sx={{ py: 0.5 }}
+                    >
+                      {isParsingFile ? 'Parsing...' : 'Upload DOCX/TXT'}
+                      <input
+                        type="file"
+                        hidden
+                        accept=".docx,.txt"
+                        onChange={handleFileUpload}
+                      />
+                    </Button>
+                  </Box>
+                  <TextField multiline rows={8} fullWidth value={resume}
                     onChange={(e) => handleResumeChange(e.target.value)}
-                    placeholder="Paste your current resume..." variant="outlined"
+                    placeholder="Paste your current resume or upload above..." variant="outlined"
                     sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+                  {parseError && (
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                      ⚠️ {parseError}
+                    </Typography>
+                  )}
                   <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(resume.length, MAX_RESUME_CHARS, RESUME_WARN_CHARS) }}>
                     {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
                   </Typography>
@@ -313,15 +409,20 @@ export default function Home() {
                   sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
 
                 {/* Anthropic Key */}
-                <TextField label="Anthropic API Key (Optional)"
+                <TextField 
+                  label={hasServerKey ? "Anthropic API Key (Configured on Server)" : "Anthropic API Key (Mandatory)"}
                   type={showAnthropicKey ? 'text' : 'password'} fullWidth
-                  value={anthropicKey} onChange={(e) => setAnthropicKey(e.target.value)}
-                  placeholder="Defaults to server key..."
+                  value={hasServerKey ? '' : anthropicKey} 
+                  onChange={(e) => setAnthropicKey(e.target.value)}
+                  placeholder={hasServerKey ? "Configured on server via environment variable." : "Enter your Anthropic API Key..."}
+                  disabled={hasServerKey}
+                  error={!hasServerKey && !anthropicKey}
+                  helperText={!hasServerKey && !anthropicKey ? "Anthropic API Key is required to run LLM operations." : ""}
                   sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
                   slotProps={{ input: {
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end">
+                        <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
                           {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
                         </IconButton>
                       </InputAdornment>
@@ -330,26 +431,52 @@ export default function Home() {
                 />
 
                 {/* Dropbox Token */}
-                <TextField label="Dropbox API Token (Optional)"
-                  type={showDropboxToken ? 'text' : 'password'} fullWidth
-                  value={dropboxToken} onChange={(e) => setDropboxToken(e.target.value)}
-                  placeholder="Enter Dropbox OAuth token..."
-                  sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-                  slotProps={{ input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
-                          {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}}
-                />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <TextField label="Dropbox API Token (Optional)"
+                    type={showDropboxToken ? 'text' : 'password'} fullWidth
+                    value={dropboxToken} onChange={(e) => setDropboxToken(e.target.value)}
+                    placeholder="Enter Dropbox OAuth token..."
+                    sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
+                    slotProps={{ input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
+                            {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}}
+                  />
+                  {dropboxToken && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleVerifyDropboxToken}
+                        disabled={isVerifyingDropbox}
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
+                      </Button>
+                      {dropboxVerifyStatus && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: dropboxVerifyStatus.success ? 'success.main' : 'error.main',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {dropboxVerifyStatus.success ? '✓ ' : '✗ '}{dropboxVerifyStatus.message}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Box>
 
                 {/* Generate Button */}
                 <Button variant="contained" size="large" fullWidth
                   onClick={() => handleGenerate(anthropicKey)}
-                  disabled={isLoading || resume.length === 0 || jobDescription.length === 0 || resume.length > MAX_RESUME_CHARS || jobDescription.length > MAX_JD_CHARS}
+                  disabled={isLoading || resume.length === 0 || jobDescription.length === 0 || resume.length > MAX_RESUME_CHARS || jobDescription.length > MAX_JD_CHARS || (!hasServerKey && !anthropicKey)}
                   sx={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', boxShadow: '0 4px 20px rgba(108,99,255,0.4)', py: 1.5, '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' } }}>
                   {isLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '✨ Generate Tailored Resume'}
                 </Button>
@@ -547,7 +674,7 @@ export default function Home() {
                           const rec = uniqueRecommendations.find(r => r.id === id);
                           return rec?.text ?? id;
                         }), anthropicKey)}
-                        disabled={selectedRecs.length === 0 || isLoading}
+                        disabled={selectedRecs.length === 0 || isLoading || (!hasServerKey && !anthropicKey)}
                         sx={{ py: 1.2, fontWeight: 700 }}>
                         {isLoading ? <CircularProgress size={20} /> : `Apply Selected Suggestions (${selectedRecs.length})`}
                       </Button>
