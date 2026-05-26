@@ -60,8 +60,10 @@ describe('buildSystemPrompt()', () => {
   });
 
   it('contains the project description synthesis rule in rules section', () => {
-    expect(prompt).toMatch(/For projects: Synthesize a concise 1-sentence description/i);
+    expect(prompt).toMatch(/For projects: Synthesize an extremely concise 1-sentence description/i);
+    expect(prompt).toMatch(/maximum of 15 words/i);
     expect(prompt).toMatch(/Do NOT include tech stack, tools, or implementation details/i);
+    expect(prompt).toMatch(/synthesize a basic one-line description \(under 15 words/i);
   });
 
   it('is idempotent — returns the same string on every call', () => {

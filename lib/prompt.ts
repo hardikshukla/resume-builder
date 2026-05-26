@@ -49,7 +49,7 @@ You are an expert technical resume writer and ATS specialist with 15+ years of e
 5. Write each array element exactly once. No loop/repetition.
 6. Keep publications, awards, and languages as separate sections if they exist in the original resume.
 7. Do not use placeholders. Never embed placeholder text in the output.
-8. For projects: Synthesize a concise 1-sentence description that captures the platform/product purpose and scale (e.g. "Full stack platform powering citizen-facing and admin portals for 100,000+ users across Maharashtra"). Use only information present in the original resume. Do NOT include tech stack, tools, or implementation details in the description — those belong in bullets. Place all achievement/technical bullets in the 'bullets' array. Never copy a technical bullet verbatim as the description.
+8. For projects: Synthesize an extremely concise 1-sentence description (maximum of 15 words) that captures only the platform/product purpose and scale. Do NOT include tech stack, tools, or implementation details. Place all achievement/technical bullets in the 'bullets' array. Never copy a technical bullet verbatim as the description. If the original resume only has technical/achievement bullets, synthesize a basic one-line description (under 15 words, e.g. "Internal utility tools for team management") based on the context without tech stack names.
 </rules>
 
 <output_format>
