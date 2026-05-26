@@ -52,6 +52,13 @@ describe('buildSystemPrompt()', () => {
     expect(prompt).toContain('missingKeywords');
   });
 
+  it('contains the recommendations guidelines including Career Coach style and generic filter', () => {
+    expect(prompt).toContain('recommendations_guidelines');
+    expect(prompt).toMatch(/Career Coach Tone/i);
+    expect(prompt).toMatch(/No Generic Advice/i);
+    expect(prompt).toMatch(/Actionable & Strategic/i);
+  });
+
   it('is idempotent — returns the same string on every call', () => {
     expect(buildSystemPrompt()).toBe(prompt);
   });
