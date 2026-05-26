@@ -346,7 +346,7 @@ export default function Home() {
         blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co);
       }
       const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
-      const path = `/Resume Builder/${folderName}/${filename}`;
+      const path = `/resumeBuilder/${folderName}/${filename}`;
       const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
         method: 'POST',
         headers: {
