@@ -5,7 +5,8 @@ import { ResumeBuilderOutput, Recommendation } from '@/types';
 import { resumeDataToText } from '@/lib/utils/string';
 
 const LOCAL_RESUME = 'rb_resume';
-const FULL_GENERATION_CACHE = 'rb_cache_full_generation';
+const CACHE_KEYS_KEY = 'rb_cache_keys';
+const MAX_CACHE_SIZE = 10;
 
 async function computeHash(content: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -13,6 +14,56 @@ async function computeHash(content: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getCachedData(hash: string): ResumeBuilderOutput | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = sessionStorage.getItem(`rb_cache_run_${hash}`);
+    if (cached) {
+      const parsed = JSON.parse(cached) as ResumeBuilderOutput;
+      updateLruKeys(hash);
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse cache entry:', e);
+  }
+  return null;
+}
+
+function setCachedData(hash: string, data: ResumeBuilderOutput) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(`rb_cache_run_${hash}`, JSON.stringify(data));
+    updateLruKeys(hash);
+  } catch (e) {
+    console.error('Failed to set cache entry:', e);
+  }
+}
+
+function updateLruKeys(hash: string) {
+  try {
+    const keysStr = sessionStorage.getItem(CACHE_KEYS_KEY);
+    let keys: string[] = keysStr ? JSON.parse(keysStr) : [];
+    
+    // Filter out existing occurrence
+    keys = keys.filter((k) => k !== hash);
+    
+    // Add to the end (MRU)
+    keys.push(hash);
+    
+    // Evict oldest entries if cache limit is exceeded
+    while (keys.length > MAX_CACHE_SIZE) {
+      const evictedHash = keys.shift();
+      if (evictedHash) {
+        sessionStorage.removeItem(`rb_cache_run_${evictedHash}`);
+      }
+    }
+    
+    sessionStorage.setItem(CACHE_KEYS_KEY, JSON.stringify(keys));
+  } catch (e) {
+    console.error('Failed to update cache keys:', e);
+  }
 }
 
 export function useGenerate() {
@@ -41,35 +92,25 @@ export function useGenerate() {
 
   const handleGenerate = useCallback(
     async (anthropicKey?: string) => {
-      setIsLoading(true);
       setError(null);
-      setOutput(null);
-      setOriginalOutput(null);
 
       try {
         const fullCacheHash = await computeHash(
           JSON.stringify({ resume, jobDescription, companyName, model: selectedModel })
         );
 
-        if (typeof window !== 'undefined') {
-          const cachedFull = sessionStorage.getItem(FULL_GENERATION_CACHE);
-          if (cachedFull) {
-            try {
-              const parsed = JSON.parse(cachedFull) as {
-                hash?: string;
-                data?: ResumeBuilderOutput;
-              };
-              if (parsed.hash === fullCacheHash && parsed.data) {
-                setOutput(parsed.data);
-                setOriginalOutput(parsed.data);
-                setIsLoading(false);
-                return;
-              }
-            } catch {
-              sessionStorage.removeItem(FULL_GENERATION_CACHE);
-            }
-          }
+        // Check cache before setting loading states to prevent unnecessary flashes
+        const cachedData = getCachedData(fullCacheHash);
+        if (cachedData) {
+          setOutput(cachedData);
+          setOriginalOutput(cachedData);
+          return;
         }
+
+        // Cache miss: proceed with loading and API call
+        setIsLoading(true);
+        setOutput(null);
+        setOriginalOutput(null);
 
         const res = await fetch('/api/generate', {
           method: 'POST',
@@ -91,17 +132,7 @@ export function useGenerate() {
 
         setOutput(data);
         setOriginalOutput(data);
-
-        if (typeof window !== 'undefined') {
-          try {
-            sessionStorage.setItem(
-              FULL_GENERATION_CACHE,
-              JSON.stringify({ hash: fullCacheHash, data })
-            );
-          } catch {
-            sessionStorage.removeItem(FULL_GENERATION_CACHE);
-          }
-        }
+        setCachedData(fullCacheHash, data);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Unknown error');
       } finally {
@@ -214,10 +245,18 @@ export function useGenerate() {
           return {
             ...prev,
             gapAnalysis: {
-              ...data.gapAnalysis,                          // refresh scores, dealbreakers, matches
+              // Spread fresh analysis first so all required GapAnalysis fields are present
+              // (gaps, missingKeywords, summaryChanges, dealbreakers, etc.)
+              ...data.gapAnalysis,
+              // Then pin the score-sensitive fields to the previous values so a
+              // non-deterministic re-score never regresses the displayed ATS score.
+              // Score should only update via an explicit refine (updatedMatchScore).
+              matchScore: prev.gapAnalysis.matchScore,
+              keywordsAdded: prev.gapAnalysis.keywordsAdded,
+              strongMatches: prev.gapAnalysis.strongMatches,
               recommendations: [
-                ...prev.gapAnalysis.recommendations,       // preserve existing (applied ones intact)
-                ...newRecs,                                 // append only net-new gaps
+                ...prev.gapAnalysis.recommendations,         // preserve existing (applied ones intact)
+                ...newRecs,                                   // append only net-new gaps
               ],
             },
           };
