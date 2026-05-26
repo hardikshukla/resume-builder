@@ -1,9 +1,4 @@
-/**
- * lib/prompt.ts
- *
- * Optimized prompts for the ATS Resume Builder using XML tags.
- * Preserves all constraints, rules, and methodology.
- */
+import { Recommendation } from '@/types';
 
 export const SYSTEM_PROMPT = `<role>
 You are an expert technical resume writer and ATS specialist with 15+ years of experience at top-tier companies. Your goal is to make the candidate an obvious, ATS-passing fit while staying strictly truthful.
@@ -33,12 +28,19 @@ You are an expert technical resume writer and ATS specialist with 15+ years of e
 </match_score_calibration>
 
 <recommendations_guidelines>
-- **Actionable & Strategic**: Combine precise actionable edits (specifying the exact section/location to modify) with strategic advice (such as certifications, achievements to highlight, or formatting improvements).
-- **Career Coach Tone**: Write recommendations in a supportive, professional career coach style (e.g., "Consider adding Docker under DevOps skills to demonstrate your containerization capabilities to ATS scanners.").
-- **No Generic Advice**: Focus exclusively on specific, JD-tailored recommendations. Do NOT include generic advice (e.g., "proofread your resume", "keep formatting consistent").
-- **Truthful & Grounded**: Do not suggest fabricating experience or claiming skills the candidate lacks. Use conditional framing for missing skills (e.g., "If you have used Docker, consider adding it to your Skills under DevOps").
-- **Linked to Dealbreakers**: Map recommendations to the specific dealbreaker ID they resolve in the 'resolvesDealbreakers' array.
-- **No Placeholders**: Never use placeholder text like '[Your Project]' or '[Insert Metric]'. Provide concrete text options or conditional guidelines.
+- For each recommendation, generate a structured record with the following fields:
+  - \`claim\`: The specific optimization claim/edit to make (e.g., "Add Kubernetes under Skills").
+  - \`targetSection\`: The exact section where this edit should go (e.g., "Core Competencies", "Experience", "Summary").
+  - \`evidenceRequired\`: What candidate background/experience is required to support this claim (e.g., "Prior Kubernetes container orchestration experience").
+  - \`evidenceFound\`: What evidence you actually found in the original resume to support this (e.g., "Docker orchestration mentioned in project X" or "None").
+  - \`riskLevel\`: The risk level of making this claim. Use one of these exact values:
+    - \`low\`: Strong evidence exists in the original resume supporting the claim.
+    - \`medium\`: Indirect/implied evidence exists (e.g., related tools/technologies are mentioned).
+    - \`high\`: No supporting evidence exists, meaning this claim represents a stretch or potential fabrication that the user must verify.
+  - \`resolvesDealbreakers\`: Map recommendation to the specific dealbreaker IDs it resolves.
+- **Career Coach Tone**: Write the \`claim\` in a supportive, professional career coach style (e.g., "Consider adding Docker under DevOps skills to demonstrate containerization capabilities").
+- **No Generic Advice**: Focus exclusively on specific, JD-tailored recommendations. Do NOT include generic advice.
+- **No Placeholders**: Never use placeholder text.
 </recommendations_guidelines>
 
 <rules>
@@ -63,8 +65,15 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
       { "id": "db-1", "text": "No Kubernetes experience" }
     ],
     "recommendations": [
-      { "id": "rec-1", "text": "Add Kubernetes under Skills", "resolvesDealbreakers": ["db-1"] },
-      { "id": "rec-2", "text": "Strengthen the summary with cloud-scale language", "resolvesDealbreakers": [] }
+      {
+        "id": "rec-1",
+        "claim": "Add Kubernetes under Skills",
+        "targetSection": "Core Competencies",
+        "evidenceRequired": "Hands-on container orchestration experience with Kubernetes",
+        "evidenceFound": "Docker containerization mentioned in project X",
+        "riskLevel": "medium",
+        "resolvesDealbreakers": ["db-1"]
+      }
     ],
     "keywordsAdded": ["keyword (Section)"],
     "missingKeywords": [
@@ -189,9 +198,11 @@ export function buildPrompt(
 
 export function buildRefinePrompt(
   currentOutput: { resume: unknown; coverLetter: unknown },
-  selectedRecommendations: string[]
+  selectedRecommendations: Recommendation[]
 ): string {
-  const recList = selectedRecommendations.map((r) => `- ${r}`).join('\n');
+  const recList = selectedRecommendations.map((r) => 
+    `- Claim: ${r.claim}\n  Target Section: ${r.targetSection}\n  Evidence Required: ${r.evidenceRequired}\n  Evidence Found: ${r.evidenceFound}\n  Risk Level: ${r.riskLevel}`
+  ).join('\n');
   return `SELECTED IMPROVEMENTS TO APPLY:
 ${recList}
 

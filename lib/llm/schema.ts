@@ -42,8 +42,12 @@ const DealbreakerSchema = z.object({
 });
 
 const RecommendationSchema = z.object({
-  id:   z.string(),
-  text: z.string(),
+  id:                   z.string(),
+  claim:                z.string(),
+  targetSection:        z.string(),
+  evidenceRequired:     z.string(),
+  evidenceFound:        z.string(),
+  riskLevel:            z.enum(['low', 'medium', 'high']),
   // LLMs sometimes omit this when no dealbreakers are resolved — default to []
   resolvesDealbreakers: z.array(z.string()).default([]),
 });

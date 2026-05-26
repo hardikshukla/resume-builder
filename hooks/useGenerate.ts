@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { ResumeBuilderOutput } from '@/types';
+import { ResumeBuilderOutput, Recommendation } from '@/types';
 
 const LOCAL_RESUME = 'rb_resume';
 const FULL_GENERATION_CACHE = 'rb_cache_full_generation';
@@ -111,7 +111,7 @@ export function useGenerate() {
   );
 
   const handleRefine = useCallback(
-    async (selectedRecommendations: string[], anthropicKey?: string): Promise<boolean> => {
+    async (selectedRecommendations: Recommendation[], anthropicKey?: string): Promise<boolean> => {
       if (!originalOutput) return false;
       setIsLoading(true);
       setError(null);

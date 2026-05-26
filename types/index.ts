@@ -11,7 +11,11 @@ export interface Dealbreaker {
 
 export interface Recommendation {
   id: string;               // e.g. "rec-1"
-  text: string;             // e.g. "Add Kubernetes under Skills and experience"
+  claim: string;             // e.g. "Add Kubernetes"
+  targetSection: string;     // e.g. "Core Competencies"
+  evidenceRequired: string;  // e.g. "Hands-on experience with Kubernetes orchestration"
+  evidenceFound: string;     // e.g. "None found in original resume"
+  riskLevel: 'low' | 'medium' | 'high'; // Risk level of adding this claim
   resolvesDealbreakers: string[]; // references IDs of Dealbreakers resolved
 }
 
@@ -107,7 +111,7 @@ export interface GenerateRequest {
   model?: string;            // Claude model override
   mode: GenerationMode;
   currentOutput?: ResumeBuilderOutput;   // refine mode only
-  selectedRecommendations?: string[];    // refine mode only
+  selectedRecommendations?: Recommendation[];    // refine mode only
 }
 
 export interface GenerateResponse {

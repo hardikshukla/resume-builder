@@ -41,6 +41,7 @@ import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 import { useApiKey } from '@/hooks/useApiKey';
+import { Recommendation } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
@@ -144,6 +145,8 @@ export default function Home() {
   const [showHighlights, setShowHighlights] = useState(true);
   const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
   const [appliedRecs, setAppliedRecs] = useState<Set<string>>(new Set());
+  const [customRecommendations, setCustomRecommendations] = useState<Recommendation[]>([]);
+  const [customRecText, setCustomRecText] = useState('');
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showDropboxToken, setShowDropboxToken] = useState(false);
   const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -291,8 +294,9 @@ export default function Home() {
     ? Array.from(new Map(output.gapAnalysis.dealbreakers.map((db) => [db.text, db])).values())
     : [];
   const uniqueRecommendations = output
-    ? Array.from(new Map(output.gapAnalysis.recommendations.map((r) => [r.text, r])).values())
+    ? Array.from(new Map(output.gapAnalysis.recommendations.map((r) => [r.claim, r])).values())
     : [];
+  const allRecommendations = [...uniqueRecommendations, ...customRecommendations];
 
   const getCompanyStr = () =>
     (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
@@ -714,65 +718,143 @@ export default function Home() {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <WarningIcon color="warning" fontSize="small" />
                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              📋 Actionable Recommendations ({uniqueRecommendations.length})
+                              📋 Actionable Recommendations ({allRecommendations.length})
                             </Typography>
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            {uniqueRecommendations.map((rec) => {
+                            {allRecommendations.map((rec) => {
                               const applied = appliedRecs.has(rec.id);
                               const checked = selectedRecs.includes(rec.id);
+                              const isCustom = rec.id.startsWith('custom-');
                               return (
-                                <FormControlLabel key={rec.id}
-                                  control={
-                                    <Checkbox
-                                      checked={checked}
-                                      onChange={() => !applied && handleRecToggle(rec.id)}
-                                      color="warning"
-                                      disabled={applied}
-                                    />
+                                <Box key={rec.id} sx={{
+                                  p: 2,
+                                  mb: 1.5,
+                                  borderRadius: 2,
+                                  border: '1px solid',
+                                  borderColor: checked ? 'warning.main' : 'divider',
+                                  backgroundColor: checked ? 'rgba(237,108,2,0.02)' : '#161920',
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: 1.5,
+                                  transition: 'all 0.2s ease',
+                                  '&:hover': {
+                                    borderColor: applied ? 'divider' : 'warning.main',
+                                    backgroundColor: checked ? 'rgba(237,108,2,0.04)' : 'rgba(255,255,255,0.02)'
                                   }
-                                  label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                }}>
+                                  <Checkbox
+                                    checked={checked}
+                                    onChange={() => !applied && handleRecToggle(rec.id)}
+                                    color="warning"
+                                    disabled={applied}
+                                    sx={{ p: 0, mt: 0.2 }}
+                                  />
+                                  <Box sx={{ flexGrow: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
                                       <Typography variant="body2" sx={{
-                                        textDecoration: applied || checked ? 'line-through' : 'none',
-                                        color: applied ? 'success.main' : checked ? 'text.secondary' : 'warning.main',
-                                        fontWeight: applied ? 400 : checked ? 400 : 500,
-                                        opacity: applied ? 0.7 : 1,
+                                        fontWeight: 600,
+                                        textDecoration: applied ? 'line-through' : 'none',
+                                        color: applied ? 'success.main' : 'text.primary',
+                                        opacity: applied ? 0.7 : 1
                                       }}>
-                                        {rec.text}
+                                        {rec.claim}
                                       </Typography>
-                                      {applied && (
-                                        <Typography variant="caption" sx={{
-                                          color: 'success.main',
-                                          fontWeight: 700,
-                                          fontSize: '0.65rem',
-                                          backgroundColor: 'rgba(46,160,67,0.12)',
-                                          px: 0.8,
-                                          py: 0.2,
-                                          borderRadius: 1,
-                                          whiteSpace: 'nowrap',
-                                        }}>
-                                          ✓ Applied
-                                        </Typography>
-                                      )}
+                                      
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Chip
+                                          label={isCustom ? 'CUSTOM' : rec.riskLevel.toUpperCase()}
+                                          size="small"
+                                          color={
+                                            isCustom ? 'info' :
+                                            rec.riskLevel === 'low' ? 'success' :
+                                            rec.riskLevel === 'medium' ? 'warning' : 'error'
+                                          }
+                                          variant="outlined"
+                                          sx={{ fontSize: '0.65rem', height: 18, fontWeight: 700 }}
+                                        />
+                                        
+                                        {applied && (
+                                          <Chip
+                                            label="APPLIED"
+                                            size="small"
+                                            color="success"
+                                            sx={{ fontSize: '0.65rem', height: 18, fontWeight: 700 }}
+                                          />
+                                        )}
+                                      </Box>
                                     </Box>
-                                  }
-                                />
+                                    
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                                      <strong>Target Section:</strong> {rec.targetSection}
+                                    </Typography>
+                                    
+                                    {!isCustom && (
+                                      <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, backgroundColor: '#0f1117', border: '1px solid', borderColor: 'divider' }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem' }}>
+                                          <strong>Evidence Required:</strong> {rec.evidenceRequired}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem', mt: 0.2 }}>
+                                          <strong>Evidence Found:</strong> {rec.evidenceFound || 'None'}
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                </Box>
                               );
                             })}
+
+                            {/* Add Custom Recommendation UI */}
+                            <Box sx={{ mt: 1, p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider', backgroundColor: '#161920' }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '0.8rem', color: 'text.primary' }}>
+                                ➕ Add Custom Refinement Instruction
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <TextField
+                                  fullWidth
+                                  size="small"
+                                  placeholder="e.g., Add Python to Core Competencies, highlight my AWS cert..."
+                                  value={customRecText}
+                                  onChange={(e) => setCustomRecText(e.target.value)}
+                                  sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
+                                />
+                                <Button
+                                  variant="outlined"
+                                  color="warning"
+                                  size="small"
+                                  onClick={() => {
+                                    if (!customRecText.trim()) return;
+                                    const newRec: Recommendation = {
+                                      id: `custom-${Date.now()}`,
+                                      claim: customRecText.trim(),
+                                      targetSection: 'User Custom Instruction',
+                                      evidenceRequired: 'User defined',
+                                      evidenceFound: 'User defined',
+                                      riskLevel: 'low',
+                                      resolvesDealbreakers: [],
+                                    };
+                                    setCustomRecommendations((prev) => [...prev, newRec]);
+                                    setSelectedRecs((prev) => [...prev, newRec.id]);
+                                    setCustomRecText('');
+                                  }}
+                                  sx={{ fontWeight: 600, px: 2 }}
+                                >
+                                  Add
+                                </Button>
+                              </Box>
+                            </Box>
                           </Box>
                         </AccordionDetails>
                       </Accordion>
 
                       <Button variant="contained" color="warning" fullWidth
                         onClick={async () => {
-                          const recTexts = selectedRecs.map(id => {
-                            const rec = uniqueRecommendations.find(r => r.id === id);
-                            return rec?.text ?? id;
-                          });
-                          const success = await handleRefine(recTexts, anthropicKey);
+                          const selectedObjects = selectedRecs.map(id => {
+                            return allRecommendations.find(r => r.id === id);
+                          }).filter((r): r is Recommendation => !!r);
+                          const success = await handleRefine(selectedObjects, anthropicKey);
                           if (success) {
                             setAppliedRecs(prev => {
                               const next = new Set<string>();

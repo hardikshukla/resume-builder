@@ -12,6 +12,7 @@ import {
   REFINE_SYSTEM_PROMPT,
 } from '../lib/prompt';
 import { ResumeBuilderOutputSchema } from '../lib/llm/schema';
+import { Recommendation } from '../types';
 
 // ── buildSystemPrompt ────────────────────────────────────────────────────────
 
@@ -56,7 +57,9 @@ describe('buildSystemPrompt()', () => {
     expect(prompt).toContain('recommendations_guidelines');
     expect(prompt).toMatch(/Career Coach Tone/i);
     expect(prompt).toMatch(/No Generic Advice/i);
-    expect(prompt).toMatch(/Actionable & Strategic/i);
+    expect(prompt).toMatch(/evidenceRequired/i);
+    expect(prompt).toMatch(/evidenceFound/i);
+    expect(prompt).toMatch(/riskLevel/i);
   });
 
   it('contains the project description synthesis rule in rules section', () => {
@@ -126,9 +129,25 @@ describe('buildRefinePrompt()', () => {
     coverLetter: { body: 'Dear Hiring Manager…' },
   };
 
-  const selectedRecs = [
-    'Add Kubernetes to Core Competencies',
-    'Quantify AWS cost savings in the CloudOps bullet',
+  const selectedRecs: Recommendation[] = [
+    {
+      id: 'rec-1',
+      claim: 'Add Kubernetes to Core Competencies',
+      targetSection: 'Core Competencies',
+      evidenceRequired: 'Kubernetes experience',
+      evidenceFound: 'Docker mentioned',
+      riskLevel: 'medium',
+      resolvesDealbreakers: [],
+    },
+    {
+      id: 'rec-2',
+      claim: 'Quantify AWS cost savings in the CloudOps bullet',
+      targetSection: 'Experience',
+      evidenceRequired: 'AWS cost management',
+      evidenceFound: 'AWS experience listed',
+      riskLevel: 'low',
+      resolvesDealbreakers: [],
+    },
   ];
 
   it('returns a non-empty string', () => {
@@ -137,10 +156,14 @@ describe('buildRefinePrompt()', () => {
     expect(prompt.length).toBeGreaterThan(50);
   });
 
-  it('embeds each selected recommendation as a bullet', () => {
+  it('embeds each selected recommendation as a structured block', () => {
     const prompt = buildRefinePrompt(currentOutput, selectedRecs);
     for (const rec of selectedRecs) {
-      expect(prompt).toContain(rec);
+      expect(prompt).toContain(rec.claim);
+      expect(prompt).toContain(rec.targetSection);
+      expect(prompt).toContain(rec.evidenceRequired);
+      expect(prompt).toContain(rec.evidenceFound);
+      expect(prompt).toContain(rec.riskLevel);
     }
   });
 
@@ -187,7 +210,11 @@ describe('GapAnalysis schema shape', () => {
     recommendations: [
       {
         id: 'rec-1',
-        text: 'Add Kubernetes to Core Competencies',
+        claim: 'Add Kubernetes to Core Competencies',
+        targetSection: 'Core Competencies',
+        evidenceRequired: 'Kubernetes experience',
+        evidenceFound: 'Docker mentioned',
+        riskLevel: 'medium',
         resolvesDealbreakers: [],
       },
     ],

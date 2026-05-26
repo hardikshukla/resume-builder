@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT } from '@/lib/prompt';
 import { ResumeBuilderOutputSchema, RefineOutputSchema } from '@/lib/llm/schema';
+import { Recommendation } from '@/types';
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20241022';
 
@@ -37,7 +38,7 @@ export async function callAnthropic(
     jobDescription?: string;
     companyName?: string;
     currentOutput?: unknown;
-    selectedRecommendations?: string[];
+    selectedRecommendations?: Recommendation[];
     modelOverride?: string;
   }
 ): Promise<unknown> {
@@ -68,7 +69,9 @@ export async function callAnthropic(
       throw new Error('currentOutput and selectedRecommendations are required for refine mode');
     }
     systemPrompt = REFINE_SYSTEM_PROMPT;
-    const recList = payload.selectedRecommendations.map((r) => `- ${r}`).join('\n');
+    const recList = payload.selectedRecommendations.map((r) => 
+      `- Claim: ${r.claim}\n  Target Section: ${r.targetSection}\n  Evidence Required: ${r.evidenceRequired}\n  Evidence Found: ${r.evidenceFound}\n  Risk Level: ${r.riskLevel}`
+    ).join('\n');
     messagesContent = [
       {
         type: 'text',
