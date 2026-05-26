@@ -151,6 +151,15 @@ describe('buildRefinePrompt()', () => {
     expect(REFINE_SYSTEM_PROMPT).toMatch(/Apply ONLY the (?:selected )?improvements listed/i);
   });
 
+  it('treats selected suggestions as mandatory commands', () => {
+    expect(REFINE_SYSTEM_PROMPT).toMatch(/mandatory commands/i);
+    expect(REFINE_SYSTEM_PROMPT).toMatch(/You MUST apply them/i);
+  });
+
+  it('instructs model to apply changes to both resume AND cover letter', () => {
+    expect(REFINE_SYSTEM_PROMPT).toMatch(/resume AND cover letter/i);
+  });
+
   it('handles an empty recommendations list', () => {
     const prompt = buildRefinePrompt(currentOutput, []);
     expect(prompt).toBeDefined();
