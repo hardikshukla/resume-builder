@@ -44,7 +44,8 @@ const DealbreakerSchema = z.object({
 const RecommendationSchema = z.object({
   id:   z.string(),
   text: z.string(),
-  resolvesDealbreakers: z.array(z.string()),
+  // LLMs sometimes omit this when no dealbreakers are resolved — default to []
+  resolvesDealbreakers: z.array(z.string()).default([]),
 });
 
 const MissingKeywordSchema = z.object({

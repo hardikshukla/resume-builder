@@ -10,6 +10,7 @@ const config = {
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
+      isolatedModules: true,
       tsconfig: {
         // Relax for tests — no need for strict JSX transform
         jsx: 'react',

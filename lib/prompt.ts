@@ -52,7 +52,8 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
       { "id": "db-1", "text": "No Kubernetes experience" }
     ],
     "recommendations": [
-      { "id": "rec-1", "text": "Add Kubernetes under Skills", "resolvesDealbreakers": ["db-1"] }
+      { "id": "rec-1", "text": "Add Kubernetes under Skills", "resolvesDealbreakers": ["db-1"] },
+      { "id": "rec-2", "text": "Strengthen the summary with cloud-scale language", "resolvesDealbreakers": [] }
     ],
     "keywordsAdded": ["keyword (Section)"],
     "missingKeywords": [

@@ -9,8 +9,6 @@ import {
   BorderStyle,
 } from 'docx';
 
-// Re-export cover letter generator so existing callers stay valid
-export { generateCoverLetterDOCX } from './coverLetterGenerator';
 
 
 /**
