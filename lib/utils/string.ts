@@ -1,3 +1,5 @@
+import { ResumeData } from '@/types';
+
 /**
  * string.ts — Shared string manipulation utilities.
  */
@@ -68,4 +70,73 @@ export function buildDownloadFilename(
   const companyPart = toPascalCase(company.trim()) || 'Tailored';
   const suffix = type === 'coverLetter' ? '_CoverLetter' : '';
   return `${namePart}_${companyPart}${suffix}.docx`;
+}
+
+export function resumeDataToText(r: ResumeData): string {
+  const parts: string[] = [];
+  if (r.name) parts.push(r.name);
+  if (r.contact) {
+    const c = r.contact;
+    const contactLine = [c.email, c.phone, c.linkedin, c.github, c.location].filter(Boolean).join(' | ');
+    if (contactLine) parts.push(contactLine);
+  }
+  if (r.summary) {
+    parts.push('\nSUMMARY');
+    parts.push(r.summary);
+  }
+  if (r.skills && r.skills.length > 0) {
+    parts.push('\nSKILLS');
+    for (const sg of r.skills) {
+      parts.push(`${sg.category}: ${sg.items.join(', ')}`);
+    }
+  }
+  if (r.experience && r.experience.length > 0) {
+    parts.push('\nEXPERIENCE');
+    for (const exp of r.experience) {
+      parts.push(`${exp.title} at ${exp.company} (${exp.startDate} - ${exp.endDate})`);
+      if (exp.location) parts.push(exp.location);
+      for (const b of exp.bullets) {
+        parts.push(`- ${b}`);
+      }
+      if (exp.projects && exp.projects.length > 0) {
+        for (const proj of exp.projects) {
+          parts.push(`  Project: ${proj.name}`);
+          if (proj.description) parts.push(`  ${proj.description}`);
+          for (const pb of proj.bullets) {
+            parts.push(`  - ${pb}`);
+          }
+          if (proj.tech && proj.tech.length > 0) {
+            parts.push(`  Stack: ${proj.tech.join(', ')}`);
+          }
+        }
+      }
+      if (exp.tech && exp.tech.length > 0) {
+        parts.push(`  Stack: ${exp.tech.join(', ')}`);
+      }
+    }
+  }
+  if (r.projects && r.projects.length > 0) {
+    parts.push('\nPROJECTS');
+    for (const proj of r.projects) {
+      parts.push(`${proj.name}`);
+      if (proj.description) parts.push(proj.description);
+      for (const b of proj.bullets) {
+        parts.push(`- ${b}`);
+      }
+      if (proj.tech && proj.tech.length > 0) {
+        parts.push(`Stack: ${proj.tech.join(', ')}`);
+      }
+    }
+  }
+  if (r.education && r.education.length > 0) {
+    parts.push('\nEDUCATION');
+    for (const edu of r.education) {
+      parts.push(`${edu.degree} - ${edu.institution} (${edu.year || ''})`);
+    }
+  }
+  if (r.certifications && r.certifications.length > 0) {
+    parts.push('\nCERTIFICATIONS');
+    parts.push(r.certifications.join('\n'));
+  }
+  return parts.join('\n');
 }

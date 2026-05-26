@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { ResumeBuilderOutput, Recommendation } from '@/types';
+import { resumeDataToText } from '@/lib/utils/string';
 
 const LOCAL_RESUME = 'rb_resume';
 const FULL_GENERATION_CACHE = 'rb_cache_full_generation';
@@ -170,6 +171,68 @@ export function useGenerate() {
     }
   }, [originalOutput]);
 
+  const handleRefreshRecommendations = useCallback(
+    async (anthropicKey?: string): Promise<boolean> => {
+      if (!output) return false;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const textResume = resumeDataToText(output.resume);
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume: textResume,
+            jobDescription,
+            companyName: companyName || undefined,
+            anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
+            mode: 'generate',
+          }),
+        });
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error ?? 'Refresh failed');
+
+        const data = json.data as ResumeBuilderOutput;
+
+        setOutput((prev) => {
+          if (!prev) return null;
+
+          // Keep all existing recs — never wipe applied/selected state.
+          // Append only genuinely new ones (deduplicated by normalised claim text).
+          const existingClaims = new Set(
+            prev.gapAnalysis.recommendations.map((r) =>
+              r.claim.trim().toLowerCase()
+            )
+          );
+          const newRecs = data.gapAnalysis.recommendations.filter(
+            (r) => !existingClaims.has(r.claim.trim().toLowerCase())
+          );
+
+          return {
+            ...prev,
+            gapAnalysis: {
+              ...data.gapAnalysis,                          // refresh scores, dealbreakers, matches
+              recommendations: [
+                ...prev.gapAnalysis.recommendations,       // preserve existing (applied ones intact)
+                ...newRecs,                                 // append only net-new gaps
+              ],
+            },
+          };
+        });
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [output, jobDescription, companyName, selectedModel]
+  );
+
   return {
     resume,
     jobDescription,
@@ -187,5 +250,6 @@ export function useGenerate() {
     handleGenerate,
     handleRefine,
     handleRevert,
+    handleRefreshRecommendations,
   };
 }

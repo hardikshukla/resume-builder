@@ -39,6 +39,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 
 import { useApiKey } from '@/hooks/useApiKey';
 import { Recommendation } from '@/types';
@@ -139,6 +140,7 @@ export default function Home() {
     handleGenerate,
     handleRefine,
     handleRevert,
+    handleRefreshRecommendations,
   } = useGenerate();
 
   const [activeTab, setActiveTab] = useState(0);
@@ -156,6 +158,7 @@ export default function Home() {
   const [dropboxVerifyStatus, setDropboxVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetch('/api/config')
@@ -715,11 +718,35 @@ export default function Home() {
                       {/* Recommendations */}
                       <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 2 }}>
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <WarningIcon color="warning" fontSize="small" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              📋 Actionable Recommendations ({allRecommendations.length})
-                            </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <WarningIcon color="warning" fontSize="small" />
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                📋 Actionable Recommendations ({allRecommendations.length})
+                              </Typography>
+                            </Box>
+                            <IconButton
+                              id="refresh-recommendations-btn"
+                              size="small"
+                              disabled={isRefreshing || isLoading}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setIsRefreshing(true);
+                                await handleRefreshRecommendations(anthropicKey || undefined);
+                                setIsRefreshing(false);
+                              }}
+                              title="Re-analyse resume against JD and surface any new gaps"
+                              sx={{
+                                color: 'warning.main',
+                                opacity: isRefreshing ? 0.6 : 1,
+                                transition: 'opacity 0.2s',
+                                '&:hover': { backgroundColor: 'rgba(237,108,2,0.1)' },
+                              }}
+                            >
+                              {isRefreshing
+                                ? <CircularProgress size={16} color="warning" />
+                                : <AutorenewIcon fontSize="small" sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />}
+                            </IconButton>
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
