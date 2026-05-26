@@ -50,6 +50,13 @@ import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS } from
 // ── Simple word-level diff for highlights ────────────────────────────────────
 function diffWords(original: string, current: string): React.ReactNode[] {
   if (original === current) return [current];
+  if (!original) {
+    return [
+      <ins key={0} style={{ textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>
+        {current}
+      </ins>
+    ];
+  }
   const oWords = original.split(/(\s+)/);
   const cWords = current.split(/(\s+)/);
   const dp: number[][] = Array(oWords.length + 1)
@@ -356,7 +363,7 @@ export default function Home() {
   };
 
   const renderDiff = (original: string | undefined, current: string) => {
-    if (showHighlights && original && current !== original) return <>{diffWords(original, current)}</>;
+    if (showHighlights && current !== original) return <>{diffWords(original || '', current)}</>;
     return current;
   };
 
