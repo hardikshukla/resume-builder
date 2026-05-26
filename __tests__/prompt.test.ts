@@ -59,6 +59,11 @@ describe('buildSystemPrompt()', () => {
     expect(prompt).toMatch(/Actionable & Strategic/i);
   });
 
+  it('contains the project description synthesis rule in rules section', () => {
+    expect(prompt).toMatch(/For projects: Synthesize a concise 1-sentence description/i);
+    expect(prompt).toMatch(/Do NOT include tech stack, tools, or implementation details/i);
+  });
+
   it('is idempotent — returns the same string on every call', () => {
     expect(buildSystemPrompt()).toBe(prompt);
   });
