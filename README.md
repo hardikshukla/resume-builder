@@ -85,11 +85,10 @@ Copy `.env.example` → `.env.local`. All values are optional — sensible defau
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/generate` | `POST` | Full resume generation — runs the 5-step ATS methodology |
-| `/api/refine` | `POST` | Surgical update — applies selected recommendations to the original resume |
-| `/api/download` | `POST` | Streams a `.docx` blob for resume or cover letter |
-| `/api/parse-resume` | `POST` | Extracts plain text from an uploaded PDF or DOCX |
+| `/api/generate` | `POST` | Processes full generation (`mode: 'generate'`) and refinement (`mode: 'refine'`) |
+| `/api/parse-resume` | `POST` | Extracts plain text from an uploaded DOCX or TXT file |
 | `/api/models` | `POST` | Lists available models for the selected provider (cached 60 s per user) |
+| `/api/config` | `GET` | Retrieves default provider configurations (SSRF blocklists, etc.) |
 | `/api/dropbox/verify` | `POST` | Validates the user's Dropbox personal access token |
 | `/api/dropbox/sync` | `POST` | Uploads generated `.docx` files directly to the user's Dropbox |
 
@@ -97,8 +96,7 @@ Copy `.env.example` → `.env.local`. All values are optional — sensible defau
 
 | Route | Limit | Window |
 |-------|-------|--------|
-| `/api/generate` | 5 requests | 60 s per IP |
-| `/api/refine` | 15 requests | 60 s per IP |
+| `/api/generate` | 15 requests | 60 s per IP |
 | `/api/dropbox/sync` | 5 requests | 60 s per IP |
 
 Returns `429` with a `Retry-After` header and a `retryAfterSeconds` field in the JSON body.
@@ -118,29 +116,28 @@ sequenceDiagram
     participant DBX as Dropbox API
 
     opt Resume Upload
-        U->>UI: Upload PDF or DOCX
+        U->>UI: Upload DOCX or TXT
         UI->>API: POST /api/parse-resume
         API-->>UI: Extracted plain text
     end
 
     U->>UI: Paste JD + Resume text
-    UI->>API: POST /api/generate
+    UI->>API: POST /api/generate (mode: 'generate')
     API->>LLM: Analyze & generate (prompt cached)
     LLM-->>API: Structured JSON
     API-->>UI: Resume · Cover Letter · Gap Analysis · Score
 
     opt Selective Refinement
-        U->>UI: Select gap recommendations
-        UI->>API: POST /api/refine (original data, never chained)
+        U->>UI: Select gap recommendations (and/or type custom instructions)
+        UI->>API: POST /api/generate (mode: 'refine', original data, never chained)
         API->>LLM: Target specific section (message cached)
-        LLM-->>API: Updated section
-        API-->>UI: Patch section in UI
+        LLM-->>API: Updated sections
+        API-->>UI: Patch sections & highlights in UI
     end
 
     opt Local Download
         U->>UI: Click Download
-        UI->>API: POST /api/download
-        API-->>UI: Streamed .docx file
+        UI->>UI: Generate .docx in browser directly (zero tokens, client-side)
     end
 
     opt Dropbox Sync
@@ -179,69 +176,49 @@ graph TD
 
 ```
 hooks/
-  useProviderConfig.ts      Provider/API-key state + sessionStorage + lock flag
-  useGenerate.ts            Inputs, section caching, output, handleGenerate
-  useRefine.ts              Refine state, handleRefine (always-from-original), handleRevert
-  useSectionCache.ts        SHA-256 keyed sessionStorage cache for section results
+  useApiKey.ts              API-key state + sessionStorage helpers
+  useGenerate.ts            Resume generation hook (both full generate and refine)
   useInactivityTimeout.ts   Clears sessionStorage after 20 min of inactivity
 
 app/
-  page.tsx                  ~120-line orchestrator — composes hooks + layout
+  page.tsx                  The single-page resume builder UI orchestrator (conflates components)
   globals.css               Design tokens and component styles (pure CSS, no Tailwind)
   layout.tsx                Root layout + SEO metadata
   api/
-    generate/route.ts       Full generation endpoint
-    refine/route.ts         Selective refinement endpoint
-    download/route.ts       DOCX streaming with sanitized filename
-    parse-resume/route.ts   PDF/DOCX text extraction
-    models/route.ts         Provider model list (SSRF-validated, 60 s cache)
-    dropbox/verify/route.ts Token validation
-    dropbox/sync/route.ts   Secure DOCX upload to Dropbox
+    config/route.ts         Retrieves provider configurations (e.g. default models)
+    generate/route.ts       Handles full generation and refinement LLM dispatch
+    models/route.ts         Retrieves available models for the selected provider
+    parse-resume/route.ts   Extracts text from uploaded DOCX or TXT files
+    dropbox/
+      verify/route.ts       Validates Dropbox personal access tokens
+      sync/route.ts         Uploads generated files directly to Dropbox
 
 components/
-  ResumeForm.tsx            Left panel: inputs, provider selector, generate button
-  OutputPanel.tsx           Orchestrates all output sub-components
-  ProviderSelector.tsx      Provider + API key + model override
-  DownloadButton.tsx        Triggers /api/download
-  ResumeUploader.tsx        Drag-and-drop upload → text extraction
-  output-panel/
-    CloudSyncButton.tsx         Browser-direct Dropbox upload
-    ViewToggle.tsx              Original / Updated tab switcher
-    ScoreBadge.tsx              Keyword coverage % with colour band
-    CollapsibleSection.tsx      Generic collapsible list
-    ATSOptimizationSummary.tsx  Keywords added + summary rewrite explanation
-    MissingKeywordsPanel.tsx    Select missing keywords → targeted refine
-    RefineableRecommendations.tsx Checkbox list → Apply & Refine
-    ResumePreview.tsx           Structured HTML preview of the generated resume JSON
+  ThemeRegistry.tsx         Material-UI Theme and cache registry
 
 lib/
-  env.ts                    Startup env-var validation (fail-fast)
   prompt.ts                 buildSystemPrompt(), buildUserMessage(), buildRefinePrompt()
-  sectionParser.ts          Splits raw resume text into named sections for cache keying
-  docxGenerator.ts          ATS-clean resume DOCX (Times New Roman, adaptive sections)
-  coverLetterGenerator.ts   Cover letter DOCX (matching header, deduplicated salutation)
+  docxGenerator.ts          Surgical DOCX generator
+  coverLetterGenerator.ts   Cover letter DOCX generator
   constants.ts              MAX_RESUME_CHARS, MAX_JD_CHARS, warn thresholds
   utils/
-    string.ts               toCamelCase, sanitizeFilename, getTimestampStr
+    string.ts               buildDownloadFilename, capitalizeName
   llm/
     index.ts                Fallback-chain router
     anthropic.ts            Claude handler (native prompt caching)
-    openai.ts               GPT-4o handler (automatic message caching)
+    openai.ts               GPT-4o handler
     ollama.ts               Ollama handler
-    dispatch.ts             Raw dispatch used by the refine route
     schema.ts               Zod schema for LLM output validation
-    guard.ts                Post-parse placeholder guard
 
-middleware.ts               Rate limiting — sliding window per IP, 429 + Retry-After
+middleware.ts               Rate limiting (sliding window per IP)
 types/index.ts              All shared TypeScript types
 
 __tests__/
   prompt.test.ts            buildSystemPrompt, buildRefinePrompt, GapAnalysis schema
-  docx.test.ts              DOCX generators: valid ZIP blobs, >5 KB, distinct output per input
-
-sentry.client.config.ts     Browser error tracking (API key scrubbing, replay masking)
-sentry.server.config.ts     Server error tracking (API key scrubbing from request bodies)
-sentry.edge.config.ts       Edge/middleware error tracking
+  docx.test.ts              DOCX generators checks
+  timeout.test.ts           Inactivity timeout checks
+  filename.test.ts          Download filename checks
+  sentry.test.ts            Sentry config checks
 ```
 
 ---

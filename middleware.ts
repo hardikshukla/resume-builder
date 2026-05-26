@@ -1,53 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * ── Rate Limiting Middleware (T6.2) ──────────────────────────────────────────
- *
- * Protects the two expensive LLM routes from abuse using an in-memory sliding
- * window counter per IP address.
- *
- * Limits (per IP):
- *   /api/generate  — 5 requests / 60 seconds  (costs ~$0.05–0.20 per call)
- *   /api/refine    — 15 requests / 60 seconds (cheaper, but still bounded)
- *
- * ── Upgrading to Upstash Redis (for multi-instance / Vercel deployment) ───────
- * This implementation uses process memory, which resets on every cold start and
- * is NOT shared across multiple server instances. For production:
- *
- *   1. npm install @upstash/ratelimit @upstash/redis
- *   2. Set env vars: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
- *   3. Replace the in-memory store below with:
- *
- *      import { Ratelimit } from '@upstash/ratelimit';
- *      import { Redis }     from '@upstash/redis';
- *
- *      const ratelimit = new Ratelimit({
- *        redis: Redis.fromEnv(),
- *        limiter: Ratelimit.slidingWindow(5, '60 s'),
- *      });
- *
- *      const { success } = await ratelimit.limit(ip);
- *
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
-// Per-route window config
 const ROUTES: Record<string, { limit: number; windowMs: number }> = {
-  '/api/generate':     { limit: 5,  windowMs: 60_000 },
-  '/api/refine':       { limit: 15, windowMs: 60_000 },
-  '/api/dropbox/sync': { limit: 5,  windowMs: 60_000 },
+  '/api/generate': { limit: 5, windowMs: 60_000 },
 };
 
 interface WindowEntry {
-  count:     number;
+  count: number;
   windowStart: number;
 }
 
-// In-memory store: Map<route, Map<ip, WindowEntry>>
 const store = new Map<string, Map<string, WindowEntry>>();
 
 function getClientIp(req: NextRequest): string {
-  // Vercel forwards the real IP in x-forwarded-for; fall back to a placeholder.
   return (
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
     req.headers.get('x-real-ip') ??
@@ -66,7 +30,6 @@ function checkLimit(route: string, ip: string): { allowed: boolean; remaining: n
   const entry = routeStore.get(ip);
 
   if (!entry || now - entry.windowStart >= config.windowMs) {
-    // New window
     routeStore.set(ip, { count: 1, windowStart: now });
     return { allowed: true, remaining: config.limit - 1, resetMs: config.windowMs };
   }
@@ -76,32 +39,36 @@ function checkLimit(route: string, ip: string): { allowed: boolean; remaining: n
     return { allowed: false, remaining: 0, resetMs };
   }
 
-  entry.count++;
-  return { allowed: true, remaining: config.limit - entry.count, resetMs: config.windowMs - (now - entry.windowStart) };
+  entry.count += 1;
+  return {
+    allowed: true,
+    remaining: config.limit - entry.count,
+    resetMs: config.windowMs - (now - entry.windowStart),
+  };
 }
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-
-  // Only rate-limit the LLM routes
   if (!ROUTES[pathname]) return NextResponse.next();
 
   const ip = getClientIp(req);
   const { allowed, remaining, resetMs } = checkLimit(pathname, ip);
 
   if (!allowed) {
+    const retryAfterSeconds = Math.ceil(resetMs / 1000);
     return NextResponse.json(
       {
-        error: 'Too many requests. Please wait before generating again.',
-        retryAfterSeconds: Math.ceil(resetMs / 1000),
+        success: false,
+        error: 'Too many requests. Please wait before generating or refining again.',
+        retryAfterSeconds,
       },
       {
         status: 429,
         headers: {
-          'Retry-After':        String(Math.ceil(resetMs / 1000)),
-          'X-RateLimit-Limit':  String(ROUTES[pathname].limit),
+          'Retry-After': String(retryAfterSeconds),
+          'X-RateLimit-Limit': String(ROUTES[pathname].limit),
           'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset':  String(Date.now() + resetMs),
+          'X-RateLimit-Reset': String(Date.now() + resetMs),
         },
       }
     );
@@ -113,5 +80,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/generate', '/api/refine', '/api/dropbox/sync'],
+  matcher: ['/api/generate'],
 };

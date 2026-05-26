@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const { token } = await req.json();
 
@@ -8,7 +8,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ valid: false, error: 'Token is required' }, { status: 400 });
     }
 
-    // Verify token by fetching the current user's account
     const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
       method: 'POST',
       headers: {
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
 
     if (response.ok) {
       const data = await response.json();
-      return NextResponse.json({ valid: true, account: data.name?.display_name });
+      return NextResponse.json({ valid: true, account: data.name?.display_name || 'Connected Account' });
     } else {
       const errorText = await response.text();
       let errorMessage = 'Invalid token';
@@ -28,7 +27,7 @@ export async function POST(req: Request) {
           errorMessage = errorJson.error_summary;
         }
       } catch {
-        // Fallback to text if not JSON
+        // Fallback
       }
       return NextResponse.json({ valid: false, error: errorMessage }, { status: 401 });
     }

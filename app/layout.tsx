@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
-import localFont from 'next/font/local';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
+import ThemeRegistry from '@/components/ThemeRegistry';
 import './globals.css';
-
-const inter = localFont({
-  src: './fonts/GeistVF.woff',
-  variable: '--font-inter',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'Resume Builder — AI-Powered ATS Resume Optimizer',
@@ -19,7 +14,6 @@ export const metadata: Metadata = {
     'cover letter generator',
     'job description tailoring',
     'Claude AI',
-    'GPT-4o',
   ],
   authors: [{ name: 'Resume Builder' }],
   openGraph: {
@@ -36,8 +30,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body>{children}</body>
+    <html lang="en">
+      <body>
+        <AppRouterCacheProvider>
+          <ThemeRegistry>{children}</ThemeRegistry>
+        </AppRouterCacheProvider>
+      </body>
     </html>
   );
 }

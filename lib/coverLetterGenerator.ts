@@ -1,4 +1,5 @@
-import { CoverLetterData, ResumeData } from '@/types';
+import { ResumeData, CoverLetterData } from '@/types';
+import { capitalizeName } from '@/lib/utils/string';
 import {
   Document,
   Packer,
@@ -9,89 +10,98 @@ import {
 } from 'docx';
 
 /**
- * Strips any salutation line the LLM might have written at the top of the body.
- * The generator adds its own canonical salutation, so we must avoid duplicates.
- * Matches variations like:
- *   "Dear Hiring Manager,"  /  "Dear Manager,"  /  "Dear [Name],"
- */
-function stripLeadingSalutation(body: string): string {
-  return body
-    .split('\n')
-    .filter((line) => !/^\s*dear\b/i.test(line.trim()))
-    .join('\n')
-    .replace(/^\n+/, ''); // drop any leading blank lines that remain
-}
-
-/**
- * Strips protocol, www, and trailing slash so URLs display cleanly
- * on the letter header, e.g. "linkedin.com/in/username".
+ * Strips protocol, www, and trailing slash from a URL so it displays cleanly.
  */
 function shortenUrl(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 }
 
-export async function generateCoverLetterDOCX(
-  coverLetter: CoverLetterData,
-  resume: ResumeData,
-  companyName?: string
-): Promise<Blob> {
-  const JUSTIFY = AlignmentType.BOTH;
-
+/**
+ * Shared candidate header function.
+ */
+function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): Paragraph[] {
   const children: Paragraph[] = [];
 
-  // ── CANDIDATE NAME (centred, large — mirrors resume header) ────────────────
+  const formattedName = name ? name.toUpperCase() : 'FIRST LAST';
+
+  // Name (Bold, 14pt, centered)
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 0, after: 60 },
       children: [
         new TextRun({
-          text: resume.name,
+          text: formattedName,
           font: 'Times New Roman',
-          size: 32,
+          size: 28, // 14pt (half-points)
           bold: true,
         }),
       ],
     })
   );
 
-  // ── CONTACT LINE (centred, pipe-separated — mirrors resume header) ─────────
+  // Contact line (11pt, centered, pipe-separated)
   const contactParts: string[] = [];
-  if (resume.contact?.email)    contactParts.push(resume.contact.email);
-  if (resume.contact?.phone)    contactParts.push(resume.contact.phone);
-  if (resume.contact?.linkedin) contactParts.push(shortenUrl(resume.contact.linkedin));
-  if (resume.contact?.github)   contactParts.push(shortenUrl(resume.contact.github));
-  if (resume.contact?.location) contactParts.push(resume.contact.location);
+  if (contact?.email) contactParts.push(contact.email);
+  if (contact?.phone) contactParts.push(contact.phone);
+  if (contact?.linkedin) contactParts.push(shortenUrl(contact.linkedin));
+  if (contact?.github) contactParts.push(shortenUrl(contact.github));
+  if (contact?.location) contactParts.push(contact.location);
 
-  if (contactParts.length > 0) {
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 240 },
-        children: [
-          new TextRun({
-            text: contactParts.join('  |  '),
-            font: 'Times New Roman',
-            size: 18,
-          }),
-        ],
-      })
-    );
-  }
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 120 },
+      children: [
+        new TextRun({
+          text: contactParts.join('  |  '),
+          font: 'Times New Roman',
+          size: 22, // 11pt
+        }),
+      ],
+    })
+  );
 
-  // ── HORIZONTAL RULE (border-bottom on an empty paragraph) ─────────────────
+  // Thin horizontal rule
   children.push(
     new Paragraph({
       border: {
-        bottom: { style: BorderStyle.SINGLE, size: 6, color: '2C3E50', space: 1 },
+        bottom: {
+          style: BorderStyle.SINGLE,
+          size: 6,
+          color: 'A0A0A0',
+          space: 1,
+        },
       },
-      spacing: { before: 0, after: 240 },
+      spacing: { before: 0, after: 200 },
       children: [],
     })
   );
 
-  // ── DATE ──────────────────────────────────────────────────────────────────
-  const today = new Date().toLocaleDateString('en-US', {
+  return children;
+}
+
+/**
+ * Generates a cover letter DOCX blob.
+ *
+ * @param coverLetter  The cover letter data (subject + body).
+ * @param resume       The candidate's resume data (name, contact info).
+ * @param companyName  Optional company name (currently reserved for future use).
+ */
+export async function generateCoverLetterDOCX(
+  coverLetter: CoverLetterData,
+  resume: ResumeData,
+  companyName?: string
+): Promise<Blob> {
+  void companyName; // reserved for future personalisation
+
+  const children: Paragraph[] = [];
+
+  // Header
+  children.push(...buildCandidateHeader(resume.name, resume.contact));
+
+  // Date
+  const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -99,83 +109,78 @@ export async function generateCoverLetterDOCX(
 
   children.push(
     new Paragraph({
-      alignment: JUSTIFY,
-      spacing: { before: 0, after: 240 },
-      children: [new TextRun({ text: today, font: 'Times New Roman', size: 20 })],
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 120, after: 120 },
+      children: [
+        new TextRun({ text: dateStr, font: 'Times New Roman', size: 22 }),
+      ],
     })
   );
 
-  // ── SUBJECT ───────────────────────────────────────────────────────────────
+  // Subject line
   children.push(
     new Paragraph({
-      alignment: JUSTIFY,
-      spacing: { before: 0, after: 160 },
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 120, after: 200 },
       children: [
         new TextRun({
-          text: `Re: ${coverLetter.subject}`,
+          text: `Subject: ${coverLetter.subject}`,
           font: 'Times New Roman',
-          size: 20,
+          size: 22,
           bold: true,
         }),
       ],
     })
   );
 
-  // ── SALUTATION (canonical — never duplicated) ──────────────────────────────
+  // Greeting
   children.push(
     new Paragraph({
-      alignment: JUSTIFY,
-      spacing: { before: 0, after: 200 },
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 0, after: 120 },
       children: [
-        new TextRun({
-          text: `Dear Hiring Manager${companyName ? ' at ' + companyName : ''},`,
-          font: 'Times New Roman',
-          size: 20,
-        }),
+        new TextRun({ text: 'Dear Hiring Manager,', font: 'Times New Roman', size: 22 }),
       ],
     })
   );
 
-  // ── BODY (strip any LLM-written salutation to prevent duplication) ─────────
-  const cleanBody = stripLeadingSalutation(coverLetter.body);
-  const paragraphs = cleanBody
-    .split('\n')
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-
-  for (const para of paragraphs) {
+  // Body paragraphs
+  for (const paraText of coverLetter.body.split(/\n+/)) {
+    const trimmed = paraText.trim();
+    if (!trimmed) continue;
     children.push(
       new Paragraph({
-        alignment: JUSTIFY,
-        spacing: { before: 0, after: 200 },
-        children: [new TextRun({ text: para, font: 'Times New Roman', size: 20 })],
+        alignment: AlignmentType.BOTH,
+        spacing: { before: 0, after: 120 },
+        children: [
+          new TextRun({ text: trimmed, font: 'Times New Roman', size: 22 }),
+        ],
       })
     );
   }
 
-  // ── SIGN-OFF ───────────────────────────────────────────────────────────────
+  // Sign off
   children.push(
     new Paragraph({
-      alignment: JUSTIFY,
+      alignment: AlignmentType.LEFT,
       spacing: { before: 200, after: 40 },
       children: [
-        new TextRun({ text: 'Sincerely,', font: 'Times New Roman', size: 20 }),
+        new TextRun({ text: 'Sincerely,', font: 'Times New Roman', size: 22 }),
       ],
     })
   );
 
-  const titleCasedName = (resume.name || '')
-    .toLowerCase()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-
   children.push(
     new Paragraph({
-      alignment: JUSTIFY,
-      spacing: { before: 0, after: 0 },
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 200, after: 0 },
       children: [
-        new TextRun({ text: titleCasedName, font: 'Times New Roman', size: 20, bold: true }),
+        new TextRun({
+          text: resume.name ? capitalizeName(resume.name) : 'Candidate Name',
+          font: 'Times New Roman',
+          size: 22,
+          bold: true,
+        }),
       ],
     })
   );
@@ -185,8 +190,8 @@ export async function generateCoverLetterDOCX(
       {
         properties: {
           page: {
-            size: { width: 12240, height: 15840 },
-            margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 },
+            size: { width: 12240, height: 15840 }, // US Letter
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1-inch margins
           },
         },
         children,

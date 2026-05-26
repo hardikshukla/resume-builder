@@ -1,13 +1,5 @@
 /**
  * schema.ts — Zod runtime validation for LLM output.
- *
- * Called via `safeParse()` in every provider adapter immediately after
- * JSON.parse. Prevents malformed LLM responses from reaching React state
- * or DOCX generation unchecked.
- *
- * The schema mirrors the TypeScript types in types/index.ts. If you add
- * a field to the types, add it here too — the build will not enforce this
- * automatically because providers cast with `as` before this file existed.
  */
 
 import { z } from 'zod';
@@ -16,7 +8,7 @@ import { z } from 'zod';
 
 const ProjectSchema = z.object({
   name:        z.string(),
-  description: z.string(),
+  description: z.string().nullable(),
   bullets:     z.array(z.string()),
   link:        z.string().nullable(),
   tech:        z.array(z.string()),
@@ -44,10 +36,54 @@ const SkillGroupSchema = z.object({
   items:    z.array(z.string()),
 });
 
+const DealbreakerSchema = z.object({
+  id:   z.string(),
+  text: z.string(),
+});
+
+const RecommendationSchema = z.object({
+  id:                   z.string(),
+  claim:                z.string(),
+  targetSection:        z.string(),
+  evidenceRequired:     z.string(),
+  evidenceFound:        z.string(),
+  riskLevel:            z.enum(['low', 'medium', 'high']),
+  // LLMs sometimes omit this when no dealbreakers are resolved — default to []
+  resolvesDealbreakers: z.array(z.string()).default([]),
+});
+
 const MissingKeywordSchema = z.object({
+  id:               z.string(),
   keyword:          z.string(),
   suggestedSection: z.string(),
   suggestedBullet:  z.string(),
+});
+
+// ── Shared Resume Schema ─────────────────────────────────────────────────────
+
+const ResumeSchema = z.object({
+  name:    z.string().optional(),
+  contact: z.object({
+    email:    z.string(),
+    phone:    z.string().nullable(),
+    linkedin: z.string().nullable(),
+    github:   z.string().nullable(),
+    location: z.string().nullable(),
+  }).optional(),
+  summary:         z.string().optional(),
+  skills:          z.array(SkillGroupSchema).optional(),
+  experience:      z.array(ExperienceSchema).optional(),
+  projects:        z.array(ProjectSchema).optional(),
+  education:       z.array(EducationSchema).optional(),
+  certifications:  z.array(z.string()).optional(),
+  publications:    z.array(z.string()).optional(),
+  awards:          z.array(z.string()).optional(),
+  languages:       z.array(z.string()).optional(),
+});
+
+const CoverLetterSchema = z.object({
+  subject: z.string(),
+  body:    z.string(),
 });
 
 // ── Top-level output ─────────────────────────────────────────────────────────
@@ -57,38 +93,22 @@ export const ResumeBuilderOutputSchema = z.object({
     matchScore:      z.number().int().min(0).max(100),
     strongMatches:   z.array(z.string()),
     gaps:            z.array(z.string()),
-    dealbreakers:    z.array(z.string()),
-    recommendations: z.array(z.string()),
+    dealbreakers:    z.array(DealbreakerSchema),
+    recommendations: z.array(RecommendationSchema),
     keywordsAdded:   z.array(z.string()),
     missingKeywords: z.array(MissingKeywordSchema),
     summaryChanges:  z.string(),
     extractedCompanyName: z.string().nullable().optional(),
   }),
+  resume: z.lazy(() => ResumeSchema),
+  coverLetter: CoverLetterSchema.optional(),
+});
 
-  resume: z.object({
-    name:    z.string().optional(),
-    contact: z.object({
-      email:    z.string(),
-      phone:    z.string().nullable(),
-      linkedin: z.string().nullable(),
-      github:   z.string().nullable(),
-      location: z.string().nullable(),
-    }).optional(),
-    summary:         z.string().optional(),
-    skills:          z.array(SkillGroupSchema).optional(),
-    experience:      z.array(ExperienceSchema).optional(),
-    projects:        z.array(ProjectSchema).optional(),
-    education:       z.array(EducationSchema).optional(),
-    certifications:  z.array(z.string()).optional(),
-    publications:    z.array(z.string()).optional(),
-    awards:          z.array(z.string()).optional(),
-    languages:       z.array(z.string()).optional(),
-  }),
-
-  coverLetter: z.object({
-    subject: z.string(),
-    body:    z.string(),
-  }).optional(),
+export const RefineOutputSchema = z.object({
+  resume: z.lazy(() => ResumeSchema),
+  coverLetter: CoverLetterSchema.optional(),
+  updatedMatchScore: z.number().int().min(0).max(100),
 });
 
 export type ValidatedResumeBuilderOutput = z.infer<typeof ResumeBuilderOutputSchema>;
+export type ValidatedRefineOutput = z.infer<typeof RefineOutputSchema>;

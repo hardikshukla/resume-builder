@@ -1,205 +1,283 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useSectionCache } from './useSectionCache';
-import { parseSections, SectionKey } from '@/lib/sectionParser';
-import { ResumeBuilderOutput } from '@/types';
-import { ProviderConfig } from './useProviderConfig';
+import { ResumeBuilderOutput, Recommendation } from '@/types';
+import { resumeDataToText } from '@/lib/utils/string';
 
 const LOCAL_RESUME = 'rb_resume';
-const FULL_GENERATION_CACHE = 'rb_cache_full_generation';
-
-export type GenerationResult = {
-  result: ResumeBuilderOutput;
-  providerUsed: string;
-  fallbackOccurred: boolean;
-  fallbackReason?: string;
-};
+const CACHE_KEYS_KEY = 'rb_cache_keys';
+const MAX_CACHE_SIZE = 10;
 
 async function computeHash(content: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export interface UseGenerateReturn {
-  // Content inputs
-  resume:        string;
-  jobDescription:string;
-  companyName:   string;
-  setResume:     (v: string) => void;
-  setJD:         (v: string) => void;
-  setCompany:    (v: string) => void;
-  handleResumeChange: (v: string) => void; // also persists to localStorage
-
-  // Generation state
-  output:        GenerationResult | null;
-  originalOutput:GenerationResult | null;
-  isLoading:     boolean;
-  error:         string | null;
-
-  // Actions
-  handleGenerate: () => Promise<void>;
-  /** Overwrite output (used by useRefine to merge updated resume) */
-  setOutput:      React.Dispatch<React.SetStateAction<GenerationResult | null>>;
-  /** Restore output to the original locked result */
-  restoreOriginal:() => void;
+function getCachedData(hash: string): ResumeBuilderOutput | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = sessionStorage.getItem(`rb_cache_run_${hash}`);
+    if (cached) {
+      const parsed = JSON.parse(cached) as ResumeBuilderOutput;
+      updateLruKeys(hash);
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse cache entry:', e);
+  }
+  return null;
 }
 
-export function useGenerate(config: ProviderConfig): UseGenerateReturn {
-  const [resume,         setResume]          = useState('');
+function setCachedData(hash: string, data: ResumeBuilderOutput) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(`rb_cache_run_${hash}`, JSON.stringify(data));
+    updateLruKeys(hash);
+  } catch (e) {
+    console.error('Failed to set cache entry:', e);
+  }
+}
+
+function updateLruKeys(hash: string) {
+  try {
+    const keysStr = sessionStorage.getItem(CACHE_KEYS_KEY);
+    let keys: string[] = keysStr ? JSON.parse(keysStr) : [];
+    
+    // Filter out existing occurrence
+    keys = keys.filter((k) => k !== hash);
+    
+    // Add to the end (MRU)
+    keys.push(hash);
+    
+    // Evict oldest entries if cache limit is exceeded
+    while (keys.length > MAX_CACHE_SIZE) {
+      const evictedHash = keys.shift();
+      if (evictedHash) {
+        sessionStorage.removeItem(`rb_cache_run_${evictedHash}`);
+      }
+    }
+    
+    sessionStorage.setItem(CACHE_KEYS_KEY, JSON.stringify(keys));
+  } catch (e) {
+    console.error('Failed to update cache keys:', e);
+  }
+}
+
+export function useGenerate() {
+  const [resume, setResume] = useState('');
+  const [jobDescription, setJD] = useState('');
+  const [companyName, setCompany] = useState('');
+  const [selectedModel, setSelectedModel] = useState('claude-3-5-sonnet-20241022');
+  const [output, setOutput] = useState<ResumeBuilderOutput | null>(null);
+  const [originalOutput, setOriginalOutput] = useState<ResumeBuilderOutput | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_RESUME);
-    if (saved) setResume(saved);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(LOCAL_RESUME);
+      if (saved) setResume(saved);
+    }
   }, []);
-  const [jobDescription, setJD]             = useState('');
-  const [companyName,    setCompany]         = useState('');
-  const [output,         setOutput]          = useState<GenerationResult | null>(null);
-  const [originalOutput, setOriginalOutput]  = useState<GenerationResult | null>(null);
-  const [isLoading,      setIsLoading]       = useState(false);
-  const [error,          setError]           = useState<string | null>(null);
 
   const handleResumeChange = useCallback((v: string) => {
     setResume(v);
-    localStorage.setItem(LOCAL_RESUME, v);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_RESUME, v);
+    }
   }, []);
 
-  const { getCachedSection, setCachedSection, invalidateSummary } = useSectionCache();
+  const handleGenerate = useCallback(
+    async (anthropicKey?: string) => {
+      setError(null);
 
-  const handleGenerate = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setOutput(null);
-    setOriginalOutput(null);
-    config.unlockProvider(); // reset lock so provider can't be changed mid-gen
-    try {
-      const selectedModel =
-        config.provider === 'anthropic' ? config.anthropicModel :
-        config.provider === 'openai'    ? config.openaiModel :
-        config.ollamaModel;
-      const fullCacheHash = await computeHash(JSON.stringify({
-        resume,
-        jobDescription,
-        companyName,
-        provider: config.provider,
-        selectedModel,
-        hasAnthropicFallback: config.anthropicKey.trim().length > 0,
-        hasOpenAIFallback: config.openaiKey.trim().length > 0,
-      }));
-      const cachedFull = sessionStorage.getItem(FULL_GENERATION_CACHE);
-      if (cachedFull) {
-        try {
-          const parsed = JSON.parse(cachedFull) as { hash?: string; data?: GenerationResult };
-          if (parsed.hash === fullCacheHash && parsed.data) {
-            setOutput(parsed.data);
-            setOriginalOutput(parsed.data);
-            setJD('');
-            config.lockProvider();
-            return;
-          }
-        } catch {
-          sessionStorage.removeItem(FULL_GENERATION_CACHE);
-        }
-      }
-
-      const parsedSections = parseSections(resume);
-      const sectionsToGenerate: SectionKey[] = [];
-      const cachedData: Partial<Record<SectionKey, any>> = {};
-
-      // 1. Check Cache for all sections
-      for (const [key, text] of Object.entries(parsedSections)) {
-        if (!text) continue;
-        const cached = await getCachedSection(key, text, jobDescription);
-        if (cached) {
-          cachedData[key as SectionKey] = cached;
-        } else {
-          sectionsToGenerate.push(key as SectionKey);
-        }
-      }
-
-      // 2. Summary Invalidation Rule: Always regenerate summary if any other section is regenerating
-      if (sectionsToGenerate.length > 0 && !sectionsToGenerate.includes('summary')) {
-        sectionsToGenerate.push('summary');
-        delete cachedData['summary'];
-        invalidateSummary();
-      }
-
-      // 3. Request API
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          resume,
-          jobDescription,
-          companyName: companyName || undefined,
-          provider:       config.provider,
-          anthropicKey:   config.anthropicKey   || undefined,
-          openaiKey:      config.openaiKey      || undefined,
-          anthropicModel: config.anthropicModel || undefined,
-          openaiModel:    config.openaiModel    || undefined,
-          ollamaModel:    config.ollamaModel    || undefined,
-          sections:       sectionsToGenerate.length === 0 ? 'all' : sectionsToGenerate,
-        }),
-      });
-
-      // 429 from rate-limiting middleware — surface a friendly countdown message
-      if (res.status === 429) {
-        const j = await res.json().catch(() => ({}));
-        const secs = j.retryAfterSeconds ?? 60;
-        throw new Error(`Rate limit reached. Please wait ${secs} seconds before generating again.`);
-      }
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error ?? 'Generation failed');
-
-      const data = json.data as GenerationResult;
-
-      // 4. Update Cache with freshly generated sections
-      for (const key of sectionsToGenerate) {
-        const text = parsedSections[key as SectionKey];
-        const freshSectionData = data.result.resume[key as keyof typeof data.result.resume];
-        if (text && freshSectionData) {
-          await setCachedSection(key, text, jobDescription, freshSectionData);
-        }
-      }
-
-      // 5. Merge Cached Data back into the result
-      if (sectionsToGenerate.length > 0) {
-        for (const [key, cachedContent] of Object.entries(cachedData)) {
-           // We cast heavily here since the structure matches the resume object
-           (data.result.resume as any)[key] = cachedContent;
-        }
-      }
-
-      setOutput(data);
-      setOriginalOutput(data); // locked — never overwritten by refine
       try {
-        sessionStorage.setItem(
-          FULL_GENERATION_CACHE,
-          JSON.stringify({ hash: fullCacheHash, data })
+        const fullCacheHash = await computeHash(
+          JSON.stringify({ resume, jobDescription, companyName, model: selectedModel })
         );
-      } catch {
-        sessionStorage.removeItem(FULL_GENERATION_CACHE);
-      }
-      setJD('');
-      config.lockProvider();        // T5.4: lock provider after successful generation
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [resume, jobDescription, companyName, config]);
 
-  const restoreOriginal = useCallback(() => {
-    if (originalOutput) setOutput(originalOutput);
+        // Check cache before setting loading states to prevent unnecessary flashes
+        const cachedData = getCachedData(fullCacheHash);
+        if (cachedData) {
+          setOutput(cachedData);
+          setOriginalOutput(cachedData);
+          return;
+        }
+
+        // Cache miss: proceed with loading and API call
+        setIsLoading(true);
+        setOutput(null);
+        setOriginalOutput(null);
+
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume,
+            jobDescription,
+            companyName: companyName || undefined,
+            anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
+            mode: 'generate',
+          }),
+        });
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error ?? 'Generation failed');
+
+        const data = json.data as ResumeBuilderOutput;
+
+        setOutput(data);
+        setOriginalOutput(data);
+        setCachedData(fullCacheHash, data);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [resume, jobDescription, companyName, selectedModel]
+  );
+
+  const handleRefine = useCallback(
+    async (selectedRecommendations: Recommendation[], anthropicKey?: string): Promise<boolean> => {
+      if (!originalOutput) return false;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume,
+            jobDescription,
+            companyName: companyName || undefined,
+            anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
+            mode: 'refine',
+            currentOutput: {
+              resume: output?.resume ?? originalOutput.resume,
+              coverLetter: output?.coverLetter ?? originalOutput.coverLetter,
+            },
+            selectedRecommendations,
+          }),
+        });
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error ?? 'Refinement failed');
+
+        // Refine mode returns { resume, coverLetter, updatedMatchScore }
+        const refined = json.data;
+
+        setOutput((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            resume: refined.resume,
+            coverLetter: refined.coverLetter,
+            gapAnalysis: {
+              ...prev.gapAnalysis,
+              matchScore: refined.updatedMatchScore ?? prev.gapAnalysis.matchScore,
+            },
+          };
+        });
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [resume, jobDescription, companyName, originalOutput, output, selectedModel]
+  );
+
+  const handleRevert = useCallback(() => {
+    if (originalOutput) {
+      setOutput(originalOutput);
+    }
   }, [originalOutput]);
+
+  const handleRefreshRecommendations = useCallback(
+    async (anthropicKey?: string): Promise<boolean> => {
+      if (!output) return false;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const textResume = resumeDataToText(output.resume);
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            resume: textResume,
+            jobDescription,
+            companyName: companyName || undefined,
+            anthropicKey: anthropicKey || undefined,
+            model: selectedModel,
+            mode: 'generate',
+          }),
+        });
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error ?? 'Refresh failed');
+
+        const data = json.data as ResumeBuilderOutput;
+
+        setOutput((prev) => {
+          if (!prev) return null;
+
+          // Keep all existing recs — never wipe applied/selected state.
+          // Append only genuinely new ones (deduplicated by normalised claim text).
+          const existingClaims = new Set(
+            prev.gapAnalysis.recommendations.map((r) =>
+              r.claim.trim().toLowerCase()
+            )
+          );
+          const newRecs = data.gapAnalysis.recommendations.filter(
+            (r) => !existingClaims.has(r.claim.trim().toLowerCase())
+          );
+
+          return {
+            ...prev,
+            gapAnalysis: {
+              // Spread fresh analysis first so all required GapAnalysis fields are present
+              // (gaps, missingKeywords, summaryChanges, dealbreakers, etc.)
+              ...data.gapAnalysis,
+              // Then pin the score-sensitive fields to the previous values so a
+              // non-deterministic re-score never regresses the displayed ATS score.
+              // Score should only update via an explicit refine (updatedMatchScore).
+              matchScore: prev.gapAnalysis.matchScore,
+              keywordsAdded: prev.gapAnalysis.keywordsAdded,
+              strongMatches: prev.gapAnalysis.strongMatches,
+              recommendations: [
+                ...prev.gapAnalysis.recommendations,         // preserve existing (applied ones intact)
+                ...newRecs,                                   // append only net-new gaps
+              ],
+            },
+          };
+        });
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [output, jobDescription, companyName, selectedModel]
+  );
 
   return {
     resume,
     jobDescription,
     companyName,
+    selectedModel,
+    setSelectedModel,
     setResume,
     setJD,
     setCompany,
@@ -209,7 +287,8 @@ export function useGenerate(config: ProviderConfig): UseGenerateReturn {
     isLoading,
     error,
     handleGenerate,
-    setOutput,
-    restoreOriginal,
+    handleRefine,
+    handleRevert,
+    handleRefreshRecommendations,
   };
 }
