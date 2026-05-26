@@ -857,9 +857,9 @@ export default function Home() {
                                       id: `custom-${Date.now()}`,
                                       claim: customRecText.trim(),
                                       targetSection: 'User Custom Instruction',
-                                      evidenceRequired: 'User defined',
-                                      evidenceFound: 'User defined',
-                                      riskLevel: 'low',
+                                      evidenceRequired: 'User supplied',
+                                      evidenceFound: 'User supplied',
+                                      riskLevel: 'medium',
                                       resolvesDealbreakers: [],
                                     };
                                     setCustomRecommendations((prev) => [...prev, newRec]);

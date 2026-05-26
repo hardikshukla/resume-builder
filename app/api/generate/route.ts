@@ -1,55 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runLLM } from '@/lib/llm';
-import { GenerateRequest } from '@/types';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS } from '@/lib/constants';
+import { validateGenerateRequest } from '@/lib/validation/generateRequest';
 
 export const maxDuration = 180; // match LLM timeout
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = (await req.json()) as GenerateRequest;
-
-    if (body.mode === 'generate') {
-      if (!body.resume || !body.jobDescription) {
-        return NextResponse.json(
-          { success: false, error: 'Resume and job description are required for generation.' },
-          { status: 400 }
-        );
-      }
-
-      if (body.resume.length > MAX_RESUME_CHARS) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Resume is too long (${body.resume.length.toLocaleString()} chars). Please shorten to under ${MAX_RESUME_CHARS.toLocaleString()} characters.`,
-          },
-          { status: 400 }
-        );
-      }
-
-      if (body.jobDescription.length > MAX_JD_CHARS) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Job description is too long (${body.jobDescription.length.toLocaleString()} chars). Please shorten to under ${MAX_JD_CHARS.toLocaleString()} characters.`,
-          },
-          { status: 400 }
-        );
-      }
-    } else if (body.mode === 'refine') {
-      if (!body.currentOutput || !body.selectedRecommendations || body.selectedRecommendations.length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'Current output and selected recommendations are required for refinement.' },
-          { status: 400 }
-        );
-      }
-    } else {
+    const validation = validateGenerateRequest(await req.json());
+    if (!validation.success) {
       return NextResponse.json(
-        { success: false, error: 'Invalid mode specified.' },
+        { success: false, error: validation.error },
         { status: 400 }
       );
     }
 
+    const body = validation.data;
     const apiKey = body.anthropicKey || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
