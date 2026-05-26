@@ -1,69 +1,96 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ResumeBuilderOutput } from '@/types';
-import { buildSystemPrompt } from '@/lib/prompt';
-import { guardOutput } from '@/lib/llm/guard';
-import { ResumeBuilderOutputSchema } from '@/lib/llm/schema';
+import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT } from '@/lib/prompt';
+import { ResumeBuilderOutputSchema, RefineOutputSchema } from '@/lib/llm/schema';
 
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20241022';
 
-type SectionKey = 'summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other';
+const PLACEHOLDER_RE = /\[PLACEHOLDER[:\s]/i;
 
-export async function callAnthropic(
-  /**
-   * `prompt` is used as the user message when resume/jd are not provided
-   * (e.g. future callers that pre-build the full prompt). When resume + jd
-   * are both present, the structured user content is built inline and prompt is ignored.
-   */
-  prompt: string,
-  apiKey: string,
-  modelOverride?: string,
-  resume?: string,
-  jd?: string,
-  companyName?: string,
-  sections: SectionKey[] | 'all' = 'all'
-): Promise<ResumeBuilderOutput> {
-  const client = new Anthropic({ apiKey });
-  const model = modelOverride || DEFAULT_MODEL;
-
-  // ── System prompt (cached — reused across all requests) ───────────────────
-  const systemPrompt = buildSystemPrompt();
-
-  // ── User message content ──────────────────────────────────────────────────
-  // Structured as two blocks so Anthropic can cache the JD independently of
-  // the candidate resume. Saves ~45% of input tokens on repeat runs.
-  let jdText = `Please follow the 6-step ATS methodology and return the structured JSON output as specified.\n\nJOB DESCRIPTION:\n${jd}\n${companyName ? `COMPANY NAME: ${companyName}\n` : ''}`;
-  if (sections !== 'all') {
-    jdText += `\n\nGenerate ONLY the following sections in the "resume" object: ${sections.join(', ')}.\nLeave all other sections in the "resume" object unchanged (omit them entirely to save output tokens). You MUST STILL generate the full "gapAnalysis" and "coverLetter" objects.`;
+export function guardOutput(output: unknown, path = 'root'): void {
+  if (typeof output === 'string') {
+    if (PLACEHOLDER_RE.test(output)) {
+      throw new Error(
+        `LLM returned placeholder text at "${path}". ` +
+        `This is a prompt compliance issue — please try again.`
+      );
+    }
+    return;
   }
 
-  // client.beta.messages supports cache_control on text blocks (prompt caching)
-  // Block 1: JD + instructions (cached) — same across repeat generations with same JD
-  // Block 2: candidate resume (not cached — changes per user)
-  const messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = resume && jd
-    ? [
-        {
-          type: 'text',
-          text: jdText,
-          cache_control: { type: 'ephemeral' }
-        } as Anthropic.Beta.Messages.BetaTextBlockParam,
-        {
-          type: 'text',
-          text: `\nCANDIDATE RESUME:\n${resume}`
-        } as Anthropic.Beta.Messages.BetaTextBlockParam
-      ]
-    : [{ type: 'text', text: prompt } as Anthropic.Beta.Messages.BetaTextBlockParam];
+  if (Array.isArray(output)) {
+    output.forEach((item, i) => guardOutput(item, `${path}[${i}]`));
+    return;
+  }
 
-  // ── System prompt block with cache_control ────────────────────────────────
+  if (output !== null && typeof output === 'object') {
+    for (const [key, value] of Object.entries(output)) {
+      guardOutput(value, `${path}.${key}`);
+    }
+  }
+}
+
+export async function callAnthropic(
+  apiKey: string,
+  mode: 'generate' | 'refine',
+  payload: {
+    resume?: string;
+    jobDescription?: string;
+    companyName?: string;
+    currentOutput?: unknown;
+    selectedRecommendations?: string[];
+    modelOverride?: string;
+  }
+): Promise<unknown> {
+  const client = new Anthropic({ apiKey });
+  const model = payload.modelOverride || DEFAULT_MODEL;
+
+  let systemPrompt = '';
+  let messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = [];
+
+  if (mode === 'generate') {
+    if (!payload.resume || !payload.jobDescription) {
+      throw new Error('Resume and Job Description are required for generate mode');
+    }
+    systemPrompt = SYSTEM_PROMPT;
+    messagesContent = [
+      {
+        type: 'text',
+        text: `CANDIDATE RESUME:\n${payload.resume}`,
+        cache_control: { type: 'ephemeral' }
+      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
+      {
+        type: 'text',
+        text: `JOB DESCRIPTION:\n${payload.jobDescription}\n${payload.companyName ? `COMPANY NAME: ${payload.companyName}\n` : ''}`
+      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam
+    ];
+  } else if (mode === 'refine') {
+    if (!payload.currentOutput || !payload.selectedRecommendations) {
+      throw new Error('currentOutput and selectedRecommendations are required for refine mode');
+    }
+    systemPrompt = REFINE_SYSTEM_PROMPT;
+    const recList = payload.selectedRecommendations.map((r) => `- ${r}`).join('\n');
+    messagesContent = [
+      {
+        type: 'text',
+        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`,
+        cache_control: { type: 'ephemeral' }
+      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
+      {
+        type: 'text',
+        text: `SELECTED IMPROVEMENTS TO APPLY:\n${recList}`
+      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam
+    ];
+  }
+
   const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
-    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }
+    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
   ];
 
-  // ── API call ──────────────────────────────────────────────────────────────
   let response: Anthropic.Beta.BetaMessage;
   try {
     response = await client.beta.messages.create({
       model,
-      max_tokens: 16000,   // large resumes + cover letter need headroom
+      max_tokens: 8192,
       system: systemBlocks,
       messages: [{ role: 'user', content: messagesContent }],
       betas: ['prompt-caching-2024-07-31'],
@@ -72,18 +99,22 @@ export async function callAnthropic(
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('looping content') || msg.includes('loop detection')) {
       throw new Error(
-        'Claude flagged the output as repetitive. This usually means your resume has many ' +
-        'similar bullet points across roles. Try reducing repeated phrasing, then generate again.'
+        'Claude flagged the output as repetitive. Try reducing repeated phrasing, then generate again.'
       );
     }
     throw err;
   }
 
-  if (response.stop_reason === 'max_tokens') {
-    throw new Error(
-      'Response was cut off (resume too long). Try shortening your resume or switching to ' +
-      'a model with a larger output limit.'
+  // Log cache stats to server console
+  if (response.usage) {
+    const usage = response.usage as unknown as { cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+    console.log(
+      `[Cache] write: ${usage.cache_creation_input_tokens ?? 0} | read: ${usage.cache_read_input_tokens ?? 0}`
     );
+  }
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('Response was cut off due to token limits. Try shortening input.');
   }
 
   const content = response.content[0];
@@ -94,19 +125,29 @@ export async function callAnthropic(
   const raw = content.text.trim();
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
 
-  let parsed: ResumeBuilderOutput;
+  let parsed: unknown;
   try {
-    const raw_parsed = JSON.parse(cleaned);
-    const result = ResumeBuilderOutputSchema.safeParse(raw_parsed);
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error('Claude returned invalid JSON. Please try again.');
+  }
+
+  if (mode === 'generate') {
+    const result = ResumeBuilderOutputSchema.safeParse(parsed);
     if (!result.success) {
       const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
       const msg = result.error.issues[0]?.message ?? 'schema mismatch';
       throw new Error(`Claude response failed validation at "${field}": ${msg}. Try again.`);
     }
     parsed = result.data;
-  } catch (e) {
-    if (e instanceof Error && e.message.includes('failed validation')) throw e;
-    throw new Error('Claude returned invalid JSON. This can happen with very long resumes — try again.');
+  } else {
+    const result = RefineOutputSchema.safeParse(parsed);
+    if (!result.success) {
+      const field = result.error.issues[0]?.path.join('.') ?? 'unknown';
+      const msg = result.error.issues[0]?.message ?? 'schema mismatch';
+      throw new Error(`Claude refine response failed validation at "${field}": ${msg}. Try again.`);
+    }
+    parsed = result.data;
   }
 
   guardOutput(parsed);

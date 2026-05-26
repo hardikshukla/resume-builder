@@ -1,35 +1,22 @@
-// ── LLM Provider Types ────────────────────────────────────────────────────────
+// ── LLM Configuration Types ────────────────────────────────────────────────────
 
-export type LLMProvider = 'anthropic' | 'openai' | 'ollama';
-
-export interface LLMRequest {
-  resume: string;
-  jobDescription: string;
-  companyName?: string;
-  provider: LLMProvider;
-  anthropicKey?: string;
-  openaiKey?: string;
-  anthropicModel?: string;  // overrides ANTHROPIC_MODEL env var
-  openaiModel?: string;     // overrides OPENAI_MODEL env var
-  ollamaModel?: string;     // overrides OLLAMA_MODEL env var
-  sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
-}
-
-export interface LLMResponse {
-  result: ResumeBuilderOutput;
-  providerUsed: LLMProvider;
-  fallbackOccurred: boolean;
-  fallbackReason?: string;
-}
+export type GenerationMode = 'generate' | 'refine';
 
 // ── Resume Builder Output ─────────────────────────────────────────────────────
 
-/**
- * A keyword from the JD that has no evidence in the candidate's resume.
- * Never embedded in the resume text — surfaced in the UI so the user can
- * consciously decide which ones apply to their experience.
- */
+export interface Dealbreaker {
+  id: string;               // e.g. "db-1"
+  text: string;             // e.g. "No Kubernetes experience"
+}
+
+export interface Recommendation {
+  id: string;               // e.g. "rec-1"
+  text: string;             // e.g. "Add Kubernetes under Skills and experience"
+  resolvesDealbreakers: string[]; // references IDs of Dealbreakers resolved
+}
+
 export interface MissingKeyword {
+  id: string;               // e.g. "kw-kubernetes"
   keyword: string;          // e.g. "Kubernetes"
   suggestedSection: string; // e.g. "Core Competencies"
   suggestedBullet: string;  // e.g. "Orchestrated containerised workloads using Kubernetes"
@@ -39,11 +26,9 @@ export interface GapAnalysis {
   matchScore: number;
   strongMatches: string[];    // PRESENT — keyword already in resume
   gaps: string[];             // IMPLIED — experience existed, term was added
-  dealbreakers: string[];     // MISSING — no evidence in candidate background
-  recommendations: string[];  // Actionable suggestions the candidate can selectively apply
-
-  // ── ATS Optimization Summary ─────────────────────────────────────────────────
-  keywordsAdded: string[];          // Implied keywords that were woven into the rewrite
+  dealbreakers: Dealbreaker[]; // MISSING — no evidence in candidate background
+  recommendations: Recommendation[]; // Actionable suggestions the candidate can selectively apply
+  keywordsAdded: string[];          // Implied keywords that were woven into the resume rewrite
   missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
   extractedCompanyName?: string | null; // Extracted company name from the JD
@@ -64,7 +49,7 @@ export interface ExperienceEntry {
   startDate: string;
   endDate: string;
   bullets: string[];
-  tech: string[];            // role-level stack — shown when no projects exist
+  tech: string[];            // role-level stack
   projects: ProjectEntry[]; // projects done within this role
 }
 
@@ -93,12 +78,12 @@ export interface ResumeData {
   summary?: string;
   skills?: SkillCategory[];           // grouped: { category, items }
   experience?: ExperienceEntry[];     // projects nested inside each entry
-  projects?: ProjectEntry[];          // standalone projects (e.g. GitHub, open source)
+  projects?: ProjectEntry[];          // standalone projects
   education?: EducationEntry[];
   certifications?: string[];
-  publications?: string[];           // journal papers, books, conference proceedings
-  awards?: string[];                 // honours, prizes, fellowships
-  languages?: string[];              // spoken/written languages + proficiency
+  publications?: string[];
+  awards?: string[];
+  languages?: string[];
 }
 
 export interface CoverLetterData {
@@ -109,7 +94,7 @@ export interface CoverLetterData {
 export interface ResumeBuilderOutput {
   gapAnalysis: GapAnalysis;
   resume: ResumeData;
-  coverLetter?: CoverLetterData;  // optional — present in normal generation, may be absent if truncated
+  coverLetter?: CoverLetterData;
 }
 
 // ── API Types ─────────────────────────────────────────────────────────────────
@@ -118,45 +103,15 @@ export interface GenerateRequest {
   resume: string;
   jobDescription: string;
   companyName?: string;
-  provider: LLMProvider;
-  anthropicKey?: string;
-  openaiKey?: string;
-  anthropicModel?: string;
-  openaiModel?: string;
-  ollamaModel?: string;
-  sections?: ('summary' | 'skills' | 'experience' | 'education' | 'projects' | 'other')[] | 'all';
+  anthropicKey?: string;     // falls back to ANTHROPIC_API_KEY env var
+  mode: GenerationMode;
+  currentOutput?: ResumeBuilderOutput;   // refine mode only
+  selectedRecommendations?: string[];    // refine mode only
 }
 
 export interface GenerateResponse {
   success: boolean;
-  data?: LLMResponse;
-  error?: string;
-}
-
-export interface DownloadRequest {
-  type: 'resume' | 'coverLetter';
-  data: ResumeBuilderOutput;
-  companyName?: string;
-}
-
-export interface RefineRequest {
-  currentOutput: ResumeBuilderOutput;      // already-generated result
-  selectedRecommendations: string[];       // which recommendations to apply
-  provider: LLMProvider;
-  anthropicKey?: string;
-  openaiKey?: string;
-  anthropicModel?: string;
-  openaiModel?: string;
-  ollamaModel?: string;
-}
-
-export interface RefineResponse {
-  success: boolean;
-  data?: {
-    resume: ResumeData;
-    coverLetter: CoverLetterData;
-    updatedMatchScore?: number; // Re-evaluated ATS score after applying improvements
-  };
+  data?: ResumeBuilderOutput;
   error?: string;
 }
 
@@ -165,3 +120,4 @@ export interface DropboxSyncRequest {
   companyName?: string;
   dropboxToken: string;
 }
+
