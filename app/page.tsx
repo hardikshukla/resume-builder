@@ -160,6 +160,14 @@ export default function Home() {
   const [parseError, setParseError] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Reset recommendations selection, applied status, and custom recommendations when JD, resume, or a fresh generation changes
+  useEffect(() => {
+    setSelectedRecs([]);
+    setAppliedRecs(new Set());
+    setCustomRecommendations([]);
+    setCustomRecText('');
+  }, [jobDescription, resume, originalOutput]);
+
   useEffect(() => {
     fetch('/api/config')
       .then((res) => res.json())
@@ -609,7 +617,11 @@ export default function Home() {
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       💡 Refined · Score: {originalOutput.gapAnalysis.matchScore}% → {output.gapAnalysis.matchScore}%
                     </Typography>
-                    <Button size="small" variant="outlined" onClick={handleRevert}>Revert to Original</Button>
+                     <Button size="small" variant="outlined" onClick={() => {
+                       handleRevert();
+                       setAppliedRecs(new Set());
+                       setSelectedRecs([]);
+                     }}>Revert to Original</Button>
                   </Paper>
                 )}
 
