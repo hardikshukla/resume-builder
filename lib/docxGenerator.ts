@@ -83,7 +83,45 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
   return children;
 }
 
-export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
+function buildTextRunsWithBolding(
+  text: string,
+  keywords: string[] = [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  baseOptions: any = {}
+): TextRun[] {
+  if (!text) return [];
+  if (keywords.length === 0) {
+    return [new TextRun({ ...baseOptions, text })];
+  }
+
+  // Construct regex pattern using safe word boundary matching
+  const patterns = keywords.map(kw => {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const startsWithWord = /^\w/.test(kw);
+    const endsWithWord = /\w$/.test(kw);
+    let pattern = escaped;
+    if (startsWithWord) pattern = '(?<!\\w)' + pattern;
+    if (endsWithWord) pattern = pattern + '(?!\\w)';
+    return pattern;
+  });
+
+  const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+  const parts = text.split(regex);
+  const lowercaseKeywords = new Set(keywords.map(k => k.toLowerCase()));
+
+  return parts
+    .filter(part => part !== '')
+    .map(part => {
+      const isKeyword = lowercaseKeywords.has(part.toLowerCase());
+      return new TextRun({
+        ...baseOptions,
+        text: part,
+        bold: isKeyword ? true : baseOptions.bold,
+      });
+    });
+}
+
+export async function generateResumeDOCX(resume: ResumeData, keywords: string[] = []): Promise<Blob> {
   const JUSTIFY = AlignmentType.BOTH;
 
   const bulletNumbering = {
@@ -144,9 +182,7 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
       new Paragraph({
         alignment: JUSTIFY,
         spacing: { before: 60, after: 60 },
-        children: [
-          new TextRun({ text: resume.summary, font: 'Times New Roman', size: 22 }),
-        ],
+        children: buildTextRunsWithBolding(resume.summary, keywords, { font: 'Times New Roman', size: 22 }),
       })
     );
   }
@@ -166,8 +202,7 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
               size: 22,
               bold: true,
             }),
-            new TextRun({
-              text: group.items.join(', '),
+            ...buildTextRunsWithBolding(group.items.join(', '), keywords, {
               font: 'Times New Roman',
               size: 22,
             }),
@@ -228,9 +263,7 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
           children.push(
             new Paragraph({
               numbering: { reference: 'resume-bullets', level: 0 },
-              children: [
-                new TextRun({ text: bullet, font: 'Times New Roman', size: 22 }),
-              ],
+              children: buildTextRunsWithBolding(bullet, keywords, { font: 'Times New Roman', size: 22 }),
             })
           );
         }
@@ -242,9 +275,14 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
               spacing: { before: 40, after: 20 },
               children: [
                 new TextRun({
-                  text: `Stack: ${exp.tech.join(', ')}`,
+                  text: 'Stack: ',
                   font: 'Times New Roman',
-                  size: 20, // 10pt
+                  size: 20,
+                  italics: true,
+                }),
+                ...buildTextRunsWithBolding(exp.tech.join(', '), keywords, {
+                  font: 'Times New Roman',
+                  size: 20,
                   italics: true,
                 }),
               ],
@@ -279,14 +317,11 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
                 alignment: JUSTIFY,
                 spacing: { before: 0, after: 40 },
                 indent: { left: 180 },
-                children: [
-                  new TextRun({
-                    text: project.description,
-                    font: 'Times New Roman',
-                    size: 22,
-                    italics: true,
-                  }),
-                ],
+                children: buildTextRunsWithBolding(project.description, keywords, {
+                  font: 'Times New Roman',
+                  size: 22,
+                  italics: true,
+                }),
               })
             );
           }
@@ -295,13 +330,10 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
             children.push(
               new Paragraph({
                 numbering: { reference: 'resume-bullets', level: 0 },
-                children: [
-                  new TextRun({
-                    text: bullet,
-                    font: 'Times New Roman',
-                    size: 22,
-                  }),
-                ],
+                children: buildTextRunsWithBolding(bullet, keywords, {
+                  font: 'Times New Roman',
+                  size: 22,
+                }),
               })
             );
           }
@@ -313,7 +345,12 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
                 spacing: { before: 40, after: 20 },
                 children: [
                   new TextRun({
-                    text: `Stack: ${project.tech.join(', ')}`,
+                    text: 'Stack: ',
+                    font: 'Times New Roman',
+                    size: 20,
+                    italics: true,
+                  }),
+                  ...buildTextRunsWithBolding(project.tech.join(', '), keywords, {
                     font: 'Times New Roman',
                     size: 20,
                     italics: true,
@@ -364,14 +401,11 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
           new Paragraph({
             alignment: JUSTIFY,
             spacing: { before: 0, after: 40 },
-            children: [
-              new TextRun({
-                text: project.description,
-                font: 'Times New Roman',
-                size: 22,
-                italics: true,
-              }),
-            ],
+            children: buildTextRunsWithBolding(project.description, keywords, {
+              font: 'Times New Roman',
+              size: 22,
+              italics: true,
+            }),
           })
         );
       }
@@ -380,13 +414,10 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
         children.push(
           new Paragraph({
             numbering: { reference: 'resume-bullets', level: 0 },
-            children: [
-              new TextRun({
-                text: bullet,
-                font: 'Times New Roman',
-                size: 22,
-              }),
-            ],
+            children: buildTextRunsWithBolding(bullet, keywords, {
+              font: 'Times New Roman',
+              size: 22,
+            }),
           })
         );
       }
@@ -398,7 +429,12 @@ export async function generateResumeDOCX(resume: ResumeData): Promise<Blob> {
             spacing: { before: 40, after: 20 },
             children: [
               new TextRun({
-                text: `Stack: ${project.tech.join(', ')}`,
+                text: 'Stack: ',
+                font: 'Times New Roman',
+                size: 20,
+                italics: true,
+              }),
+              ...buildTextRunsWithBolding(project.tech.join(', '), keywords, {
                 font: 'Times New Roman',
                 size: 20,
                 italics: true,

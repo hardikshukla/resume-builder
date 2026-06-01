@@ -104,6 +104,15 @@ describe('generateResumeDOCX()', () => {
     // Blobs should differ (different name → different XML)
     expect(buf.equals(bufB)).toBe(false);
   });
+
+  it('runs successfully with keywords and produces different output', async () => {
+    const blobKeywords = await generateResumeDOCX(mockResume, ['AWS', 'Kubernetes']);
+    const bufKeywords = await blobToBuffer(blobKeywords);
+    expect(blobKeywords).toBeInstanceOf(Blob);
+    expect(isPKZip(bufKeywords)).toBe(true);
+    // Should differ from clean output
+    expect(buf.equals(bufKeywords)).toBe(false);
+  });
 });
 
 // ── Cover Letter DOCX ─────────────────────────────────────────────────────────
@@ -141,5 +150,14 @@ describe('generateCoverLetterDOCX()', () => {
     const blobB    = await generateCoverLetterDOCX(altLetter, mockResume, 'Acme Corp');
     const bufB     = await blobToBuffer(blobB);
     expect(buf.equals(bufB)).toBe(false);
+  });
+
+  it('runs successfully with keywords and produces different output', async () => {
+    const blobKeywords = await generateCoverLetterDOCX(mockCoverLetter, mockResume, 'Acme Corp', ['Acme Corp', 'cloud infrastructure']);
+    const bufKeywords = await blobToBuffer(blobKeywords);
+    expect(blobKeywords).toBeInstanceOf(Blob);
+    expect(isPKZip(bufKeywords)).toBe(true);
+    // Should differ from clean output
+    expect(buf.equals(bufKeywords)).toBe(false);
   });
 });

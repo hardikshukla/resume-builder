@@ -88,10 +88,49 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
  * @param resume       The candidate's resume data (name, contact info).
  * @param companyName  Optional company name (currently reserved for future use).
  */
+function buildTextRunsWithBolding(
+  text: string,
+  keywords: string[] = [],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  baseOptions: any = {}
+): TextRun[] {
+  if (!text) return [];
+  if (keywords.length === 0) {
+    return [new TextRun({ ...baseOptions, text })];
+  }
+
+  // Construct regex pattern using safe word boundary matching
+  const patterns = keywords.map(kw => {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const startsWithWord = /^\w/.test(kw);
+    const endsWithWord = /\w$/.test(kw);
+    let pattern = escaped;
+    if (startsWithWord) pattern = '(?<!\\w)' + pattern;
+    if (endsWithWord) pattern = pattern + '(?!\\w)';
+    return pattern;
+  });
+
+  const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+  const parts = text.split(regex);
+  const lowercaseKeywords = new Set(keywords.map(k => k.toLowerCase()));
+
+  return parts
+    .filter(part => part !== '')
+    .map(part => {
+      const isKeyword = lowercaseKeywords.has(part.toLowerCase());
+      return new TextRun({
+        ...baseOptions,
+        text: part,
+        bold: isKeyword ? true : baseOptions.bold,
+      });
+    });
+}
+
 export async function generateCoverLetterDOCX(
   coverLetter: CoverLetterData,
   resume: ResumeData,
-  companyName?: string
+  companyName?: string,
+  keywords: string[] = []
 ): Promise<Blob> {
   void companyName; // reserved for future personalisation
 
@@ -152,9 +191,7 @@ export async function generateCoverLetterDOCX(
       new Paragraph({
         alignment: AlignmentType.BOTH,
         spacing: { before: 0, after: 120 },
-        children: [
-          new TextRun({ text: trimmed, font: 'Times New Roman', size: 22 }),
-        ],
+        children: buildTextRunsWithBolding(trimmed, keywords, { font: 'Times New Roman', size: 22 }),
       })
     );
   }

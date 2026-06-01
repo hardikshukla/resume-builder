@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -83,6 +83,51 @@ function diffWords(original: string, current: string): React.ReactNode[] {
     }
   }
   return result;
+}
+
+// ── Recursive React helper to bold keywords ──────────────────────────────────
+function boldKeywords(node: React.ReactNode, keywords: string[]): React.ReactNode {
+  if (!node || keywords.length === 0) return node;
+
+  if (typeof node === 'string') {
+    const patterns = keywords.map(kw => {
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const startsWithWord = /^\w/.test(kw);
+      const endsWithWord = /\w$/.test(kw);
+      let pattern = escaped;
+      if (startsWithWord) pattern = '(?<!\\w)' + pattern;
+      if (endsWithWord) pattern = pattern + '(?!\\w)';
+      return pattern;
+    });
+    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
+    const parts = node.split(regex);
+    const lowercaseKeywords = new Set(keywords.map(k => k.toLowerCase()));
+    
+    return parts.map((part, index) => {
+      const isKeyword = lowercaseKeywords.has(part.toLowerCase());
+      if (isKeyword) {
+        return <strong key={index} style={{ fontWeight: 700 }}>{part}</strong>;
+      }
+      return part;
+    });
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child, idx) => (
+      <React.Fragment key={idx}>
+        {boldKeywords(child, keywords)}
+      </React.Fragment>
+    ));
+  }
+
+  if (React.isValidElement(node)) {
+    const { children, ...otherProps } = node.props;
+    if (children !== undefined) {
+      return React.cloneElement(node, otherProps, boldKeywords(children, keywords));
+    }
+  }
+
+  return node;
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -309,6 +354,23 @@ export default function Home() {
     : [];
   const allRecommendations = [...uniqueRecommendations, ...customRecommendations];
 
+  // Get all unique keywords for bolding (strongMatches and clean version of keywordsAdded)
+  const boldingKeywords = useMemo(() => {
+    if (!output) return [];
+    const keywords = new Set<string>();
+    output.gapAnalysis.strongMatches.forEach(kw => {
+      if (kw) keywords.add(kw.trim());
+    });
+    output.gapAnalysis.keywordsAdded.forEach(kw => {
+      if (kw) {
+        const clean = kw.replace(/ \([^)]+\)$/, '').trim();
+        if (clean) keywords.add(clean);
+      }
+    });
+    // Sort descending by length so we match longer phrases before shorter substrings
+    return Array.from(keywords).sort((a, b) => b.length - a.length);
+  }, [output]);
+
   const getCompanyStr = () =>
     (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
 
@@ -325,10 +387,10 @@ export default function Home() {
       let blob: Blob;
       const filename = getFilename(type);
       if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume);
+        blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, getCompanyStr());
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, getCompanyStr(), boldingKeywords);
       }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -348,10 +410,10 @@ export default function Home() {
       const filename = getFilename(type);
       let blob: Blob;
       if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume);
+        blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co, boldingKeywords);
       }
       const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
       const path = `/resumeBuilder/${folderName}/${filename}`;
@@ -378,8 +440,13 @@ export default function Home() {
   };
 
   const renderDiff = (original: string | undefined, current: string) => {
-    if (showHighlights && current !== original) return <>{diffWords(original || '', current)}</>;
-    return current;
+    let result: React.ReactNode;
+    if (showHighlights && current !== original) {
+      result = <>{diffWords(original || '', current)}</>;
+    } else {
+      result = current;
+    }
+    return boldKeywords(result, boldingKeywords);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1013,7 +1080,7 @@ export default function Home() {
                                     </Box>
                                     {exp.tech && exp.tech.length > 0 && (
                                       <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.4 }}>
-                                        Stack: {exp.tech.join(', ')}
+                                        Stack: {boldKeywords(exp.tech.join(', '), boldingKeywords)}
                                       </Typography>
                                     )}
                                   </>
@@ -1026,7 +1093,7 @@ export default function Home() {
                                         <Box key={pi} sx={{ pl: 2, mb: 1 }}>
                                           <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>{proj.name}</Typography>
                                           {proj.description && (
-                                            <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic' }}>{proj.description}</Typography>
+                                            <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic' }}>{boldKeywords(proj.description, boldingKeywords)}</Typography>
                                           )}
                                           <Box component="ul" sx={{ m: 0, pl: 2, mt: 0.3 }}>
                                             {proj.bullets.map((b, bi) => (
@@ -1039,7 +1106,7 @@ export default function Home() {
                                           </Box>
                                           {proj.tech && proj.tech.length > 0 && (
                                             <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                                              Stack: {proj.tech.join(', ')}{proj.link ? ` | ${proj.link}` : ''}
+                                              Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
                                             </Typography>
                                           )}
                                         </Box>
@@ -1063,7 +1130,7 @@ export default function Home() {
                               <Box key={pi} sx={{ mb: 1.5 }}>
                                 <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>{proj.name}</Typography>
                                 {proj.description && (
-                                  <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic', mb: 0.3 }}>{proj.description}</Typography>
+                                  <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic', mb: 0.3 }}>{boldKeywords(proj.description, boldingKeywords)}</Typography>
                                 )}
                                 <Box component="ul" sx={{ m: 0, pl: 3 }}>
                                   {proj.bullets.map((b, bi) => (
@@ -1076,7 +1143,7 @@ export default function Home() {
                                 </Box>
                                 {proj.tech && proj.tech.length > 0 && (
                                   <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                                    Stack: {proj.tech.join(', ')}{proj.link ? ` | ${proj.link}` : ''}
+                                    Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
                                   </Typography>
                                 )}
                               </Box>
