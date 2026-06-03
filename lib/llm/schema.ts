@@ -136,6 +136,7 @@ export const ResumeBuilderOutputSchema = z.object({
     missingKeywords: z.array(MissingKeywordSchema),
     summaryChanges:  z.string(),
     extractedCompanyName: z.string().nullable().optional(),
+    metrics:         z.array(z.string()).optional(),
   }),
   resume: z.lazy(() => ResumeSchema),
   coverLetter: CoverLetterSchema.optional(),
@@ -145,6 +146,7 @@ export const RefineOutputSchema = z.object({
   resume: z.lazy(() => ResumeSchema),
   coverLetter: CoverLetterSchema.optional(),
   updatedMatchScore: z.number().int().min(0).max(100),
+  metrics:           z.array(z.string()).optional(),
 });
 
 export type ValidatedResumeBuilderOutput = z.infer<typeof ResumeBuilderOutputSchema>;

@@ -287,6 +287,13 @@ export default function Home() {
       });
     }
 
+    // 5. LLM-extracted achievements & metrics
+    if (output.gapAnalysis.metrics) {
+      output.gapAnalysis.metrics.forEach(m => {
+        if (m) keywords.add(m.trim());
+      });
+    }
+
     // Sort descending by length so longer phrases match before shorter substrings
     return Array.from(keywords).sort((a, b) => b.length - a.length);
   }, [output, jdKeywords, appliedRecs]);

@@ -170,6 +170,17 @@ describe('ResumeBuilderOutputSchema', () => {
       expect(breakdown?.dealbreakersDeducted).toBe(10);
     }
   });
+
+  it('validates optional metrics array in gapAnalysis', () => {
+    const result = ResumeBuilderOutputSchema.safeParse({
+      gapAnalysis: { ...minimalGapAnalysis, metrics: ['50% to 80%+', '25-30 APIs'] },
+      resume: minimalResume,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gapAnalysis.metrics).toEqual(['50% to 80%+', '25-30 APIs']);
+    }
+  });
 });
 
 // ── RefineOutputSchema ────────────────────────────────────────────────────────
@@ -190,6 +201,18 @@ describe('RefineOutputSchema', () => {
       updatedMatchScore: 90,
     });
     expect(result.success).toBe(true);
+  });
+
+  it('validates optional metrics array in refine payload', () => {
+    const result = RefineOutputSchema.safeParse({
+      resume: minimalResume,
+      updatedMatchScore: 90,
+      metrics: ['10-person team', '$5M budget'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.metrics).toEqual(['10-person team', '$5M budget']);
+    }
   });
 
   it('fails when updatedMatchScore is missing', () => {
