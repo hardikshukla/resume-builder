@@ -233,22 +233,63 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', clearOnUnload);
   }, []);
 
-  // Get all unique keywords for bolding (strongMatches and clean version of keywordsAdded)
+  // Get all unique keywords for bolding (strongMatches, clean version of keywordsAdded, JD keywords, and applied recommendations)
   const boldingKeywords = useMemo(() => {
     if (!output) return [];
     const keywords = new Set<string>();
+    
+    // 1. Initial strong matches
     output.gapAnalysis.strongMatches.forEach(kw => {
       if (kw) keywords.add(kw.trim());
     });
+    
+    // 2. Keywords added during initial tailoring
     output.gapAnalysis.keywordsAdded.forEach(kw => {
       if (kw) {
         const clean = kw.replace(/ \([^)]+\)$/, '').trim();
         if (clean) keywords.add(clean);
       }
     });
+
+    // 3. All JD keywords (must-have and nice-to-have skills)
+    if (jdKeywords) {
+      jdKeywords.mustHaveSkills.forEach(kw => {
+        if (kw) keywords.add(kw.trim());
+      });
+      jdKeywords.niceToHaveSkills.forEach(kw => {
+        if (kw) keywords.add(kw.trim());
+      });
+    }
+
+    // 4. Keywords from applied recommendations
+    if (output.gapAnalysis.recommendations) {
+      output.gapAnalysis.recommendations.forEach(rec => {
+        if (appliedRecs.has(rec.id)) {
+          // Extract capitalized words from the recommendation claim (excluding common verbs/prepositions/nouns)
+          const words = rec.claim.split(/[\s,.:;()'"?]+/);
+          words.forEach(w => {
+            const trimmed = w.trim();
+            if (trimmed && /^[A-Z]/.test(trimmed)) {
+              const lower = trimmed.toLowerCase();
+              const exclusions = new Set([
+                'add', 'consider', 'under', 'skills', 'experience', 'summary', 
+                'projects', 'mention', 'use', 'include', 'integrate', 'create', 
+                'update', 'modify', 'show', 'display', 'highlight', 'demonstrate', 
+                'provide', 'list', 'write', 'in', 'to', 'the', 'as', 'for', 'with',
+                'and', 'or', 'a', 'an', 'at', 'on', 'by'
+              ]);
+              if (!exclusions.has(lower)) {
+                keywords.add(trimmed);
+              }
+            }
+          });
+        }
+      });
+    }
+
     // Sort descending by length so longer phrases match before shorter substrings
     return Array.from(keywords).sort((a, b) => b.length - a.length);
-  }, [output]);
+  }, [output, jdKeywords, appliedRecs]);
 
   const getCompanyStr = () =>
     (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
@@ -731,7 +772,7 @@ export default function Home() {
       )}
 
       {/* Print CSS */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.15); opacity: 0.7; }
@@ -749,7 +790,7 @@ export default function Home() {
           ins { background: none !important; color: black !important; text-decoration: none !important; }
           del { display: none !important; }
         }
-      `}</style>
+      ` }} />
     </Box>
   );
 }

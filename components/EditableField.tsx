@@ -99,12 +99,14 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     };
 
     return (
-      <div 
+      <span 
         className="editable-field-container editable-field-container--editing"
         style={{
           borderLeft: '2px solid var(--primary-main, #1976d2)',
           paddingLeft: '4px',
           background: 'rgba(25, 118, 210, 0.04)',
+          display: 'inline-block',
+          width: '100%',
         }}
       >
         {multiline ? (
@@ -112,12 +114,12 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         ) : (
           <input type="text" {...commonProps} ref={inputRef as React.RefObject<HTMLInputElement>} />
         )}
-      </div>
+      </span>
     );
   }
 
   return (
-    <div
+    <span
       onClick={() => setIsEditing(true)}
       onKeyDown={handleViewKeyDown}
       tabIndex={0}
@@ -133,6 +135,6 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       }}
     >
       {children}
-    </div>
+    </span>
   );
 };
