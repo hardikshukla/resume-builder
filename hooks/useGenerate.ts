@@ -1,8 +1,15 @@
-'use client';
-
 import { useState, useCallback, useEffect } from 'react';
-import { ResumeBuilderOutput, Recommendation } from '@/types';
+import { ResumeBuilderOutput, Recommendation, JDExtractionResult } from '@/types';
+import { ApiErrorResponse, toApiErrorResponse } from '@/types/error';
 import { resumeDataToText } from '@/lib/utils/string';
+import { ANTHROPIC_DEFAULT_MODEL } from '@/lib/constants';
+import { getAtPath, setAtPath, levenshtein } from '@/lib/utils/path';
+
+export type ManualEdit = {
+  path: string;
+  originalValue: string;
+  editedValue: string;
+};
 
 const LOCAL_RESUME = 'rb_resume';
 const CACHE_KEYS_KEY = 'rb_cache_keys';
@@ -41,6 +48,28 @@ function setCachedData(hash: string, data: ResumeBuilderOutput) {
   }
 }
 
+function getCachedJdAnalysis(hash: string): JDExtractionResult | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = sessionStorage.getItem(`rb_cache_jd_${hash}`);
+    if (cached) {
+      return JSON.parse(cached) as JDExtractionResult;
+    }
+  } catch (e) {
+    console.error('Failed to parse JD cache entry:', e);
+  }
+  return null;
+}
+
+function setCachedJdAnalysis(hash: string, data: JDExtractionResult) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(`rb_cache_jd_${hash}`, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to set JD cache entry:', e);
+  }
+}
+
 function updateLruKeys(hash: string) {
   try {
     const keysStr = sessionStorage.getItem(CACHE_KEYS_KEY);
@@ -70,11 +99,75 @@ export function useGenerate() {
   const [resume, setResume] = useState('');
   const [jobDescription, setJD] = useState('');
   const [companyName, setCompany] = useState('');
-  const [selectedModel, setSelectedModel] = useState('claude-3-5-sonnet-20241022');
+  const [selectedModel, setSelectedModel] = useState(ANTHROPIC_DEFAULT_MODEL);
   const [output, setOutput] = useState<ResumeBuilderOutput | null>(null);
   const [originalOutput, setOriginalOutput] = useState<ResumeBuilderOutput | null>(null);
+  const [jdKeywords, setJdKeywords] = useState<JDExtractionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiErrorResponse | null>(null);
+  const clearError = useCallback(() => setError(null), []);
+
+  const [manualEdits, setManualEdits] = useState<ManualEdit[]>([]);
+  const [orphanedEdits, setOrphanedEdits] = useState<ManualEdit[]>([]);
+  const clearOrphanedEdits = useCallback((prefix?: 'resume' | 'coverLetter') => {
+    if (prefix) {
+      setOrphanedEdits((prev) => prev.filter((e) => !e.path.startsWith(prefix)));
+    } else {
+      setOrphanedEdits([]);
+    }
+  }, []);
+
+  const handleManualEdit = useCallback((path: string, newValue: string) => {
+    setOutput((prev) => {
+      if (!prev) return null;
+      
+      let originalValue: any;
+      let resolvedOriginal: any;
+      let resolvedNewValue: any = newValue;
+      let updatedOutput = prev;
+
+      const bodyMatch = path.match(/^coverLetter\.body\[(\d+)\]$/);
+      if (bodyMatch) {
+        const paragraphs = (prev.coverLetter?.body || '').split('\n').filter(Boolean);
+        const index = parseInt(bodyMatch[1], 10);
+        originalValue = paragraphs[index] || '';
+        resolvedOriginal = originalValue;
+        
+        paragraphs[index] = newValue;
+        resolvedNewValue = paragraphs.join('\n\n');
+        
+        updatedOutput = setAtPath(prev, 'coverLetter.body', resolvedNewValue);
+      } else {
+        originalValue = getAtPath(prev, path) ?? '';
+        resolvedOriginal = originalValue;
+        if (Array.isArray(originalValue)) {
+          resolvedOriginal = originalValue.join(', ');
+        }
+        
+        if (path.match(/^resume\.skills\[\d+\]\.items$/)) {
+          resolvedNewValue = newValue.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+        
+        updatedOutput = setAtPath(prev, path, resolvedNewValue);
+      }
+
+      setManualEdits((prevEdits) => {
+        const existingIdx = prevEdits.findIndex((e) => e.path === path);
+        if (existingIdx !== -1) {
+          const updated = [...prevEdits];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            editedValue: newValue,
+          };
+          return updated;
+        } else {
+          return [...prevEdits, { path, originalValue: String(resolvedOriginal), editedValue: newValue }];
+        }
+      });
+
+      return updatedOutput;
+    });
+  }, [originalOutput]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -90,9 +183,16 @@ export function useGenerate() {
     }
   }, []);
 
+  // Reset JD keywords when JD changes
+  useEffect(() => {
+    setJdKeywords(null);
+  }, [jobDescription]);
+
   const handleGenerate = useCallback(
     async (anthropicKey?: string) => {
       setError(null);
+      setManualEdits([]);
+      setOrphanedEdits([]);
 
       try {
         const fullCacheHash = await computeHash(
@@ -104,14 +204,47 @@ export function useGenerate() {
         if (cachedData) {
           setOutput(cachedData);
           setOriginalOutput(cachedData);
+          
+          const jdHash = await computeHash(jobDescription);
+          const cachedJd = getCachedJdAnalysis(jdHash);
+          if (cachedJd) {
+            setJdKeywords(cachedJd);
+          }
           return;
         }
 
-        // Cache miss: proceed with loading and API call
+        // Cache miss: proceed with loading and sequential calls
         setIsLoading(true);
         setOutput(null);
         setOriginalOutput(null);
 
+        // 1. Get JD Keywords analysis (cached or endpoint)
+        const jdHash = await computeHash(jobDescription);
+        let extracted = getCachedJdAnalysis(jdHash);
+
+        if (!extracted) {
+          const jdRes = await fetch('/api/analyze-jd', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jobDescription,
+              companyName: companyName || undefined,
+              anthropicKey: anthropicKey || undefined,
+            }),
+          });
+
+          const jdJson = await jdRes.json();
+          if (!jdJson.success) {
+            setError(jdJson as ApiErrorResponse);
+            return;
+          }
+          extracted = jdJson.data as JDExtractionResult;
+          setCachedJdAnalysis(jdHash, extracted);
+        }
+
+        setJdKeywords(extracted);
+
+        // 2. Call main generate endpoint passing keywords context
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -122,11 +255,15 @@ export function useGenerate() {
             anthropicKey: anthropicKey || undefined,
             model: selectedModel,
             mode: 'generate',
+            jdKeywords: extracted,
           }),
         });
 
         const json = await res.json();
-        if (!json.success) throw new Error(json.error ?? 'Generation failed');
+        if (!json.success) {
+          setError(json as ApiErrorResponse);
+          return;
+        }
 
         const data = json.data as ResumeBuilderOutput;
 
@@ -134,7 +271,7 @@ export function useGenerate() {
         setOriginalOutput(data);
         setCachedData(fullCacheHash, data);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
+        setError(toApiErrorResponse(e));
       } finally {
         setIsLoading(false);
       }
@@ -149,6 +286,9 @@ export function useGenerate() {
       setError(null);
 
       try {
+        const jdHash = await computeHash(jobDescription);
+        const cachedJd = getCachedJdAnalysis(jdHash);
+
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -164,41 +304,112 @@ export function useGenerate() {
               coverLetter: output?.coverLetter ?? originalOutput.coverLetter,
             },
             selectedRecommendations,
+            jdKeywords: cachedJd || undefined,
           }),
         });
 
         const json = await res.json();
-        if (!json.success) throw new Error(json.error ?? 'Refinement failed');
+        if (!json.success) {
+          setError(json as ApiErrorResponse);
+          return false;
+        }
 
         // Refine mode returns { resume, coverLetter, updatedMatchScore }
         const refined = json.data;
+
+        // Run fuzzy merge of manualEdits on refined output
+        const nextOrphaned: ManualEdit[] = [];
+        const nextManualEdits: ManualEdit[] = [];
+        let mergedOutputTemp = {
+          resume: refined.resume,
+          coverLetter: refined.coverLetter,
+        };
+
+        for (const edit of manualEdits) {
+          const bodyMatch = edit.path.match(/^coverLetter\.body\[(\d+)\]$/);
+          if (bodyMatch) {
+            const index = parseInt(bodyMatch[1], 10);
+            const paragraphs = (mergedOutputTemp.coverLetter?.body || '').split('\n').filter(Boolean);
+            const targetValue = paragraphs[index] || '';
+            
+            if (targetValue === edit.originalValue) {
+              paragraphs[index] = edit.editedValue;
+              mergedOutputTemp = setAtPath(mergedOutputTemp, 'coverLetter.body', paragraphs.join('\n\n'));
+              nextManualEdits.push(edit);
+            } else if (levenshtein(targetValue, edit.originalValue) <= 3) {
+              paragraphs[index] = edit.editedValue;
+              mergedOutputTemp = setAtPath(mergedOutputTemp, 'coverLetter.body', paragraphs.join('\n\n'));
+              nextManualEdits.push({
+                ...edit,
+                originalValue: targetValue,
+              });
+            } else {
+              nextOrphaned.push(edit);
+            }
+          } else {
+            let targetValue = getAtPath(mergedOutputTemp, edit.path);
+            if (Array.isArray(targetValue)) {
+              targetValue = targetValue.join(', ');
+            }
+            if (typeof targetValue === 'string') {
+              if (targetValue === edit.originalValue) {
+                let resolvedNewValue: any = edit.editedValue;
+                if (edit.path.match(/^resume\.skills\[\d+\]\.items$/)) {
+                  resolvedNewValue = edit.editedValue.split(',').map((s) => s.trim()).filter(Boolean);
+                }
+                mergedOutputTemp = setAtPath(mergedOutputTemp, edit.path, resolvedNewValue);
+                nextManualEdits.push(edit);
+              } else if (levenshtein(targetValue, edit.originalValue) <= 3) {
+                let resolvedNewValue: any = edit.editedValue;
+                if (edit.path.match(/^resume\.skills\[\d+\]\.items$/)) {
+                  resolvedNewValue = edit.editedValue.split(',').map((s) => s.trim()).filter(Boolean);
+                }
+                mergedOutputTemp = setAtPath(mergedOutputTemp, edit.path, resolvedNewValue);
+                nextManualEdits.push({
+                  ...edit,
+                  originalValue: targetValue,
+                });
+              } else {
+                nextOrphaned.push(edit);
+              }
+            } else {
+              nextOrphaned.push(edit);
+            }
+          }
+        }
+
+        setOrphanedEdits((prev) => [...prev, ...nextOrphaned]);
+        setManualEdits(nextManualEdits);
 
         setOutput((prev) => {
           if (!prev) return null;
           return {
             ...prev,
-            resume: refined.resume,
-            coverLetter: refined.coverLetter,
+            resume: mergedOutputTemp.resume,
+            coverLetter: mergedOutputTemp.coverLetter,
             gapAnalysis: {
               ...prev.gapAnalysis,
               matchScore: refined.updatedMatchScore ?? prev.gapAnalysis.matchScore,
             },
+            hallucinationReport: refined.hallucinationReport ?? prev.hallucinationReport,
           };
         });
         return true;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
+        setError(toApiErrorResponse(e));
         return false;
       } finally {
         setIsLoading(false);
       }
     },
-    [resume, jobDescription, companyName, originalOutput, output, selectedModel]
+    [resume, jobDescription, companyName, originalOutput, output, selectedModel, manualEdits]
   );
 
   const handleRevert = useCallback(() => {
     if (originalOutput) {
       setOutput(originalOutput);
+      setManualEdits([]);
+      setOrphanedEdits([]);
     }
   }, [originalOutput]);
 
@@ -210,6 +421,9 @@ export function useGenerate() {
 
       try {
         const textResume = resumeDataToText(output.resume);
+        const jdHash = await computeHash(jobDescription);
+        const cachedJd = getCachedJdAnalysis(jdHash);
+
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -220,11 +434,15 @@ export function useGenerate() {
             anthropicKey: anthropicKey || undefined,
             model: selectedModel,
             mode: 'generate',
+            jdKeywords: cachedJd || undefined,
           }),
         });
 
         const json = await res.json();
-        if (!json.success) throw new Error(json.error ?? 'Refresh failed');
+        if (!json.success) {
+          setError(json as ApiErrorResponse);
+          return false;
+        }
 
         const data = json.data as ResumeBuilderOutput;
 
@@ -246,16 +464,13 @@ export function useGenerate() {
             ...prev,
             gapAnalysis: {
               // Spread fresh analysis first so all required GapAnalysis fields are present
-              // (gaps, missingKeywords, summaryChanges, dealbreakers, etc.)
               ...data.gapAnalysis,
-              // Then pin the score-sensitive fields to the previous values so a
-              // non-deterministic re-score never regresses the displayed ATS score.
-              // Score should only update via an explicit refine (updatedMatchScore).
+              // Then pin the score-sensitive fields to the previous values
               matchScore: prev.gapAnalysis.matchScore,
               keywordsAdded: prev.gapAnalysis.keywordsAdded,
               strongMatches: prev.gapAnalysis.strongMatches,
               recommendations: [
-                ...prev.gapAnalysis.recommendations,         // preserve existing (applied ones intact)
+                ...prev.gapAnalysis.recommendations,         // preserve existing
                 ...newRecs,                                   // append only net-new gaps
               ],
             },
@@ -263,7 +478,7 @@ export function useGenerate() {
         });
         return true;
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
+        setError(toApiErrorResponse(e));
         return false;
       } finally {
         setIsLoading(false);
@@ -284,11 +499,17 @@ export function useGenerate() {
     handleResumeChange,
     output,
     originalOutput,
+    jdKeywords,
     isLoading,
     error,
+    clearError,
     handleGenerate,
     handleRefine,
     handleRevert,
     handleRefreshRecommendations,
+    manualEdits,
+    orphanedEdits,
+    clearOrphanedEdits,
+    handleManualEdit,
   };
 }

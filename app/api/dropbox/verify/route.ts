@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toApiErrorResponse } from '@/types/error';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const { token } = await req.json();
 
     if (!token) {
-      return NextResponse.json({ valid: false, error: 'Token is required' }, { status: 400 });
+      return NextResponse.json(
+        {
+          valid: false,
+          success: false,
+          error: {
+            type: 'VALIDATION_FAILED',
+            message: 'Token is required',
+          },
+        },
+        { status: 400 }
+      );
     }
 
     const response = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
@@ -29,10 +40,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       } catch {
         // Fallback
       }
-      return NextResponse.json({ valid: false, error: errorMessage }, { status: 401 });
+      return NextResponse.json(
+        {
+          valid: false,
+          success: false,
+          error: {
+            type: 'VALIDATION_FAILED',
+            message: errorMessage,
+          },
+        },
+        { status: 401 }
+      );
     }
   } catch (error) {
     console.error('Error verifying Dropbox token:', error);
-    return NextResponse.json({ valid: false, error: 'Server error during verification' }, { status: 500 });
+    return NextResponse.json(
+      {
+        valid: false,
+        ...toApiErrorResponse(error instanceof Error ? error : new Error('Server error during verification')),
+      },
+      { status: 500 }
+    );
   }
 }

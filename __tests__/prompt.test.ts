@@ -5,19 +5,16 @@
  */
 
 import {
-  buildSystemPrompt,
-  buildUserMessage,
-  buildPrompt,
-  buildRefinePrompt,
+  SYSTEM_PROMPT,
   REFINE_SYSTEM_PROMPT,
 } from '../lib/prompt';
 import { ResumeBuilderOutputSchema } from '../lib/llm/schema';
 import { Recommendation } from '../types';
 
-// ── buildSystemPrompt ────────────────────────────────────────────────────────
+// ── SYSTEM_PROMPT ────────────────────────────────────────────────────────────
 
-describe('buildSystemPrompt()', () => {
-  const prompt = buildSystemPrompt();
+describe('SYSTEM_PROMPT', () => {
+  const prompt = SYSTEM_PROMPT;
 
   it('returns a non-empty string', () => {
     expect(typeof prompt).toBe('string');
@@ -40,7 +37,6 @@ describe('buildSystemPrompt()', () => {
 
   it('instructs the model NOT to use placeholders', () => {
     expect(prompt.toLowerCase()).toContain('placeholder');
-    // Specifically should say never embed placeholder text
     expect(prompt).toMatch(/never embed placeholder/i);
   });
 
@@ -68,111 +64,11 @@ describe('buildSystemPrompt()', () => {
     expect(prompt).toMatch(/Do NOT include tech stack, tools, or implementation details/i);
     expect(prompt).toMatch(/synthesize a basic one-line description \(under 15 words/i);
   });
-
-  it('is idempotent — returns the same string on every call', () => {
-    expect(buildSystemPrompt()).toBe(prompt);
-  });
 });
 
-// ── buildUserMessage ─────────────────────────────────────────────────────────
+// ── REFINE_SYSTEM_PROMPT ──────────────────────────────────────────────────────
 
-describe('buildUserMessage()', () => {
-  const resume = 'Senior Engineer with 5 years Python experience.';
-  const jd = 'We need a Python engineer with AWS and Kubernetes experience.';
-
-  it('embeds the resume text verbatim', () => {
-    const msg = buildUserMessage(resume, jd);
-    expect(msg).toContain(resume);
-  });
-
-  it('embeds the job description verbatim', () => {
-    const msg = buildUserMessage(resume, jd);
-    expect(msg).toContain(jd);
-  });
-
-  it('does NOT include company name when not provided', () => {
-    const msg = buildUserMessage(resume, jd);
-    expect(msg).not.toContain('COMPANY NAME');
-  });
-
-  it('includes company name when provided', () => {
-    const msg = buildUserMessage(resume, jd, 'Acme Corp');
-    expect(msg).toContain('COMPANY NAME');
-    expect(msg).toContain('Acme Corp');
-  });
-});
-
-// ── buildPrompt ──────────────────────────────────────────────────────────────
-
-describe('buildPrompt()', () => {
-  const resume = 'Engineer resume';
-  const jd = 'Software engineer JD';
-
-  it('combines system prompt and user message', () => {
-    const combined = buildPrompt(resume, jd);
-    expect(combined).toContain(buildSystemPrompt());
-    expect(combined).toContain(resume);
-    expect(combined).toContain(jd);
-  });
-
-  it('includes company name when provided', () => {
-    const combined = buildPrompt(resume, jd, 'Stripe');
-    expect(combined).toContain('Stripe');
-  });
-});
-
-// ── buildRefinePrompt ────────────────────────────────────────────────────────
-
-describe('buildRefinePrompt()', () => {
-  const currentOutput = {
-    resume:      { name: 'Jane Doe', summary: 'Engineer' },
-    coverLetter: { body: 'Dear Hiring Manager…' },
-  };
-
-  const selectedRecs: Recommendation[] = [
-    {
-      id: 'rec-1',
-      claim: 'Add Kubernetes to Core Competencies',
-      targetSection: 'Core Competencies',
-      evidenceRequired: 'Kubernetes experience',
-      evidenceFound: 'Docker mentioned',
-      riskLevel: 'medium',
-      resolvesDealbreakers: [],
-    },
-    {
-      id: 'rec-2',
-      claim: 'Quantify AWS cost savings in the CloudOps bullet',
-      targetSection: 'Experience',
-      evidenceRequired: 'AWS cost management',
-      evidenceFound: 'AWS experience listed',
-      riskLevel: 'low',
-      resolvesDealbreakers: [],
-    },
-  ];
-
-  it('returns a non-empty string', () => {
-    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
-    expect(typeof prompt).toBe('string');
-    expect(prompt.length).toBeGreaterThan(50);
-  });
-
-  it('embeds each selected recommendation as a structured block', () => {
-    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
-    for (const rec of selectedRecs) {
-      expect(prompt).toContain(rec.claim);
-      expect(prompt).toContain(rec.targetSection);
-      expect(prompt).toContain(rec.evidenceRequired);
-      expect(prompt).toContain(rec.evidenceFound);
-      expect(prompt).toContain(rec.riskLevel);
-    }
-  });
-
-  it('embeds the current output JSON', () => {
-    const prompt = buildRefinePrompt(currentOutput, selectedRecs);
-    expect(prompt).toContain('Jane Doe');
-    expect(prompt).toContain('Dear Hiring Manager');
-  });
-
+describe('REFINE_SYSTEM_PROMPT', () => {
   it('instructs the model to return updatedMatchScore', () => {
     expect(REFINE_SYSTEM_PROMPT).toContain('updatedMatchScore');
   });
@@ -188,13 +84,6 @@ describe('buildRefinePrompt()', () => {
 
   it('instructs model to apply changes to both resume AND cover letter', () => {
     expect(REFINE_SYSTEM_PROMPT).toMatch(/resume AND cover letter/i);
-  });
-
-  it('handles an empty recommendations list', () => {
-    const prompt = buildRefinePrompt(currentOutput, []);
-    expect(prompt).toBeDefined();
-    // No bullets should be listed
-    expect(prompt).not.toContain('- Add Kubernetes');
   });
 });
 

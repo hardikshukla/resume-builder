@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const ROUTES: Record<string, { limit: number; windowMs: number }> = {
-  '/api/generate': { limit: 5, windowMs: 60_000 },
+  '/api/generate': { limit: 15, windowMs: 60_000 },
+  '/api/analyze-jd': { limit: 15, windowMs: 60_000 },
 };
 
 interface WindowEntry {
@@ -59,8 +60,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Too many requests. Please wait before generating or refining again.',
-        retryAfterSeconds,
+        error: {
+          type: 'RATE_LIMIT',
+          message: 'Too many requests. Please wait before generating or refining again.',
+          retryAfterSeconds,
+        },
       },
       {
         status: 429,
@@ -80,5 +84,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/generate'],
+  matcher: ['/api/generate', '/api/analyze-jd'],
 };

@@ -26,8 +26,16 @@ export interface MissingKeyword {
   suggestedBullet: string;  // e.g. "Orchestrated containerised workloads using Kubernetes"
 }
 
+export interface ScoreBreakdown {
+  summary: number;
+  skills: number;
+  experience: number;
+  dealbreakersDeducted: number;
+}
+
 export interface GapAnalysis {
   matchScore: number;
+  scoreBreakdown?: ScoreBreakdown;
   strongMatches: string[];    // PRESENT — keyword already in resume
   gaps: string[];             // IMPLIED — experience existed, term was added
   dealbreakers: Dealbreaker[]; // MISSING — no evidence in candidate background
@@ -95,13 +103,32 @@ export interface CoverLetterData {
   body: string;
 }
 
+export interface HallucinatedClaim {
+  text: string;
+  reason: string;
+}
+
+export interface HallucinationReport {
+  passed: boolean;
+  flaggedClaims: HallucinatedClaim[];
+}
+
 export interface ResumeBuilderOutput {
   gapAnalysis: GapAnalysis;
   resume: ResumeData;
   coverLetter?: CoverLetterData;
+  hallucinationReport?: HallucinationReport;
 }
 
 // ── API Types ─────────────────────────────────────────────────────────────────
+
+export interface JDExtractionResult {
+  seniority: string;
+  companyName: string | null;
+  mustHaveSkills: string[];
+  niceToHaveSkills: string[];
+  gapsDetected: string[];
+}
 
 export interface GenerateRequest {
   resume: string;
@@ -112,17 +139,6 @@ export interface GenerateRequest {
   mode: GenerationMode;
   currentOutput?: ResumeBuilderOutput;   // refine mode only
   selectedRecommendations?: Recommendation[];    // refine mode only
-}
-
-export interface GenerateResponse {
-  success: boolean;
-  data?: ResumeBuilderOutput;
-  error?: string;
-}
-
-export interface DropboxSyncRequest {
-  resumeData: ResumeBuilderOutput;
-  companyName?: string;
-  dropboxToken: string;
+  jdKeywords?: JDExtractionResult; // pre-extracted keywords context
 }
 

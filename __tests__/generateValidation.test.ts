@@ -96,4 +96,77 @@ describe('validateGenerateRequest()', () => {
       expect(result.error).toContain('too large to refine');
     }
   });
+
+  // ── jdKeywords passthrough tests ──────────────────────────────────────────
+
+  const validJdKeywords = {
+    seniority: 'Senior',
+    companyName: 'Acme Corp',
+    mustHaveSkills: ['TypeScript', 'Node.js'],
+    niceToHaveSkills: ['GraphQL'],
+    gapsDetected: ['No Kubernetes experience'],
+  };
+
+  it('accepts jdKeywords in generate mode and preserves all fields', () => {
+    const result = validateGenerateRequest({
+      mode: 'generate',
+      resume: 'Experienced engineer',
+      jobDescription: 'Hiring a backend engineer',
+      jdKeywords: validJdKeywords,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Confirm the field is not stripped
+      expect(result.data.jdKeywords).toBeDefined();
+      expect(result.data.jdKeywords?.seniority).toBe('Senior');
+      expect(result.data.jdKeywords?.mustHaveSkills).toEqual(['TypeScript', 'Node.js']);
+    }
+  });
+
+  it('accepts jdKeywords in refine mode and preserves all fields', () => {
+    const result = validateGenerateRequest({
+      mode: 'refine',
+      currentOutput: {
+        resume: { name: 'Jane Doe', summary: 'Engineer' },
+        coverLetter: { subject: 'Application', body: 'Interested.' },
+      },
+      selectedRecommendations: [recommendation],
+      jdKeywords: validJdKeywords,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.jdKeywords).toBeDefined();
+      expect(result.data.jdKeywords?.companyName).toBe('Acme Corp');
+    }
+  });
+
+  it('omitting jdKeywords is still valid (optional field)', () => {
+    const result = validateGenerateRequest({
+      mode: 'generate',
+      resume: 'Experienced engineer',
+      jobDescription: 'Hiring a backend engineer',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.jdKeywords).toBeUndefined();
+    }
+  });
+
+  it('rejects jdKeywords with missing required fields', () => {
+    const result = validateGenerateRequest({
+      mode: 'generate',
+      resume: 'Experienced engineer',
+      jobDescription: 'Hiring a backend engineer',
+      jdKeywords: {
+        // missing seniority, companyName, gapsDetected
+        mustHaveSkills: ['TypeScript'],
+        niceToHaveSkills: [],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
