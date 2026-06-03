@@ -81,7 +81,8 @@ export function renderDiffText(
   original: string | undefined,
   current: string,
   showHighlights: boolean,
-  boldingKeywords: string[]
+  boldingKeywords: string[],
+  applyBolding = true
 ): React.ReactNode {
   let result: React.ReactNode;
   if (showHighlights && current !== original) {
@@ -89,5 +90,5 @@ export function renderDiffText(
   } else {
     result = current;
   }
-  return boldKeywords(result, boldingKeywords);
+  return applyBolding ? boldKeywords(result, boldingKeywords) : result;
 }

@@ -7,6 +7,10 @@ import {
   AlignmentType,
   LevelFormat,
   BorderStyle,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
 } from 'docx';
 
 
@@ -170,7 +174,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
       ],
     });
 
-  const children: Paragraph[] = [];
+  const children: (Paragraph | Table)[] = [];
 
   // Header (Shared)
   children.push(...buildCandidateHeader(resume.name, resume.contact));
@@ -190,26 +194,80 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
   // ── SKILLS ─────────────────────────────────────────────────────────────────
   if (resume.skills && resume.skills.length > 0) {
     children.push(sectionHeader('CORE COMPETENCIES'));
-    for (const group of resume.skills) {
-      children.push(
-        new Paragraph({
-          alignment: JUSTIFY,
-          spacing: { before: 30, after: 30 },
-          children: [
-            new TextRun({
-              text: `${group.category}: `,
-              font: 'Times New Roman',
-              size: 22,
-              bold: true,
-            }),
-            ...buildTextRunsWithBolding(group.items.join(', '), keywords, {
-              font: 'Times New Roman',
-              size: 22,
-            }),
-          ],
-        })
-      );
-    }
+
+    const tableRows = resume.skills.map((group) => {
+      return new TableRow({
+        children: [
+          new TableCell({
+            width: {
+              size: 2304, // 1.6 inches
+              type: WidthType.DXA,
+            },
+            margins: { top: 30, bottom: 30, left: 0, right: 100 },
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            },
+            children: [
+              new Paragraph({
+                spacing: { before: 0, after: 0 },
+                children: [
+                  new TextRun({
+                    text: `${group.category}:`,
+                    font: 'Times New Roman',
+                    size: 22,
+                    bold: true,
+                  }),
+                ],
+              }),
+            ],
+          }),
+          new TableCell({
+            width: {
+              size: 7056, // 4.9 inches
+              type: WidthType.DXA,
+            },
+            margins: { top: 30, bottom: 30, left: 0, right: 0 },
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+              right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+            },
+            children: [
+              new Paragraph({
+                alignment: JUSTIFY,
+                spacing: { before: 0, after: 0 },
+                children: buildTextRunsWithBolding(group.items.join(', '), keywords, {
+                  font: 'Times New Roman',
+                  size: 22,
+                }),
+              }),
+            ],
+          }),
+        ],
+      });
+    });
+
+    const table = new Table({
+      width: {
+        size: 9360, // 6.5 inches total printable area
+        type: WidthType.DXA,
+      },
+      borders: {
+        top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        left: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        right: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+        insideVertical: { style: BorderStyle.NONE, size: 0, color: 'auto' },
+      },
+      rows: tableRows,
+    });
+
+    children.push(table);
   }
 
   // ── EXPERIENCE ─────────────────────────────────────────────────────────────
@@ -263,7 +321,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
           children.push(
             new Paragraph({
               numbering: { reference: 'resume-bullets', level: 0 },
-              children: buildTextRunsWithBolding(bullet, keywords, { font: 'Times New Roman', size: 22 }),
+              children: buildTextRunsWithBolding(bullet, [], { font: 'Times New Roman', size: 22 }),
             })
           );
         }
@@ -280,7 +338,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
                   size: 20,
                   italics: true,
                 }),
-                ...buildTextRunsWithBolding(exp.tech.join(', '), keywords, {
+                ...buildTextRunsWithBolding(exp.tech.join(', '), [], {
                   font: 'Times New Roman',
                   size: 20,
                   italics: true,
@@ -317,7 +375,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
                 alignment: JUSTIFY,
                 spacing: { before: 0, after: 40 },
                 indent: { left: 180 },
-                children: buildTextRunsWithBolding(project.description, keywords, {
+                children: buildTextRunsWithBolding(project.description, [], {
                   font: 'Times New Roman',
                   size: 22,
                   italics: true,
@@ -330,7 +388,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
             children.push(
               new Paragraph({
                 numbering: { reference: 'resume-bullets', level: 0 },
-                children: buildTextRunsWithBolding(bullet, keywords, {
+                children: buildTextRunsWithBolding(bullet, [], {
                   font: 'Times New Roman',
                   size: 22,
                 }),
@@ -350,7 +408,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
                     size: 20,
                     italics: true,
                   }),
-                  ...buildTextRunsWithBolding(project.tech.join(', '), keywords, {
+                  ...buildTextRunsWithBolding(project.tech.join(', '), [], {
                     font: 'Times New Roman',
                     size: 20,
                     italics: true,
@@ -401,7 +459,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
           new Paragraph({
             alignment: JUSTIFY,
             spacing: { before: 0, after: 40 },
-            children: buildTextRunsWithBolding(project.description, keywords, {
+            children: buildTextRunsWithBolding(project.description, [], {
               font: 'Times New Roman',
               size: 22,
               italics: true,
@@ -414,7 +472,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
         children.push(
           new Paragraph({
             numbering: { reference: 'resume-bullets', level: 0 },
-            children: buildTextRunsWithBolding(bullet, keywords, {
+            children: buildTextRunsWithBolding(bullet, [], {
               font: 'Times New Roman',
               size: 22,
             }),
@@ -434,7 +492,7 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
                 size: 20,
                 italics: true,
               }),
-              ...buildTextRunsWithBolding(project.tech.join(', '), keywords, {
+              ...buildTextRunsWithBolding(project.tech.join(', '), [], {
                 font: 'Times New Roman',
                 size: 20,
                 italics: true,

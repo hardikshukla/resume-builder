@@ -10,7 +10,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
 import { ResumeBuilderOutput } from '@/types';
-import { renderDiffText, boldKeywords } from '@/lib/utils/highlight';
+import { renderDiffText } from '@/lib/utils/highlight';
 import { EditableField } from './EditableField';
 
 const A4_STYLES = {
@@ -82,8 +82,8 @@ export default function ResumePreview({
     return orphanedEdits.filter((e) => e.path.startsWith('resume'));
   }, [orphanedEdits]);
 
-  const renderDiff = (original: string | undefined, current: string) => {
-    return renderDiffText(original, current, showHighlights, boldingKeywords);
+  const renderDiff = (original: string | undefined, current: string, applyBolding = true) => {
+    return renderDiffText(original, current, showHighlights, boldingKeywords, applyBolding);
   };
 
   return (
@@ -169,7 +169,7 @@ export default function ResumePreview({
             <Typography sx={SECTION_HEADER_SX}>Core Competencies</Typography>
             {output.resume.skills.map((sg, idx) => (
               <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 0.4 }}>
-                <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, minWidth: 160, flexShrink: 0 }}>
+                <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, width: 154, minWidth: 154, flexShrink: 0 }}>
                   {sg.category}:
                 </Typography>
                 <Typography sx={BODY_TEXT_SX}>
@@ -208,10 +208,11 @@ export default function ResumePreview({
                   )}
                   {(!exp.projects || exp.projects.length === 0) && (
                     <>
-                      <Box component="ul" sx={{ m: 0, pl: 3 }}>
+                      <Box sx={{ mt: 0.3 }}>
                         {exp.bullets.map((b, bi) => (
-                          <Box component="li" key={bi} sx={{ mb: 0.3 }}>
-                            <Typography sx={BODY_TEXT_SX}>
+                          <Box key={bi} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.3, pl: 2 }}>
+                            <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                            <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>
                               <EditableField
                                 path={`resume.experience[${expIdx}].bullets[${bi}]`}
                                 value={b}
@@ -219,7 +220,7 @@ export default function ResumePreview({
                                 onSave={handleManualEdit}
                                 isEdited={manualEdits.some(e => e.path === `resume.experience[${expIdx}].bullets[${bi}]`)}
                               >
-                                {renderDiff(origExp?.bullets?.[bi], b)}
+                                {renderDiff(origExp?.bullets?.[bi], b, false)}
                               </EditableField>
                             </Typography>
                           </Box>
@@ -227,7 +228,7 @@ export default function ResumePreview({
                       </Box>
                       {exp.tech && exp.tech.length > 0 && (
                         <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.4 }}>
-                          Stack: {boldKeywords(exp.tech.join(', '), boldingKeywords)}
+                          Stack: {exp.tech.join(', ')}
                         </Typography>
                       )}
                     </>
@@ -248,14 +249,15 @@ export default function ResumePreview({
                                   onSave={handleManualEdit}
                                   isEdited={manualEdits.some(e => e.path === `resume.experience[${expIdx}].projects[${pi}].description`)}
                                 >
-                                  {boldKeywords(proj.description, boldingKeywords)}
+                                  {proj.description}
                                 </EditableField>
                               </Typography>
                             )}
-                            <Box component="ul" sx={{ m: 0, pl: 2, mt: 0.3 }}>
+                            <Box sx={{ mt: 0.3, pl: 1 }}>
                               {proj.bullets.map((b, bi) => (
-                                <Box component="li" key={bi} sx={{ mb: 0.2 }}>
-                                  <Typography sx={BODY_TEXT_SX}>
+                                <Box key={bi} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.2 }}>
+                                  <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                                  <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>
                                     <EditableField
                                       path={`resume.experience[${expIdx}].projects[${pi}].bullets[${bi}]`}
                                       value={b}
@@ -263,7 +265,7 @@ export default function ResumePreview({
                                       onSave={handleManualEdit}
                                       isEdited={manualEdits.some(e => e.path === `resume.experience[${expIdx}].projects[${pi}].bullets[${bi}]`)}
                                     >
-                                      {renderDiff(origProj?.bullets?.[bi], b)}
+                                      {renderDiff(origProj?.bullets?.[bi], b, false)}
                                     </EditableField>
                                   </Typography>
                                 </Box>
@@ -271,7 +273,7 @@ export default function ResumePreview({
                             </Box>
                             {proj.tech && proj.tech.length > 0 && (
                               <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                                Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
+                                Stack: {proj.tech.join(', ')}{proj.link ? ` | ${proj.link}` : ''}
                               </Typography>
                             )}
                           </Box>
@@ -305,15 +307,16 @@ export default function ResumePreview({
                         onSave={handleManualEdit}
                         isEdited={manualEdits.some(e => e.path === `resume.projects[${idx}].description`)}
                       >
-                        {boldKeywords(proj.description, boldingKeywords)}
+                        {renderDiff(origProj?.description ?? undefined, proj.description, false)}
                       </EditableField>
                     </Typography>
                   )}
                   {proj.bullets && proj.bullets.length > 0 && (
-                    <Box component="ul" sx={{ m: 0, pl: 3, mt: 0.3 }}>
+                    <Box sx={{ mt: 0.3 }}>
                       {proj.bullets.map((b, bi) => (
-                        <Box component="li" key={bi} sx={{ mb: 0.2 }}>
-                          <Typography sx={BODY_TEXT_SX}>
+                        <Box key={bi} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.2, pl: 2 }}>
+                          <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                          <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>
                             <EditableField
                               path={`resume.projects[${idx}].bullets[${bi}]`}
                               value={b}
@@ -321,7 +324,7 @@ export default function ResumePreview({
                               onSave={handleManualEdit}
                               isEdited={manualEdits.some(e => e.path === `resume.projects[${idx}].bullets[${bi}]`)}
                             >
-                              {renderDiff(origProj?.bullets?.[bi], b)}
+                              {renderDiff(origProj?.bullets?.[bi], b, false)}
                             </EditableField>
                           </Typography>
                         </Box>
@@ -330,7 +333,7 @@ export default function ResumePreview({
                   )}
                   {proj.tech && proj.tech.length > 0 && (
                     <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                      Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
+                      Stack: {proj.tech.join(', ')}{proj.link ? ` | ${proj.link}` : ''}
                     </Typography>
                   )}
                 </Box>
@@ -360,10 +363,11 @@ export default function ResumePreview({
         {output.resume.certifications && output.resume.certifications.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={SECTION_HEADER_SX}>Certifications</Typography>
-            <Box component="ul" sx={{ m: 0, pl: 3 }}>
+            <Box sx={{ mt: 0.3 }}>
               {output.resume.certifications.map((cert, idx) => (
-                <Box component="li" key={idx} sx={{ mb: 0.2 }}>
-                  <Typography sx={BODY_TEXT_SX}>{cert}</Typography>
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.2, pl: 2 }}>
+                  <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                  <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>{cert}</Typography>
                 </Box>
               ))}
             </Box>
@@ -374,10 +378,11 @@ export default function ResumePreview({
         {output.resume.publications && output.resume.publications.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={SECTION_HEADER_SX}>Publications</Typography>
-            <Box component="ul" sx={{ m: 0, pl: 3 }}>
+            <Box sx={{ mt: 0.3 }}>
               {output.resume.publications.map((pub, idx) => (
-                <Box component="li" key={idx} sx={{ mb: 0.2 }}>
-                  <Typography sx={BODY_TEXT_SX}>{pub}</Typography>
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.2, pl: 2 }}>
+                  <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                  <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>{pub}</Typography>
                 </Box>
               ))}
             </Box>
@@ -388,10 +393,11 @@ export default function ResumePreview({
         {output.resume.awards && output.resume.awards.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography sx={SECTION_HEADER_SX}>Awards</Typography>
-            <Box component="ul" sx={{ m: 0, pl: 3 }}>
+            <Box sx={{ mt: 0.3 }}>
               {output.resume.awards.map((aw, idx) => (
-                <Box component="li" key={idx} sx={{ mb: 0.2 }}>
-                  <Typography sx={BODY_TEXT_SX}>{aw}</Typography>
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', mb: 0.2, pl: 2 }}>
+                  <Box component="span" sx={{ ...BODY_TEXT_SX, flexShrink: 0, mr: 1, lineHeight: 1.5 }}>•</Box>
+                  <Typography sx={{ ...BODY_TEXT_SX, flex: 1 }}>{aw}</Typography>
                 </Box>
               ))}
             </Box>

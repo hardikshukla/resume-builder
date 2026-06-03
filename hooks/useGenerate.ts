@@ -390,7 +390,6 @@ export function useGenerate() {
             gapAnalysis: {
               ...prev.gapAnalysis,
               matchScore: refined.updatedMatchScore ?? prev.gapAnalysis.matchScore,
-              metrics: refined.metrics ?? prev.gapAnalysis.metrics,
             },
             hallucinationReport: refined.hallucinationReport ?? prev.hallucinationReport,
           };

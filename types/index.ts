@@ -44,7 +44,6 @@ export interface GapAnalysis {
   missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
   extractedCompanyName?: string | null; // Extracted company name from the JD
-  metrics?: string[];                  // Key achievements & metrics identified by LLM
 }
 
 export interface ContactInfo {

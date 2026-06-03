@@ -26,7 +26,7 @@ Do not override this data unless the raw JD contains a clear factual contradicti
    - Experience & Projects: Preserve all jobs, projects, exact dates, and titles (no merging/deletion). Reframe bullet language with strong action verbs. Quantify only if original resume supports it. NEVER invent metrics or import JD scale. Max 1-2 lines per bullet, no em-dashes, max 3 uses of any keyword. Tech array must only contain tools present in the original resume for that role.
    - Education/Certifications: Reproduce exactly.
 4. Format: Times New Roman, justified, no columns/tables, single-line contact block.
-5. Populate Gap Analysis: Calculate matchScore, scoreBreakdown, strongMatches, gaps, dealbreakers, recommendations (following <recommendations_guidelines>), keywordsAdded, missingKeywords, summaryChanges, extractedCompanyName, and metrics. For metrics, scan the final generated resume bullets and extract all quantifiable metrics, numbers, percentages, scale values, or key performance highlights (exactly as they appear in the text, e.g. "50% to 80%+", "25-30 GraphQL APIs") to be bolded in the output.
+5. Populate Gap Analysis: Calculate matchScore, strongMatches, gaps, dealbreakers, recommendations (following <recommendations_guidelines>), keywordsAdded, missingKeywords, summaryChanges, extractedCompanyName.
 6. Cover Letter: Plain text subject and body (3-4 paragraphs, no salutations, highlights relevant personal/GitHub projects).
 </steps>
 
@@ -100,8 +100,7 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
       }
     ],
     "summaryChanges": "one sentence summary of changes",
-    "extractedCompanyName": "company name or null",
-    "metrics": ["metric or key achievement phrase exact match"]
+    "extractedCompanyName": "company name or null"
   },
   "coverLetter": {
     "subject": "Application for Role at Company",
@@ -181,7 +180,6 @@ You are an expert editor applying surgical improvements to an already ATS-optimi
 - Do not add company scale claims unless present in the original resume.
 - Write each array item exactly once. No loop/repetition.
 - Max 1-2 lines per bullet, no em-dashes, no hollow buzzwords.
-- If any new metrics, performance gains, percentages, scale values, or key achievements are introduced in the rewritten resume or projects, extract them exactly as they appear in the text and return them in the optional 'metrics' array in the root JSON response.
 </rules>
 
 <output_format>
@@ -189,8 +187,7 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
 {
   "resume": { ...updated resume object matching the resume schema },
   "coverLetter": { "subject": "subject", "body": "body text" },
-  "updatedMatchScore": integer (0-100),
-  "metrics": ["updated metric or key achievement phrase exact match"]
+  "updatedMatchScore": integer (0-100)
 }
 </output_format>
 `;

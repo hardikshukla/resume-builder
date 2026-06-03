@@ -287,13 +287,6 @@ export default function Home() {
       });
     }
 
-    // 5. LLM-extracted achievements & metrics
-    if (output.gapAnalysis.metrics) {
-      output.gapAnalysis.metrics.forEach(m => {
-        if (m) keywords.add(m.trim());
-      });
-    }
-
     // Sort descending by length so longer phrases match before shorter substrings
     return Array.from(keywords).sort((a, b) => b.length - a.length);
   }, [output, jdKeywords, appliedRecs]);
@@ -814,6 +807,32 @@ export default function Home() {
           }
           ins { background: none !important; color: black !important; text-decoration: none !important; }
           del { display: none !important; }
+          .editable-field-container--editing,
+          .editable-field,
+          .editable-field--edited {
+            border: none !important;
+            border-left: none !important;
+            border-bottom: none !important;
+            padding: 0 !important;
+            padding-left: 0 !important;
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            cursor: default !important;
+          }
+          .editable-field::after {
+            display: none !important;
+          }
+          .editable-field-container--editing input,
+          .editable-field-container--editing textarea {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
         }
       ` }} />
     </Box>
