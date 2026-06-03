@@ -39,19 +39,22 @@ export function sanitizeFilename(raw: string): string {
 }
 
 /**
- * Builds a download filename in the format: FirstnameLastname_Company[_CoverLetter].docx
+ * Builds a download filename in the format: FirstnameLastname[_Company]_Resume[_CoverLetter].docx
  *
  * - candidateName: raw string from the AI, e.g. "John A. Smith"
- * - company: raw company name, e.g. "Google LLC"
+ * - company: raw company name, e.g. "Google LLC" (optional)
  * - type: 'resume' | 'coverLetter'
  *
- * Both name and company are converted to PascalCase tokens joined without separator.
- * Fallbacks: 'Candidate' for name, 'Tailored' for company.
+ * Name and company are converted to PascalCase. Company is only included if provided.
+ * Fallback for name: 'Candidate'
+ * Suffix is always included: '_Resume' for resume, '_CoverLetter' for cover letter
  *
  * Examples:
- *   buildDownloadFilename('John Smith', 'Google')             → 'JohnSmith_Google.docx'
- *   buildDownloadFilename('John Smith', 'Google', 'coverLetter') → 'JohnSmith_Google_CoverLetter.docx'
- *   buildDownloadFilename('', '')                              → 'Candidate_Tailored.docx'
+ *   buildDownloadFilename('John Smith', 'Google', 'resume')             → 'JohnSmith_Google_Resume.docx'
+ *   buildDownloadFilename('John Smith', '', 'resume')                  → 'JohnSmith_Resume.docx'
+ *   buildDownloadFilename('John Smith', 'Google', 'coverLetter')       → 'JohnSmith_Google_CoverLetter.docx'
+ *   buildDownloadFilename('John Smith', '', 'coverLetter')             → 'JohnSmith_CoverLetter.docx'
+ *   buildDownloadFilename('', '', 'resume')                            → 'Candidate_Resume.docx'
  */
 export function buildDownloadFilename(
   candidateName: string,
@@ -59,9 +62,10 @@ export function buildDownloadFilename(
   type: 'resume' | 'coverLetter' = 'resume'
 ): string {
   const namePart = toPascalCase(candidateName.trim()) || 'Candidate';
-  const companyPart = toPascalCase(company.trim()) || 'Tailored';
-  const suffix = type === 'coverLetter' ? '_CoverLetter' : '';
-  return `${namePart}_${companyPart}${suffix}.docx`;
+  const companyPart = toPascalCase(company.trim());
+  const typeSuffix = type === 'coverLetter' ? '_CoverLetter' : '_Resume';
+  const filename = companyPart ? `${namePart}_${companyPart}${typeSuffix}` : `${namePart}${typeSuffix}`;
+  return `${filename}.docx`;
 }
 
 export function resumeDataToText(r: ResumeData): string {

@@ -36,18 +36,20 @@ describe('Filename and Path Helpers', () => {
     expect(capitalizeName('')).toBe('');
   });
 
-  it('buildDownloadFilename should build PascalCase FirstnameLastname_Company[_CoverLetter].docx', () => {
-    // Normal cases
-    expect(buildDownloadFilename('John Smith', 'Google')).toBe('JohnSmith_Google.docx');
+  it('buildDownloadFilename should build PascalCase FirstnameLastname[_Company]_Resume[_CoverLetter].docx', () => {
+    // Resume format
+    expect(buildDownloadFilename('John Smith', 'Google', 'resume')).toBe('JohnSmith_Google_Resume.docx');
+    expect(buildDownloadFilename('John Smith', '', 'resume')).toBe('JohnSmith_Resume.docx');
+    expect(buildDownloadFilename('', '', 'resume')).toBe('Candidate_Resume.docx');
+    expect(buildDownloadFilename('', 'Google', 'resume')).toBe('Candidate_Google_Resume.docx');
+    
+    // Cover Letter format
     expect(buildDownloadFilename('John Smith', 'Google', 'coverLetter')).toBe('JohnSmith_Google_CoverLetter.docx');
+    expect(buildDownloadFilename('John Smith', '', 'coverLetter')).toBe('JohnSmith_CoverLetter.docx');
+    expect(buildDownloadFilename('', '', 'coverLetter')).toBe('Candidate_CoverLetter.docx');
     
     // Spaces, special characters, multi-word
-    expect(buildDownloadFilename('John A. Smith', 'Google LLC')).toBe('JohnASmith_GoogleLlc.docx');
-    expect(buildDownloadFilename('Jane-Doe', 'Yahoo! Inc.')).toBe('JaneDoe_YahooInc.docx');
-    
-    // Empty inputs / fallbacks
-    expect(buildDownloadFilename('', '')).toBe('Candidate_Tailored.docx');
-    expect(buildDownloadFilename('', 'Google')).toBe('Candidate_Google.docx');
-    expect(buildDownloadFilename('John Smith', '')).toBe('JohnSmith_Tailored.docx');
+    expect(buildDownloadFilename('John A. Smith', 'Google LLC', 'resume')).toBe('JohnASmith_GoogleLlc_Resume.docx');
+    expect(buildDownloadFilename('Jane-Doe', 'Yahoo! Inc.', 'resume')).toBe('JaneDoe_YahooInc_Resume.docx');
   });
 });

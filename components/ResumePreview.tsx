@@ -55,6 +55,7 @@ interface ResumePreviewProps {
   handleDownload: (type: 'resume' | 'coverLetter') => void;
   handleSaveToDropbox: (type: 'resume' | 'coverLetter') => void;
   handleManualEdit: (path: string, value: string) => void;
+  handlePrint: () => void;
   manualEdits: { path: string; originalValue: string; editedValue: string }[];
   orphanedEdits: { path: string; originalValue: string; editedValue: string }[];
   clearOrphanedEdits: (prefix?: 'resume' | 'coverLetter') => void;
@@ -72,6 +73,7 @@ export default function ResumePreview({
   handleDownload,
   handleSaveToDropbox,
   handleManualEdit,
+  handlePrint,
   manualEdits,
   orphanedEdits,
   clearOrphanedEdits,
@@ -96,7 +98,7 @@ export default function ResumePreview({
           {dropboxToken && (
             <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('resume')}>Save to Dropbox</Button>
           )}
-          <Button startIcon={<PrintIcon />} variant="contained" color="secondary" size="small" onClick={() => window.print()}>Print / PDF</Button>
+          <Button startIcon={<PrintIcon />} variant="contained" color="secondary" size="small" onClick={handlePrint}>Print / PDF</Button>
         </Box>
       </Box>
 

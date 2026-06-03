@@ -323,6 +323,23 @@ export default function Home() {
     }
   };
 
+  const handlePrint = () => {
+    if (!output) return;
+    // Set dynamic document title for PDF filename
+    const filename = getFilename('resume').replace('.docx', '');
+    const originalTitle = document.title;
+    document.title = filename;
+    
+    // Trigger print dialog
+    setTimeout(() => {
+      window.print();
+      // Restore original title after print dialog opens
+      setTimeout(() => {
+        document.title = originalTitle;
+      }, 500);
+    }, 100);
+  };
+
   const handleSaveToDropbox = async (type: 'resume' | 'coverLetter') => {
     if (!output || !dropboxToken) return;
     setDropboxStatus(null);
@@ -677,7 +694,7 @@ export default function Home() {
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                   <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
                     <Tab label="Gap Analysis" id="tab-gap" aria-controls="tabpanel-gap" />
-                    <Tab label="Tailored Resume" id="tab-resume" aria-controls="tabpanel-resume" />
+                    <Tab label="Resume" id="tab-resume" aria-controls="tabpanel-resume" />
                     <Tab label="Cover Letter" id="tab-cover" aria-controls="tabpanel-cover" />
                   </Tabs>
                 </Box>
@@ -717,6 +734,7 @@ export default function Home() {
                     handleDownload={handleDownload}
                     handleSaveToDropbox={handleSaveToDropbox}
                     handleManualEdit={handleManualEdit}
+                    handlePrint={handlePrint}
                     manualEdits={manualEdits}
                     orphanedEdits={orphanedEdits}
                     clearOrphanedEdits={clearOrphanedEdits}
