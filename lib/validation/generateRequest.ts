@@ -10,6 +10,8 @@ type ValidationResult =
   | { success: true; data: GenerateRequest }
   | { success: false; error: string };
 
+import { JDExtractionResultSchema } from '@/lib/llm/schema';
+
 const OptionalTextSchema = z.string().trim().max(500).optional();
 
 const RecommendationSchema = z.object({
@@ -35,6 +37,7 @@ const GenerateSchema = z.object({
   companyName: OptionalTextSchema,
   anthropicKey: OptionalTextSchema,
   model: OptionalTextSchema,
+  jdKeywords: JDExtractionResultSchema.optional(),
 });
 
 const RefineSchema = z.object({
@@ -54,6 +57,7 @@ const RefineSchema = z.object({
       MAX_SELECTED_RECOMMENDATIONS,
       `Select at most ${MAX_SELECTED_RECOMMENDATIONS} recommendations at once.`
     ),
+  jdKeywords: JDExtractionResultSchema.optional(),
 });
 
 function firstIssueMessage(error: z.ZodError): string {

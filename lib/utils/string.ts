@@ -38,14 +38,6 @@ export function sanitizeFilename(raw: string): string {
     .replace(/\s+/g, '_').slice(0, 80) || 'document';
 }
 
-export function getTimestampStr() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const full = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return { date, full };
-}
-
 /**
  * Builds a download filename in the format: FirstnameLastname_Company[_CoverLetter].docx
  *

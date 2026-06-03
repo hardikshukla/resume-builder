@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { toApiErrorResponse } from '@/types/error';
+import { getModelCapabilities, MODEL_FALLBACKS } from '@/lib/constants';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -7,7 +9,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (!apiKey) {
       return NextResponse.json(
-        { success: false, error: 'Anthropic API key is required to fetch models.' },
+        {
+          success: false,
+          error: {
+            type: 'VALIDATION_FAILED',
+            message: 'Anthropic API key is required to fetch models.',
+          },
+        },
         { status: 400 }
       );
     }
@@ -31,15 +39,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Filter to models starting with 'claude-' and map them
     const models = data.data
       .filter((m) => m.id.startsWith('claude-'))
-      .map((m) => ({
-        id: m.id,
-        name: m.display_name || m.id,
-      }));
+      .map((m) => {
+        const caps = getModelCapabilities(m.id);
+        const fallback = MODEL_FALLBACKS[m.id] || (m.id.includes('haiku') ? 'claude-haiku-4-5-20251001' : 'claude-3-5-sonnet-20241022');
+        return {
+          id: m.id,
+          name: m.display_name || m.id,
+          capabilities: caps,
+          fallbackModelId: fallback !== m.id ? fallback : undefined,
+        };
+      });
 
     return NextResponse.json({ success: true, models });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch models.';
-    console.error('[API /models]', message);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    console.error('[API /models]', err);
+    return NextResponse.json(toApiErrorResponse(err), { status: 500 });
   }
 }

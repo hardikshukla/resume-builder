@@ -8,12 +8,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: { type: 'VALIDATION_FAILED', message: 'No file provided.' } },
+        { status: 400 }
+      );
     }
 
     if (file.size > MAX_FILE_BYTES) {
       return NextResponse.json(
-        { error: `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 5 MB.` },
+        {
+          success: false,
+          error: {
+            type: 'VALIDATION_FAILED',
+            message: `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 5 MB.`,
+          },
+        },
         { status: 413 }
       );
     }
@@ -35,8 +44,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (!result.value.trim()) {
         return NextResponse.json(
           {
-            error:
-              'No text could be extracted. The file may be image-based or password-protected.',
+            success: false,
+            error: {
+              type: 'VALIDATION_FAILED',
+              message: 'No text could be extracted. The file may be image-based or password-protected.',
+            },
           },
           { status: 422 }
         );
@@ -49,20 +61,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (ext === 'doc') {
       return NextResponse.json(
         {
-          error:
-            '.doc (legacy format) is not supported. Open the file in Word and Save As → .docx, then re-upload.',
+          success: false,
+          error: {
+            type: 'VALIDATION_FAILED',
+            message: '.doc (legacy format) is not supported. Open the file in Word and Save As → .docx, then re-upload.',
+          },
         },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: `Unsupported file type: .${ext}. Please upload a .docx or .txt file.` },
+      {
+        success: false,
+        error: {
+          type: 'VALIDATION_FAILED',
+          message: `Unsupported file type: .${ext}. Please upload a .docx or .txt file.`,
+        },
+      },
       { status: 400 }
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to parse file.';
     console.error('[API /parse-resume]', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          type: 'FATAL',
+          message,
+        },
+      },
+      { status: 500 }
+    );
   }
 }

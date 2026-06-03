@@ -12,160 +12,37 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
-import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
-import Switch from '@mui/material/Switch';
-import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
-import Divider from '@mui/material/Divider';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import ErrorIcon from '@mui/icons-material/Error';
-import DownloadIcon from '@mui/icons-material/Download';
-import PrintIcon from '@mui/icons-material/Print';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 import { useApiKey } from '@/hooks/useApiKey';
 import { Recommendation } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
+import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
-import { buildDownloadFilename, capitalizeName } from '@/lib/utils/string';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS } from '@/lib/constants';
-
-// ── Simple word-level diff for highlights ────────────────────────────────────
-function diffWords(original: string, current: string): React.ReactNode[] {
-  if (original === current) return [current];
-  if (!original) {
-    return [
-      <ins key={0} style={{ textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>
-        {current}
-      </ins>
-    ];
-  }
-  const oWords = original.split(/(\s+)/);
-  const cWords = current.split(/(\s+)/);
-  const dp: number[][] = Array(oWords.length + 1)
-    .fill(0)
-    .map(() => Array(cWords.length + 1).fill(0));
-  for (let i = 1; i <= oWords.length; i++)
-    for (let j = 1; j <= cWords.length; j++)
-      dp[i][j] = oWords[i - 1] === cWords[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
-
-  const result: React.ReactNode[] = [];
-  let i = oWords.length, j = cWords.length, k = 0;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oWords[i - 1] === cWords[j - 1]) {
-      result.unshift(<span key={k++}>{oWords[i - 1]}</span>);
-      i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift(<ins key={k++} style={{ textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>{cWords[j - 1]}</ins>);
-      j--;
-    } else {
-      result.unshift(<del key={k++} style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', textDecoration: 'line-through' }}>{oWords[i - 1]}</del>);
-      i--;
-    }
-  }
-  return result;
-}
-
-// ── Recursive React helper to bold keywords ──────────────────────────────────
-function boldKeywords(node: React.ReactNode, keywords: string[]): React.ReactNode {
-  if (!node || keywords.length === 0) return node;
-
-  if (typeof node === 'string') {
-    const patterns = keywords.map(kw => {
-      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const startsWithWord = /^\w/.test(kw);
-      const endsWithWord = /\w$/.test(kw);
-      let pattern = escaped;
-      if (startsWithWord) pattern = '(?<!\\w)' + pattern;
-      if (endsWithWord) pattern = pattern + '(?!\\w)';
-      return pattern;
-    });
-    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
-    const parts = node.split(regex);
-    const lowercaseKeywords = new Set(keywords.map(k => k.toLowerCase()));
-    
-    return parts.map((part, index) => {
-      const isKeyword = lowercaseKeywords.has(part.toLowerCase());
-      if (isKeyword) {
-        return <strong key={index} style={{ fontWeight: 700 }}>{part}</strong>;
-      }
-      return part;
-    });
-  }
-
-  if (Array.isArray(node)) {
-    return node.map((child, idx) => (
-      <React.Fragment key={idx}>
-        {boldKeywords(child, keywords)}
-      </React.Fragment>
-    ));
-  }
-
-  if (React.isValidElement(node)) {
-    const { children, ...otherProps } = node.props;
-    if (children !== undefined) {
-      return React.cloneElement(node, otherProps, boldKeywords(children, keywords));
-    }
-  }
-
-  return node;
-}
-
-// ── Shared styles ─────────────────────────────────────────────────────────────
-const A4_STYLES = {
-  backgroundColor: '#ffffff',
-  color: '#000000',
-  p: 6,
-  fontFamily: '"Times New Roman", Times, serif',
-  fontSize: '11pt',
-  lineHeight: 1.5,
-  boxShadow: '0 4px 40px rgba(0,0,0,0.5)',
-  border: '1px solid #d3d3d3',
-  minHeight: '11in',
-  width: '100%',
-  maxWidth: '8.5in',
-  mx: 'auto',
-} as const;
-
-const SECTION_HEADER_SX = {
-  fontFamily: '"Times New Roman"',
-  fontSize: '11pt',
-  borderBottom: '1px solid #000',
-  pb: 0.2,
-  mb: 0.8,
-  textTransform: 'uppercase' as const,
-  fontWeight: 700,
-};
-
-const BODY_TEXT_SX = {
-  fontFamily: '"Times New Roman"',
-  fontSize: '11pt',
-};
-
-const DEFAULT_MODELS = [
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast)' },
-  { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus (Advanced)' },
-];
+import { buildDownloadFilename } from '@/lib/utils/string';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS } from '@/lib/constants';
+import GapAnalysisPanel from '@/components/GapAnalysisPanel';
+import ResumePreview from '@/components/ResumePreview';
+import CoverLetterPreview from '@/components/CoverLetterPreview';
+import ErrorBanner from '@/components/ErrorBanner';
+import Drawer from '@mui/material/Drawer';
+import Fab from '@mui/material/Fab';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { WorkflowStepper } from '@/components/WorkflowStepper';
+import { ContextPill } from '@/components/ContextPill';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -180,12 +57,18 @@ export default function Home() {
     handleResumeChange,
     output,
     originalOutput,
+    jdKeywords,
     isLoading,
     error,
+    clearError,
     handleGenerate,
     handleRefine,
     handleRevert,
     handleRefreshRecommendations,
+    manualEdits,
+    orphanedEdits,
+    clearOrphanedEdits,
+    handleManualEdit,
   } = useGenerate();
 
   const [activeTab, setActiveTab] = useState(0);
@@ -203,7 +86,40 @@ export default function Home() {
   const [dropboxVerifyStatus, setDropboxVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [activeStep, setActiveStep] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+
+  const handleStepChange = (step: number) => {
+    setActiveStep(step);
+    if (step === 0 || step === 1) {
+      if (isMobile) {
+        setDrawerOpen(true);
+      }
+    } else {
+      if (isMobile) {
+        setDrawerOpen(false);
+      }
+    }
+  };
+
+  const handleGenerateClick = async () => {
+    setActiveStep(1);
+    if (isMobile) {
+      setDrawerOpen(false);
+    }
+    await handleGenerate(anthropicKey);
+  };
+
+  useEffect(() => {
+    if (output) {
+      setActiveStep(2);
+    } else {
+      setActiveStep(0);
+    }
+  }, [output]);
 
   // Reset recommendations selection, applied status, and custom recommendations when JD, resume, or a fresh generation changes
   useEffect(() => {
@@ -269,7 +185,7 @@ export default function Home() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to parse resume file.');
+        throw new Error(data.error?.message || data.error || 'Failed to parse resume file.');
       }
 
       handleResumeChange(data.text);
@@ -294,7 +210,8 @@ export default function Home() {
       if (res.ok && data.valid) {
         setDropboxVerifyStatus({ success: true, message: `Connected: ${data.account}` });
       } else {
-        setDropboxVerifyStatus({ success: false, message: data.error || 'Verification failed.' });
+        const errMsg = typeof data.error === 'object' && data.error ? data.error.message : (data.error || 'Verification failed.');
+        setDropboxVerifyStatus({ success: false, message: errMsg });
       }
     } catch (err) {
       console.error('Dropbox token verification error:', err);
@@ -304,55 +221,17 @@ export default function Home() {
     }
   };
 
-
-  // Inactivity session lock (20 min)
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const resetTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        sessionStorage.clear();
-        setIsSessionExpired(true);
-      }, 40 * 60 * 1000);
-    };
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    resetTimer();
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-    };
-  }, []);
+  // Inactivity session lock (40 min) using custom hook
+  useInactivityTimeout(40, () => {
+    sessionStorage.clear();
+    setIsSessionExpired(true);
+  });
 
   useEffect(() => {
     const clearOnUnload = () => sessionStorage.clear();
     window.addEventListener('beforeunload', clearOnUnload);
     return () => window.removeEventListener('beforeunload', clearOnUnload);
   }, []);
-
-  const handleRecToggle = (recId: string) => {
-    setSelectedRecs((prev) =>
-      prev.includes(recId) ? prev.filter((id) => id !== recId) : [...prev, recId]
-    );
-  };
-
-  const isDealbreakerResolved = (dbId: string) =>
-    selectedRecs.some((recId) => {
-      const rec = output?.gapAnalysis.recommendations.find((r) => r.id === recId);
-      return rec?.resolvesDealbreakers.includes(dbId);
-    });
-
-  // Deduplication
-  const uniqueStrongMatches = output ? Array.from(new Set(output.gapAnalysis.strongMatches)) : [];
-  const uniqueKeywordsAdded = output ? Array.from(new Set(output.gapAnalysis.keywordsAdded)) : [];
-  const uniqueDealbreakers = output
-    ? Array.from(new Map(output.gapAnalysis.dealbreakers.map((db) => [db.text, db])).values())
-    : [];
-  const uniqueRecommendations = output
-    ? Array.from(new Map(output.gapAnalysis.recommendations.map((r) => [r.claim, r])).values())
-    : [];
-  const allRecommendations = [...uniqueRecommendations, ...customRecommendations];
 
   // Get all unique keywords for bolding (strongMatches and clean version of keywordsAdded)
   const boldingKeywords = useMemo(() => {
@@ -367,7 +246,7 @@ export default function Home() {
         if (clean) keywords.add(clean);
       }
     });
-    // Sort descending by length so we match longer phrases before shorter substrings
+    // Sort descending by length so longer phrases match before shorter substrings
     return Array.from(keywords).sort((a, b) => b.length - a.length);
   }, [output]);
 
@@ -397,6 +276,7 @@ export default function Home() {
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      setActiveStep(3);
     } catch (err) {
       alert(`Download failed: ${err}`);
     }
@@ -428,6 +308,7 @@ export default function Home() {
       });
       if (!res.ok) throw new Error(await res.text() || 'Upload failed');
       setDropboxStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
+      setActiveStep(3);
     } catch (err) {
       setDropboxStatus({ type: 'error', message: err instanceof Error ? err.message : 'Dropbox failed.' });
     }
@@ -439,15 +320,177 @@ export default function Home() {
     return 'text.secondary';
   };
 
-  const renderDiff = (original: string | undefined, current: string) => {
-    let result: React.ReactNode;
-    if (showHighlights && current !== original) {
-      result = <>{diffWords(original || '', current)}</>;
-    } else {
-      result = current;
-    }
-    return boldKeywords(result, boldingKeywords);
-  };
+  const renderInputs = () => (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 3,
+        border: isMobile ? 'none' : '1px solid',
+        borderColor: 'divider',
+        borderRadius: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+        backgroundColor: '#0f1117',
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Tailoring Parameters
+        </Typography>
+        {isMobile && (
+          <Button onClick={() => setDrawerOpen(false)} variant="text" size="small">
+            Close
+          </Button>
+        )}
+      </Box>
+
+      {/* Resume */}
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+            Candidate Resume
+          </Typography>
+          <Button
+            variant="outlined"
+            component="label"
+            size="small"
+            startIcon={isParsingFile ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+            disabled={isParsingFile}
+            sx={{ py: 0.5 }}
+          >
+            {isParsingFile ? 'Parsing...' : 'Upload DOCX/TXT'}
+            <input
+              type="file"
+              hidden
+              accept=".docx,.txt"
+              onChange={handleFileUpload}
+            />
+          </Button>
+        </Box>
+        <TextField multiline rows={8} fullWidth value={resume}
+          onChange={(e) => handleResumeChange(e.target.value)}
+          placeholder="Paste your current resume or upload above..." variant="outlined"
+          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+        {parseError && (
+          <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+            ⚠️ {parseError}
+          </Typography>
+        )}
+        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(resume.length, MAX_RESUME_CHARS, RESUME_WARN_CHARS) }}>
+          {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
+        </Typography>
+      </Box>
+
+      {/* Job Description */}
+      <Box>
+        <TextField label="Job Description" multiline rows={8} fullWidth value={jobDescription}
+          onChange={(e) => setJD(e.target.value)}
+          placeholder="Paste the target Job Description..." variant="outlined"
+          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(jobDescription.length, MAX_JD_CHARS, JD_WARN_CHARS) }}>
+          {jobDescription.length.toLocaleString()} / {MAX_JD_CHARS.toLocaleString()} chars
+        </Typography>
+      </Box>
+
+      {/* Company Name */}
+      <TextField label="Company Name (Optional)" fullWidth value={companyName}
+        onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google"
+        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+
+      {/* Anthropic Key */}
+      <TextField
+        label={hasServerKey ? 'Anthropic API Key (Configured on Server)' : 'Anthropic API Key (Mandatory)'}
+        type={showAnthropicKey ? 'text' : 'password'} fullWidth
+        value={hasServerKey ? '' : anthropicKey}
+        onChange={(e) => setAnthropicKey(e.target.value)}
+        placeholder={hasServerKey ? 'Configured on server via environment variable.' : 'Enter your Anthropic API Key...'}
+        disabled={hasServerKey}
+        error={!hasServerKey && !anthropicKey}
+        helperText={!hasServerKey && !anthropicKey ? 'Anthropic API Key is required to run LLM operations.' : ''}
+        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
+        slotProps={{ input: {
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
+                {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        }}}
+      />
+
+      {/* Claude Model Selection */}
+      <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
+        <InputLabel id="model-select-label">Claude Model</InputLabel>
+        <Select
+          labelId="model-select-label"
+          value={selectedModel}
+          label="Claude Model"
+          onChange={(e) => setSelectedModel(e.target.value as string)}
+        >
+          {availableModels.map((m) => (
+            <MenuItem key={m.id} value={m.id}>
+              {m.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {/* Dropbox (Optional) */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <TextField
+          label="Dropbox Access Token (Optional)"
+          type={showDropboxToken ? 'text' : 'password'} fullWidth
+          value={dropboxToken || ''}
+          onChange={(e) => setDropboxToken(e.target.value)}
+          placeholder="Enter Dropbox Access Token..."
+          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
+          slotProps={{ input: {
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
+                  {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}}
+        />
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleVerifyDropboxToken}
+          disabled={isVerifyingDropbox}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
+        </Button>
+        {dropboxVerifyStatus && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: dropboxVerifyStatus.success ? 'success.main' : 'error.main',
+              fontWeight: 600,
+            }}
+          >
+            {dropboxVerifyStatus.success ? '✓ ' : '✗ '}{dropboxVerifyStatus.message}
+          </Typography>
+        )}
+      </Box>
+
+      {/* Generate Button */}
+      <Button variant="contained" size="large" fullWidth
+        onClick={handleGenerateClick}
+        disabled={isLoading || resume.length === 0 || jobDescription.length === 0 || resume.length > MAX_RESUME_CHARS || jobDescription.length > MAX_JD_CHARS || (!hasServerKey && !anthropicKey)}
+        sx={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', boxShadow: '0 4px 20px rgba(108,99,255,0.4)', py: 1.5, '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' } }}>
+        {isLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '✨ Generate Tailored Resume'}
+      </Button>
+
+      <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
+        API keys stored in session only · Never logged server-side
+      </Typography>
+    </Paper>
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -477,170 +520,59 @@ export default function Home() {
       </Box>
 
       <Container maxWidth="xl" sx={{ flexGrow: 1, py: 4 }}>
+        <WorkflowStepper
+          activeStep={activeStep}
+          isLoading={isLoading}
+          hasOutput={!!output}
+          onStepChange={handleStepChange}
+        />
+
         <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           {/* ── Left Panel (Inputs) ────────────────────────────────── */}
-          <Box sx={{ flex: '0 0 auto', width: { xs: '100%', lg: '350px' } }}>
-            <Box sx={{ position: { lg: 'sticky' }, top: 80, maxHeight: { lg: 'calc(100vh - 120px)' }, overflowY: 'auto' }}>
-              <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Tailoring Parameters
-                </Typography>
-
-                {/* Resume */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                      Candidate Resume
-                    </Typography>
-                    <Button
-                      variant="outlined"
-                      component="label"
-                      size="small"
-                      startIcon={isParsingFile ? <CircularProgress size={16} /> : <CloudUploadIcon />}
-                      disabled={isParsingFile}
-                      sx={{ py: 0.5 }}
-                    >
-                      {isParsingFile ? 'Parsing...' : 'Upload DOCX/TXT'}
-                      <input
-                        type="file"
-                        hidden
-                        accept=".docx,.txt"
-                        onChange={handleFileUpload}
-                      />
-                    </Button>
-                  </Box>
-                  <TextField multiline rows={8} fullWidth value={resume}
-                    onChange={(e) => handleResumeChange(e.target.value)}
-                    placeholder="Paste your current resume or upload above..." variant="outlined"
-                    sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
-                  {parseError && (
-                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                      ⚠️ {parseError}
-                    </Typography>
-                  )}
-                  <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(resume.length, MAX_RESUME_CHARS, RESUME_WARN_CHARS) }}>
-                    {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
-                  </Typography>
-                </Box>
-
-                {/* Job Description */}
-                <Box>
-                  <TextField label="Job Description" multiline rows={8} fullWidth value={jobDescription}
-                    onChange={(e) => setJD(e.target.value)}
-                    placeholder="Paste the target Job Description..." variant="outlined"
-                    sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
-                  <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(jobDescription.length, MAX_JD_CHARS, JD_WARN_CHARS) }}>
-                    {jobDescription.length.toLocaleString()} / {MAX_JD_CHARS.toLocaleString()} chars
-                  </Typography>
-                </Box>
-
-                {/* Company Name */}
-                <TextField label="Company Name (Optional)" fullWidth value={companyName}
-                  onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google"
-                  sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
-
-                {/* Anthropic Key */}
-                <TextField 
-                  label={hasServerKey ? "Anthropic API Key (Configured on Server)" : "Anthropic API Key (Mandatory)"}
-                  type={showAnthropicKey ? 'text' : 'password'} fullWidth
-                  value={hasServerKey ? '' : anthropicKey} 
-                  onChange={(e) => setAnthropicKey(e.target.value)}
-                  placeholder={hasServerKey ? "Configured on server via environment variable." : "Enter your Anthropic API Key..."}
-                  disabled={hasServerKey}
-                  error={!hasServerKey && !anthropicKey}
-                  helperText={!hasServerKey && !anthropicKey ? "Anthropic API Key is required to run LLM operations." : ""}
-                  sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-                  slotProps={{ input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
-                          {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}}
-                />
-
-                {/* Claude Model Selection */}
-                <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
-                  <InputLabel id="model-select-label">Claude Model</InputLabel>
-                  <Select
-                    labelId="model-select-label"
-                    value={selectedModel}
-                    label="Claude Model"
-                    onChange={(e) => setSelectedModel(e.target.value as string)}
-                  >
-                    {availableModels.map((m) => (
-                      <MenuItem key={m.id} value={m.id}>
-                        {m.name}
-                      </MenuItem>
-                    ))}
-                    {!availableModels.some((m) => m.id === selectedModel) && (
-                      <MenuItem value={selectedModel}>
-                        {selectedModel}
-                      </MenuItem>
-                    )}
-                  </Select>
-                </FormControl>
-
-                {/* Dropbox Token */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <TextField label="Dropbox API Token (Optional)"
-                    type={showDropboxToken ? 'text' : 'password'} fullWidth
-                    value={dropboxToken} onChange={(e) => setDropboxToken(e.target.value)}
-                    placeholder="Enter Dropbox OAuth token..."
-                    sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-                    slotProps={{ input: {
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
-                            {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}}
-                  />
-                  {dropboxToken && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={handleVerifyDropboxToken}
-                        disabled={isVerifyingDropbox}
-                        sx={{ alignSelf: 'flex-start' }}
-                      >
-                        {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
-                      </Button>
-                      {dropboxVerifyStatus && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: dropboxVerifyStatus.success ? 'success.main' : 'error.main',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {dropboxVerifyStatus.success ? '✓ ' : '✗ '}{dropboxVerifyStatus.message}
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Generate Button */}
-                <Button variant="contained" size="large" fullWidth
-                  onClick={() => handleGenerate(anthropicKey)}
-                  disabled={isLoading || resume.length === 0 || jobDescription.length === 0 || resume.length > MAX_RESUME_CHARS || jobDescription.length > MAX_JD_CHARS || (!hasServerKey && !anthropicKey)}
-                  sx={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', boxShadow: '0 4px 20px rgba(108,99,255,0.4)', py: 1.5, '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' } }}>
-                  {isLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '✨ Generate Tailored Resume'}
-                </Button>
-
-                <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-                  API keys stored in session only · Never logged server-side
-                </Typography>
-              </Paper>
+          {!isMobile && (
+            <Box sx={{ flex: '0 0 auto', width: '350px' }}>
+              <Box sx={{ position: 'sticky', top: 80, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                {renderInputs()}
+              </Box>
             </Box>
-          </Box>
+          )}
+
+          {isMobile && (
+            <Drawer
+              anchor="left"
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+              slotProps={{
+                paper: {
+                  sx: {
+                    width: '320px',
+                    backgroundColor: '#0f1117',
+                    borderRight: '1px solid rgba(255,255,255,0.1)',
+                  },
+                },
+              }}
+            >
+              {renderInputs()}
+            </Drawer>
+          )}
+
+          {isMobile && (
+            <Fab
+              color="primary"
+              aria-label="edit parameters"
+              onClick={() => setDrawerOpen(true)}
+              sx={{
+                position: 'fixed',
+                bottom: 24,
+                right: 24,
+                zIndex: 1000,
+                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+              }}
+            >
+              <SettingsIcon />
+            </Fab>
+          )}
 
           {/* ── Right Panel (Output) ───────────────────────────────── */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
@@ -657,7 +589,9 @@ export default function Home() {
             )}
 
             {/* Error */}
-            {error && !isLoading && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+            {error && !isLoading && (
+              <ErrorBanner error={error} onDismiss={clearError} />
+            )}
 
             {/* Empty state */}
             {!isLoading && !output && !error && (
@@ -677,6 +611,12 @@ export default function Home() {
             {/* Output */}
             {output && !isLoading && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <ContextPill
+                  model={selectedModel}
+                  matchScore={output.gapAnalysis.matchScore}
+                  editCount={manualEdits.length}
+                  appliedRecsCount={appliedRecs.size}
+                />
 
                 {/* Refined banner */}
                 {originalOutput && output !== originalOutput && (
@@ -684,11 +624,11 @@ export default function Home() {
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       💡 Refined · Score: {originalOutput.gapAnalysis.matchScore}% → {output.gapAnalysis.matchScore}%
                     </Typography>
-                     <Button size="small" variant="outlined" onClick={() => {
-                       handleRevert();
-                       setAppliedRecs(new Set());
-                       setSelectedRecs([]);
-                     }}>Revert to Original</Button>
+                    <Button size="small" variant="outlined" onClick={() => {
+                      handleRevert();
+                      setAppliedRecs(new Set());
+                      setSelectedRecs([]);
+                    }}>Revert to Original</Button>
                   </Paper>
                 )}
 
@@ -703,580 +643,63 @@ export default function Home() {
 
                 {/* ── Tab 0: Gap Analysis ─────────────────────────── */}
                 {activeTab === 0 && (
-                  <Box id="tabpanel-gap" role="tabpanel" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
-
-                      {/* Match Score */}
-                      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>ATS Keyword Match Score</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                        <LinearProgress variant="determinate" value={output.gapAnalysis.matchScore}
-                          sx={{ flexGrow: 1, height: 10, borderRadius: 5 }} />
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main', minWidth: 50 }}>
-                          {output.gapAnalysis.matchScore}%
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 3 }}>
-                        Placement-weighted coverage (Summary &amp; Skills score higher). Deducts 5 pts per unresolved dealbreaker. Capped at 95.
-                      </Typography>
-
-                      {/* Strong Matches */}
-                      <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CheckCircleIcon color="success" fontSize="small" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              ✅ Strong Matches ({uniqueStrongMatches.length})
-                            </Typography>
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {uniqueStrongMatches.map((kw) => (
-                              <Chip key={kw} label={kw} color="success" variant="outlined" size="small" />
-                            ))}
-                          </Box>
-                        </AccordionDetails>
-                      </Accordion>
-
-                      {/* Keywords Added by Claude */}
-                      <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AutoAwesomeIcon color="primary" fontSize="small" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              💡 Keywords Added by Claude ({uniqueKeywordsAdded.length})
-                            </Typography>
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {uniqueKeywordsAdded.map((kw) => (
-                              <Chip key={kw} label={kw} color="primary" variant="outlined" size="small" />
-                            ))}
-                          </Box>
-                        </AccordionDetails>
-                      </Accordion>
-
-                      {/* Dealbreakers */}
-                      <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <ErrorIcon color="error" fontSize="small" />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              ❌ Dealbreakers / Missing ({uniqueDealbreakers.length})
-                            </Typography>
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            {uniqueDealbreakers.map((db) => {
-                              const resolved = isDealbreakerResolved(db.id);
-                              return (
-                                <FormControlLabel key={db.id}
-                                  control={<Checkbox checked={resolved} disabled color="error" />}
-                                  label={
-                                    <Typography variant="body2" sx={{
-                                      textDecoration: resolved ? 'line-through' : 'none',
-                                      color: resolved ? 'text.secondary' : 'error.main',
-                                      opacity: resolved ? 0.6 : 1,
-                                      fontWeight: resolved ? 400 : 600,
-                                    }}>
-                                      {db.text}{resolved && ' (Covered by recommendation)'}
-                                    </Typography>
-                                  }
-                                />
-                              );
-                            })}
-                            {uniqueDealbreakers.length === 0 && (
-                              <Typography variant="body2" sx={{ color: 'success.main' }}>No dealbreakers — excellent match!</Typography>
-                            )}
-                          </Box>
-                        </AccordionDetails>
-                      </Accordion>
-
-                      {/* Recommendations */}
-                      <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 2 }}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WarningIcon color="warning" fontSize="small" />
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                📋 Actionable Recommendations ({allRecommendations.length})
-                              </Typography>
-                            </Box>
-                            <IconButton
-                              id="refresh-recommendations-btn"
-                              size="small"
-                              disabled={isRefreshing || isLoading}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                setIsRefreshing(true);
-                                await handleRefreshRecommendations(anthropicKey || undefined);
-                                setIsRefreshing(false);
-                              }}
-                              title="Re-analyse resume against JD and surface any new gaps"
-                              sx={{
-                                color: 'warning.main',
-                                opacity: isRefreshing ? 0.6 : 1,
-                                transition: 'opacity 0.2s',
-                                '&:hover': { backgroundColor: 'rgba(237,108,2,0.1)' },
-                              }}
-                            >
-                              {isRefreshing
-                                ? <CircularProgress size={16} color="warning" />
-                                : <AutorenewIcon fontSize="small" sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />}
-                            </IconButton>
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            {allRecommendations.map((rec) => {
-                              const applied = appliedRecs.has(rec.id);
-                              const checked = selectedRecs.includes(rec.id);
-                              const isCustom = rec.id.startsWith('custom-');
-                              return (
-                                <Box key={rec.id} sx={{
-                                  p: 2,
-                                  mb: 1.5,
-                                  borderRadius: 2,
-                                  border: '1px solid',
-                                  borderColor: checked ? 'warning.main' : 'divider',
-                                  backgroundColor: checked ? 'rgba(237,108,2,0.02)' : '#161920',
-                                  display: 'flex',
-                                  alignItems: 'flex-start',
-                                  gap: 1.5,
-                                  transition: 'all 0.2s ease',
-                                  '&:hover': {
-                                    borderColor: applied ? 'divider' : 'warning.main',
-                                    backgroundColor: checked ? 'rgba(237,108,2,0.04)' : 'rgba(255,255,255,0.02)'
-                                  }
-                                }}>
-                                  <Checkbox
-                                    checked={checked}
-                                    onChange={() => !applied && handleRecToggle(rec.id)}
-                                    color="warning"
-                                    disabled={applied}
-                                    sx={{ p: 0, mt: 0.2 }}
-                                  />
-                                  <Box sx={{ flexGrow: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
-                                      <Typography variant="body2" sx={{
-                                        fontWeight: 600,
-                                        textDecoration: applied ? 'line-through' : 'none',
-                                        color: applied ? 'success.main' : 'text.primary',
-                                        opacity: applied ? 0.7 : 1
-                                      }}>
-                                        {rec.claim}
-                                      </Typography>
-                                      
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Chip
-                                          label={isCustom ? 'CUSTOM' : rec.riskLevel.toUpperCase()}
-                                          size="small"
-                                          color={
-                                            isCustom ? 'info' :
-                                            rec.riskLevel === 'low' ? 'success' :
-                                            rec.riskLevel === 'medium' ? 'warning' : 'error'
-                                          }
-                                          variant="outlined"
-                                          sx={{ fontSize: '0.65rem', height: 18, fontWeight: 700 }}
-                                        />
-                                        
-                                        {applied && (
-                                          <Chip
-                                            label="APPLIED"
-                                            size="small"
-                                            color="success"
-                                            sx={{ fontSize: '0.65rem', height: 18, fontWeight: 700 }}
-                                          />
-                                        )}
-                                      </Box>
-                                    </Box>
-                                    
-                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                                      <strong>Target Section:</strong> {rec.targetSection}
-                                    </Typography>
-                                    
-                                    {!isCustom && (
-                                      <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, backgroundColor: '#0f1117', border: '1px solid', borderColor: 'divider' }}>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem' }}>
-                                          <strong>Evidence Required:</strong> {rec.evidenceRequired}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem', mt: 0.2 }}>
-                                          <strong>Evidence Found:</strong> {rec.evidenceFound || 'None'}
-                                        </Typography>
-                                      </Box>
-                                    )}
-                                  </Box>
-                                </Box>
-                              );
-                            })}
-
-                            {/* Add Custom Recommendation UI */}
-                            <Box sx={{ mt: 1, p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider', backgroundColor: '#161920' }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '0.8rem', color: 'text.primary' }}>
-                                ➕ Add Custom Refinement Instruction
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <TextField
-                                  fullWidth
-                                  size="small"
-                                  placeholder="e.g., Add Python to Core Competencies, highlight my AWS cert..."
-                                  value={customRecText}
-                                  onChange={(e) => setCustomRecText(e.target.value)}
-                                  sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-                                />
-                                <Button
-                                  variant="outlined"
-                                  color="warning"
-                                  size="small"
-                                  onClick={() => {
-                                    if (!customRecText.trim()) return;
-                                    const newRec: Recommendation = {
-                                      id: `custom-${Date.now()}`,
-                                      claim: customRecText.trim(),
-                                      targetSection: 'User Custom Instruction',
-                                      evidenceRequired: 'User supplied',
-                                      evidenceFound: 'User supplied',
-                                      riskLevel: 'medium',
-                                      resolvesDealbreakers: [],
-                                    };
-                                    setCustomRecommendations((prev) => [...prev, newRec]);
-                                    setSelectedRecs((prev) => [...prev, newRec.id]);
-                                    setCustomRecText('');
-                                  }}
-                                  sx={{ fontWeight: 600, px: 2 }}
-                                >
-                                  Add
-                                </Button>
-                              </Box>
-                            </Box>
-                          </Box>
-                        </AccordionDetails>
-                      </Accordion>
-
-                      <Button variant="contained" color="warning" fullWidth
-                        onClick={async () => {
-                          const selectedObjects = selectedRecs.map(id => {
-                            return allRecommendations.find(r => r.id === id);
-                          }).filter((r): r is Recommendation => !!r);
-                          const success = await handleRefine(selectedObjects, anthropicKey);
-                          if (success) {
-                            setAppliedRecs(prev => {
-                              const next = new Set<string>();
-                              prev.forEach(id => next.add(id));
-                              selectedRecs.forEach(id => next.add(id));
-                              return next;
-                            });
-                            setSelectedRecs([]);
-                          }
-                        }}
-                        disabled={selectedRecs.length === 0 || isLoading || (!hasServerKey && !anthropicKey)}
-                        sx={{ py: 1.2, fontWeight: 700 }}>
-                        {isLoading ? <CircularProgress size={20} /> : `Apply Selected Suggestions (${selectedRecs.length})`}
-                      </Button>
-
-                      {output.gapAnalysis.summaryChanges && (
-                        <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(108,99,255,0.06)', border: '1px solid', borderColor: 'rgba(108,99,255,0.2)', borderRadius: 2 }}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-                            📝 Summary changes: {output.gapAnalysis.summaryChanges}
-                          </Typography>
-                        </Box>
-                      )}
-                    </Paper>
-                  </Box>
+                  <GapAnalysisPanel
+                    output={output}
+                    jdKeywords={jdKeywords}
+                    anthropicKey={anthropicKey}
+                    hasServerKey={hasServerKey}
+                    isLoading={isLoading}
+                    handleRefreshRecommendations={handleRefreshRecommendations}
+                    handleRefine={handleRefine}
+                    selectedRecs={selectedRecs}
+                    setSelectedRecs={setSelectedRecs}
+                    appliedRecs={appliedRecs}
+                    setAppliedRecs={setAppliedRecs}
+                    customRecommendations={customRecommendations}
+                    setCustomRecommendations={setCustomRecommendations}
+                    customRecText={customRecText}
+                    setCustomRecText={setCustomRecText}
+                  />
                 )}
 
                 {/* ── Tab 1: Tailored Resume ──────────────────────── */}
                 {activeTab === 1 && (
-                  <Box id="tabpanel-resume" role="tabpanel" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                      <FormControlLabel
-                        control={<Switch checked={showHighlights} onChange={(e) => setShowHighlights(e.target.checked)} color="success" />}
-                        label="Show Highlights"
-                      />
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('resume')}>Download DOCX</Button>
-                        {dropboxToken && (
-                          <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('resume')}>Save to Dropbox</Button>
-                        )}
-                        <Button startIcon={<PrintIcon />} variant="contained" color="secondary" size="small" onClick={() => window.print()}>Print / PDF</Button>
-                      </Box>
-                    </Box>
-
-                    {dropboxStatus && (
-                      <Alert severity={dropboxStatus.type} onClose={() => setDropboxStatus(null)}>{dropboxStatus.message}</Alert>
-                    )}
-
-                    {/* A4 Preview */}
-                    <Box id="resume-print-area" sx={A4_STYLES}>
-                      {/* Header */}
-                      <Box sx={{ textAlign: 'center', mb: 2 }}>
-                        <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>
-                          {output.resume.name || 'Candidate Name'}
-                        </Typography>
-                        <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>
-                          {[output.resume.contact?.email, output.resume.contact?.phone, output.resume.contact?.linkedin, output.resume.contact?.github, output.resume.contact?.location].filter(Boolean).join('  |  ')}
-                        </Typography>
-                        <Divider sx={{ mt: 1, borderColor: '#000', borderBottomWidth: 1.5 }} />
-                      </Box>
-
-                      {/* Summary */}
-                      {output.resume.summary && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Summary</Typography>
-                          <Typography sx={{ ...BODY_TEXT_SX, textAlign: 'justify' }}>
-                            {renderDiff(originalOutput?.resume.summary, output.resume.summary)}
-                          </Typography>
-                        </Box>
-                      )}
-
-                      {/* Skills */}
-                      {output.resume.skills && output.resume.skills.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Core Competencies</Typography>
-                          {output.resume.skills.map((sg, idx) => (
-                            <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 0.4 }}>
-                              <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, minWidth: 160, flexShrink: 0 }}>
-                                {sg.category}:
-                              </Typography>
-                              <Typography sx={BODY_TEXT_SX}>
-                                {renderDiff(originalOutput?.resume.skills?.[idx]?.items.join(', '), sg.items.join(', '))}
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      )}
-
-                      {/* Experience */}
-                      {output.resume.experience && output.resume.experience.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Experience</Typography>
-                          {output.resume.experience.map((exp, expIdx) => {
-                            const origExp = originalOutput?.resume.experience?.[expIdx];
-                            return (
-                              <Box key={expIdx} sx={{ mb: 2 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>
-                                    {exp.title} | {exp.company}
-                                  </Typography>
-                                  <Typography sx={BODY_TEXT_SX}>
-                                    {exp.startDate} – {exp.endDate}
-                                  </Typography>
-                                </Box>
-                                {exp.location && (
-                                  <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic', mb: 0.5 }}>{exp.location}</Typography>
-                                )}
-                                {(!exp.projects || exp.projects.length === 0) && (
-                                  <>
-                                    <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                                      {exp.bullets.map((b, bi) => (
-                                        <Box component="li" key={bi} sx={{ mb: 0.3 }}>
-                                          <Typography sx={BODY_TEXT_SX}>
-                                            {renderDiff(origExp?.bullets?.[bi], b)}
-                                          </Typography>
-                                        </Box>
-                                      ))}
-                                    </Box>
-                                    {exp.tech && exp.tech.length > 0 && (
-                                      <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.4 }}>
-                                        Stack: {boldKeywords(exp.tech.join(', '), boldingKeywords)}
-                                      </Typography>
-                                    )}
-                                  </>
-                                )}
-                                {exp.projects && exp.projects.length > 0 && (
-                                  <Box sx={{ mt: 0.5 }}>
-                                    {exp.projects.map((proj, pi) => {
-                                      const origProj = origExp?.projects?.[pi];
-                                      return (
-                                        <Box key={pi} sx={{ pl: 2, mb: 1 }}>
-                                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>{proj.name}</Typography>
-                                          {proj.description && (
-                                            <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic' }}>{boldKeywords(proj.description, boldingKeywords)}</Typography>
-                                          )}
-                                          <Box component="ul" sx={{ m: 0, pl: 2, mt: 0.3 }}>
-                                            {proj.bullets.map((b, bi) => (
-                                              <Box component="li" key={bi} sx={{ mb: 0.2 }}>
-                                                <Typography sx={BODY_TEXT_SX}>
-                                                  {renderDiff(origProj?.bullets?.[bi], b)}
-                                                </Typography>
-                                              </Box>
-                                            ))}
-                                          </Box>
-                                          {proj.tech && proj.tech.length > 0 && (
-                                            <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                                              Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
-                                            </Typography>
-                                          )}
-                                        </Box>
-                                      );
-                                    })}
-                                  </Box>
-                                )}
-                              </Box>
-                            );
-                          })}
-                        </Box>
-                      )}
-
-                      {/* Standalone Projects */}
-                      {output.resume.projects && output.resume.projects.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Projects</Typography>
-                          {output.resume.projects.map((proj, pi) => {
-                            const origProj = originalOutput?.resume.projects?.[pi];
-                            return (
-                              <Box key={pi} sx={{ mb: 1.5 }}>
-                                <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>{proj.name}</Typography>
-                                {proj.description && (
-                                  <Typography sx={{ ...BODY_TEXT_SX, fontStyle: 'italic', mb: 0.3 }}>{boldKeywords(proj.description, boldingKeywords)}</Typography>
-                                )}
-                                <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                                  {proj.bullets.map((b, bi) => (
-                                    <Box component="li" key={bi} sx={{ mb: 0.3 }}>
-                                      <Typography sx={BODY_TEXT_SX}>
-                                        {renderDiff(origProj?.bullets?.[bi], b)}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Box>
-                                {proj.tech && proj.tech.length > 0 && (
-                                  <Typography sx={{ ...BODY_TEXT_SX, fontSize: '10pt', fontStyle: 'italic', mt: 0.3 }}>
-                                    Stack: {boldKeywords(proj.tech.join(', '), boldingKeywords)}{proj.link ? ` | ${proj.link}` : ''}
-                                  </Typography>
-                                )}
-                              </Box>
-                            );
-                          })}
-                        </Box>
-                      )}
-
-                      {/* Education */}
-                      {output.resume.education && output.resume.education.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Education</Typography>
-                          {output.resume.education.map((edu, i) => (
-                            <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
-                              <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700 }}>
-                                {edu.degree} — {edu.institution}
-                              </Typography>
-                              <Typography sx={BODY_TEXT_SX}>{edu.year}</Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      )}
-
-                      {/* Certifications */}
-                      {output.resume.certifications && output.resume.certifications.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Certifications</Typography>
-                          <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                            {output.resume.certifications.map((c, i) => (
-                              <Box component="li" key={i} sx={{ mb: 0.3 }}><Typography sx={BODY_TEXT_SX}>{c}</Typography></Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Publications */}
-                      {output.resume.publications && output.resume.publications.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Publications</Typography>
-                          <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                            {output.resume.publications.map((p, i) => (
-                              <Box component="li" key={i} sx={{ mb: 0.3 }}><Typography sx={BODY_TEXT_SX}>{p}</Typography></Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Awards */}
-                      {output.resume.awards && output.resume.awards.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Awards &amp; Honours</Typography>
-                          <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                            {output.resume.awards.map((a, i) => (
-                              <Box component="li" key={i} sx={{ mb: 0.3 }}><Typography sx={BODY_TEXT_SX}>{a}</Typography></Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-
-                      {/* Languages */}
-                      {output.resume.languages && output.resume.languages.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={SECTION_HEADER_SX}>Languages</Typography>
-                          <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                            {output.resume.languages.map((l, i) => (
-                              <Box component="li" key={i} sx={{ mb: 0.3 }}><Typography sx={BODY_TEXT_SX}>{l}</Typography></Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  </Box>
+                  <ResumePreview
+                    output={output}
+                    originalOutput={originalOutput}
+                    showHighlights={showHighlights}
+                    setShowHighlights={setShowHighlights}
+                    boldingKeywords={boldingKeywords}
+                    dropboxToken={dropboxToken}
+                    dropboxStatus={dropboxStatus}
+                    setDropboxStatus={setDropboxStatus}
+                    handleDownload={handleDownload}
+                    handleSaveToDropbox={handleSaveToDropbox}
+                    handleManualEdit={handleManualEdit}
+                    manualEdits={manualEdits}
+                    orphanedEdits={orphanedEdits}
+                    clearOrphanedEdits={clearOrphanedEdits}
+                  />
                 )}
 
                 {/* ── Tab 2: Cover Letter ─────────────────────────── */}
                 {activeTab === 2 && (
-                  <Box id="tabpanel-cover" role="tabpanel" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                      <FormControlLabel
-                        control={<Switch checked={showHighlights} onChange={(e) => setShowHighlights(e.target.checked)} color="success" />}
-                        label="Show Highlights"
-                      />
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button startIcon={<ContentCopyIcon />} variant="outlined" size="small"
-                          onClick={() => { if (output.coverLetter) { navigator.clipboard.writeText(output.coverLetter.body); } }}>
-                          Copy Body
-                        </Button>
-                        <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('coverLetter')}>Download DOCX</Button>
-                        {dropboxToken && (
-                          <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('coverLetter')}>Save to Dropbox</Button>
-                        )}
-                      </Box>
-                    </Box>
-
-                    {dropboxStatus && (
-                      <Alert severity={dropboxStatus.type} onClose={() => setDropboxStatus(null)}>{dropboxStatus.message}</Alert>
-                    )}
-
-                    {output.coverLetter ? (
-                      <Box sx={A4_STYLES}>
-                        {/* Header */}
-                        <Box sx={{ textAlign: 'center', mb: 2 }}>
-                          <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>
-                            {output.resume.name || 'Candidate Name'}
-                          </Typography>
-                          <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>
-                            {[output.resume.contact?.email, output.resume.contact?.phone, output.resume.contact?.linkedin, output.resume.contact?.github, output.resume.contact?.location].filter(Boolean).join('  |  ')}
-                          </Typography>
-                          <Divider sx={{ mt: 1, borderColor: '#000', borderBottomWidth: 1.5 }} />
-                        </Box>
-                        <Typography sx={{ ...BODY_TEXT_SX, mt: 3, mb: 2 }}>
-                          {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </Typography>
-                        <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, mb: 2 }}>
-                          Subject: {output.coverLetter.subject}
-                        </Typography>
-                        <Typography sx={{ ...BODY_TEXT_SX, mb: 2 }}>Dear Hiring Manager,</Typography>
-                        {output.coverLetter.body.split(/\n+/).filter(Boolean).map((para, i) => (
-                          <Typography key={i} sx={{ ...BODY_TEXT_SX, textAlign: 'justify', mb: 1.5 }}>
-                            {renderDiff(originalOutput?.coverLetter?.body.split(/\n+/).filter(Boolean)[i], para)}
-                          </Typography>
-                        ))}
-                        <Typography sx={{ ...BODY_TEXT_SX, mt: 3 }}>Sincerely,</Typography>
-                         <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, mt: 3 }}>
-                          {output.resume.name ? capitalizeName(output.resume.name) : 'Candidate Name'}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Alert severity="warning">
-                        Cover letter was not generated this round. Use Apply &amp; Refine to trigger it.
-                      </Alert>
-                    )}
-                  </Box>
+                  <CoverLetterPreview
+                    output={output}
+                    originalOutput={originalOutput}
+                    showHighlights={showHighlights}
+                    setShowHighlights={setShowHighlights}
+                    boldingKeywords={boldingKeywords}
+                    dropboxToken={dropboxToken}
+                    dropboxStatus={dropboxStatus}
+                    setDropboxStatus={setDropboxStatus}
+                    handleDownload={handleDownload}
+                    handleSaveToDropbox={handleSaveToDropbox}
+                    handleManualEdit={handleManualEdit}
+                    manualEdits={manualEdits}
+                    orphanedEdits={orphanedEdits}
+                    clearOrphanedEdits={clearOrphanedEdits}
+                  />
                 )}
               </Box>
             )}

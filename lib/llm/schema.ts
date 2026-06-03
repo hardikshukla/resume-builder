@@ -15,18 +15,30 @@ const ProjectSchema = z.object({
 });
 
 const ExperienceSchema = z.object({
-  title:     z.string(),
-  company:   z.string(),
+  title:     z.string().min(1),
+  company:   z.string().min(1),
   location:  z.string().nullable(),
   startDate: z.string(),
   endDate:   z.string(),
   bullets:   z.array(z.string()),
   tech:      z.array(z.string()),
   projects:  z.array(ProjectSchema),
-});
+}).refine(
+  (data) => {
+    // If experience has projects, standard bullets must be empty to avoid redundancy
+    if (data.projects && data.projects.length > 0) {
+      return data.bullets.length === 0;
+    }
+    return true;
+  },
+  {
+    message: 'Experience entries with projects should not duplicate bullets.',
+    path: ['bullets'],
+  }
+);
 
 const EducationSchema = z.object({
-  degree:      z.string(),
+  degree:      z.string().min(1),
   institution: z.string(),
   year:        z.string().nullable(),
 });
@@ -86,11 +98,36 @@ const CoverLetterSchema = z.object({
   body:    z.string(),
 });
 
+const ScoreBreakdownSchema = z.object({
+  summary: z.preprocess(
+    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 25) : val,
+    z.number().int()
+  ),
+  skills: z.preprocess(
+    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 30) : val,
+    z.number().int()
+  ),
+  experience: z.preprocess(
+    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 30) : val,
+    z.number().int()
+  ),
+  dealbreakersDeducted: z.number().int().min(0),
+});
+
+export const JDExtractionResultSchema = z.object({
+  seniority: z.string(),
+  companyName: z.string().nullable(),
+  mustHaveSkills: z.array(z.string()),
+  niceToHaveSkills: z.array(z.string()),
+  gapsDetected: z.array(z.string()),
+});
+
 // ── Top-level output ─────────────────────────────────────────────────────────
 
 export const ResumeBuilderOutputSchema = z.object({
   gapAnalysis: z.object({
     matchScore:      z.number().int().min(0).max(100),
+    scoreBreakdown:  ScoreBreakdownSchema.optional(),
     strongMatches:   z.array(z.string()),
     gaps:            z.array(z.string()),
     dealbreakers:    z.array(DealbreakerSchema),
