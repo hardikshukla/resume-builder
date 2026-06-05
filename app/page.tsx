@@ -43,6 +43,8 @@ import { useTheme } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { WorkflowStepper } from '@/components/WorkflowStepper';
 import { ContextPill } from '@/components/ContextPill';
+import { useBackButtonPrevention } from '@/hooks/useBackButtonPrevention';
+import BackNavigationDialog from '@/components/BackNavigationDialog';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -70,6 +72,8 @@ export default function Home() {
     clearOrphanedEdits,
     handleManualEdit,
   } = useGenerate();
+
+  const { showDialog: showBackDialog, cancelLeave, confirmLeave } = useBackButtonPrevention(!!output);
 
   const [activeTab, setActiveTab] = useState(0);
   const [showHighlights, setShowHighlights] = useState(true);
@@ -772,6 +776,9 @@ export default function Home() {
           API keys stored in session memory only · Safe from server logs
         </Typography>
       </Box>
+
+      {/* Back Navigation Guard */}
+      <BackNavigationDialog open={showBackDialog} onStay={cancelLeave} onLeave={confirmLeave} />
 
       {/* Session Expired Overlay */}
       {isSessionExpired && (
