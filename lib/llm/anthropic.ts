@@ -234,6 +234,8 @@ export async function callAnthropic(
       );
     } catch (err) {
       if (isUnsupportedModelError(err)) {
+        // 'claude-sonnet-4-6' is an alias — intentionally kept without date suffix
+        // per project spec (mirrors user-selectable model IDs in constants.ts).
         const fallbackModel = (mode === 'analyze-jd' || model.includes('haiku'))
           ? 'claude-haiku-4-5-20251001'
           : 'claude-sonnet-4-6';
