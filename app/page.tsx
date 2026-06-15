@@ -95,12 +95,15 @@ export default function Home() {
 
   const [isGenerationError, setIsGenerationError] = useState(false);
   const prevIsLoadingRef = useRef(false);
+  const isGenerateFlowRef = useRef(false);
   useEffect(() => {
-    if (prevIsLoadingRef.current && !isLoading && error) {
+    if (prevIsLoadingRef.current && !isLoading && error && isGenerateFlowRef.current) {
       setIsGenerationError(true);
+      isGenerateFlowRef.current = false;
     }
     if (!error) {
       setIsGenerationError(false);
+      isGenerateFlowRef.current = false;
     }
     prevIsLoadingRef.current = isLoading;
   }, [isLoading, error]);
@@ -124,6 +127,7 @@ export default function Home() {
   };
 
   const handleGenerateClick = async () => {
+    isGenerateFlowRef.current = true;
     setActiveStep(1);
     if (isMobile) {
       setDrawerOpen(false);
@@ -881,7 +885,6 @@ export default function Home() {
             margin: 0 !important;
           }
           .skills-row { page-break-inside: avoid; }
-          .skills-grid { display: grid; grid-template-columns: 154px 1fr; }
         }
       ` }} />
     </Box>

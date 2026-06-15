@@ -165,7 +165,7 @@ export default function ResumePreview({
 
         {/* Skills */}
         {output.resume.skills && output.resume.skills.length > 0 && (
-          <Box className="skills-grid" sx={{ mb: 2 }}>
+          <Box sx={{ mb: 2 }}>
             <Typography sx={SECTION_HEADER_SX}>Core Competencies</Typography>
             {output.resume.skills.map((sg, idx) => (
               <Box key={idx} className="skills-row" sx={{ display: 'flex', gap: 1, mb: 0.4 }}>
