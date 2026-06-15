@@ -14,6 +14,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
@@ -655,11 +656,36 @@ export default function Home() {
 
             {/* Loading */}
             {isLoading && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 3 }}>
-                <Box sx={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, #6c63ff, #a855f7)', animation: 'pulse 1.5s ease-in-out infinite', boxShadow: '0 0 40px rgba(108,99,255,0.4)' }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Optimizing your profile…</Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Analyzing JD · Weaving evidence-backed keywords · Writing cover letter
+              <Box sx={{ p: 3 }}>
+                {/* Header skeleton */}
+                <Skeleton variant="text" width="60%" height={32} sx={{ mb: 0.5 }} />
+                <Skeleton variant="text" width="40%" height={20} sx={{ mb: 3 }} />
+                {/* Summary skeleton */}
+                <Skeleton variant="text" width="30%" height={18} sx={{ mb: 1 }} />
+                <Skeleton variant="rectangular" width="100%" height={60} sx={{ mb: 3, borderRadius: 1 }} />
+                {/* Skills rows skeleton */}
+                <Skeleton variant="text" width="30%" height={18} sx={{ mb: 1 }} />
+                {[1, 2, 3, 4].map((i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: 2, mb: 0.75 }}>
+                    <Skeleton variant="text" width={140} height={16} />
+                    <Skeleton variant="text" width="70%" height={16} />
+                  </Box>
+                ))}
+                {/* Experience skeleton */}
+                <Skeleton variant="text" width="30%" height={18} sx={{ mt: 2, mb: 1 }} />
+                {[1, 2].map((i) => (
+                  <Box key={i} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Skeleton variant="text" width="45%" height={16} />
+                      <Skeleton variant="text" width="20%" height={16} />
+                    </Box>
+                    {[1, 2, 3].map((j) => (
+                      <Skeleton key={j} variant="text" width={`${85 - j * 5}%`} height={14} sx={{ mb: 0.4 }} />
+                    ))}
+                  </Box>
+                ))}
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center', mt: 2 }}>
+                  Analyzing JD · Weaving evidence-backed keywords · Writing cover letter…
                 </Typography>
               </Box>
             )}
