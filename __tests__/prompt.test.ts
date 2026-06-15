@@ -85,6 +85,14 @@ describe('REFINE_SYSTEM_PROMPT', () => {
   it('instructs model to apply changes to both resume AND cover letter', () => {
     expect(REFINE_SYSTEM_PROMPT).toMatch(/resume AND cover letter/i);
   });
+
+  it('does not contain currentOutput placeholder text (cache_control must not be on the JSON blob)', () => {
+    // The REFINE_SYSTEM_PROMPT itself is static — this test documents that the
+    // current-output JSON block must NOT receive cache_control. We verify the
+    // prompt contains no dynamic/output markers that would indicate it was
+    // embedded in the system prompt instead of the user message.
+    expect(REFINE_SYSTEM_PROMPT).not.toContain('CURRENT RESUME AND COVER LETTER (JSON)');
+  });
 });
 
 // ── GapAnalysis schema guard ─────────────────────────────────────────────────

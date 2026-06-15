@@ -204,8 +204,7 @@ export async function callAnthropic(
     messagesContent = [
       {
         type: 'text',
-        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`,
-        cache_control: { type: 'ephemeral' }
+        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
       {
         type: 'text',
@@ -237,7 +236,7 @@ export async function callAnthropic(
       if (isUnsupportedModelError(err)) {
         const fallbackModel = (mode === 'analyze-jd' || model.includes('haiku'))
           ? 'claude-haiku-4-5-20251001'
-          : 'claude-3-5-sonnet-20241022';
+          : 'claude-sonnet-4-6';
         console.warn(`[callAnthropic] Model "${model}" is unsupported. Falling back to "${fallbackModel}"...`);
         response = await withRetry(() =>
           client.beta.messages.create({
