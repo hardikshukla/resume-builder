@@ -502,6 +502,7 @@ export function useGenerate() {
     jdKeywords,
     isLoading,
     error,
+    setError,
     clearError,
     handleGenerate,
     handleRefine,

@@ -62,6 +62,7 @@ export default function Home() {
     jdKeywords,
     isLoading,
     error,
+    setError,
     clearError,
     handleGenerate,
     handleRefine,
@@ -323,7 +324,7 @@ export default function Home() {
       URL.revokeObjectURL(url);
       setActiveStep(3);
     } catch (err) {
-      alert(`Download failed: ${err}`);
+      setError({ error: { type: 'FATAL', message: `Download failed: ${err instanceof Error ? err.message : String(err)}` } });
     }
   };
 
@@ -652,7 +653,7 @@ export default function Home() {
 
             {/* Error */}
             {error && !isLoading && (
-              <ErrorBanner error={error} onDismiss={clearError} />
+              <ErrorBanner error={error} onDismiss={clearError} onRetry={() => handleGenerate(anthropicKey)} />
             )}
 
             {/* Empty state */}

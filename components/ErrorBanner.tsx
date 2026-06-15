@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { ApiErrorResponse } from '@/types/error';
@@ -7,6 +8,7 @@ import { ApiErrorResponse } from '@/types/error';
 interface ErrorBannerProps {
   error: ApiErrorResponse | null;
   onDismiss: () => void;
+  onRetry?: () => void;
 }
 
 const TYPE_LABELS: Record<ApiErrorResponse['error']['type'], string> = {
@@ -17,10 +19,9 @@ const TYPE_LABELS: Record<ApiErrorResponse['error']['type'], string> = {
   FATAL: '❌ Error',
 };
 
-export default function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
+export default function ErrorBanner({ error, onDismiss, onRetry }: ErrorBannerProps) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
-  // Initialise countdown whenever a new rate-limit error arrives
   useEffect(() => {
     if (error?.error.type === 'RATE_LIMIT' && error.error.retryAfterSeconds) {
       setSecondsLeft(error.error.retryAfterSeconds);
@@ -29,7 +30,6 @@ export default function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
     }
   }, [error]);
 
-  // Tick the countdown down every second
   useEffect(() => {
     if (secondsLeft === null || secondsLeft <= 0) return;
     const id = setInterval(() => {
@@ -63,6 +63,18 @@ export default function ErrorBanner({ error, onDismiss }: ErrorBannerProps) {
               ? `Retry available in ${secondsLeft}s`
               : '✅ Ready to retry'}
           </Typography>
+        )}
+        {onRetry && (
+          <Box sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onRetry}
+              sx={{ textTransform: 'none' }}
+            >
+              Try Again
+            </Button>
+          </Box>
         )}
       </Box>
     </Alert>
