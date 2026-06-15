@@ -168,7 +168,7 @@ export default function ResumePreview({
           <Box sx={{ mb: 2 }}>
             <Typography sx={SECTION_HEADER_SX}>Core Competencies</Typography>
             {output.resume.skills.map((sg, idx) => (
-              <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 0.4 }}>
+              <Box key={idx} className="skills-row" sx={{ display: 'flex', gap: 1, mb: 0.4 }}>
                 <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, width: 154, minWidth: 154, flexShrink: 0 }}>
                   {sg.category}:
                 </Typography>

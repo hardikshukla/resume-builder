@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, buildJDExtractionPrompt } from '@/lib/prompt';
+import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, JD_EXTRACTION_SYSTEM_PROMPT } from '@/lib/prompt';
 import { ResumeBuilderOutputSchema, RefineOutputSchema, JDExtractionResultSchema } from '@/lib/llm/schema';
 import { Recommendation } from '@/types';
 import { ANTHROPIC_DEFAULT_MODEL, MODEL_FALLBACKS } from '@/lib/constants';
@@ -163,11 +163,11 @@ export async function callAnthropic(
     if (!payload.jobDescription) {
       throw new Error('Job Description is required for analyze-jd mode');
     }
-    systemPrompt = buildJDExtractionPrompt(payload.jobDescription, payload.companyName);
+    systemPrompt = JD_EXTRACTION_SYSTEM_PROMPT;
     messagesContent = [
       {
         type: 'text',
-        text: `Please analyze the job description and extract the keywords, seniority, and company name as JSON: ${payload.jobDescription}`,
+        text: `JOB DESCRIPTION:\n${payload.jobDescription}${payload.companyName ? `\n\nCANDIDATE IS APPLYING TO: ${payload.companyName}` : ''}`,
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
     ];
   } else if (mode === 'generate') {
@@ -179,7 +179,7 @@ export async function callAnthropic(
       {
         type: 'text',
         text: `CANDIDATE RESUME:\n${payload.resume}`,
-        cache_control: { type: 'ephemeral' }
+        cache_control: { type: 'ephemeral', ttl: '1h' }
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
       {
         type: 'text',
@@ -204,8 +204,7 @@ export async function callAnthropic(
     messagesContent = [
       {
         type: 'text',
-        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`,
-        cache_control: { type: 'ephemeral' }
+        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
       {
         type: 'text',
@@ -215,7 +214,7 @@ export async function callAnthropic(
   }
 
   const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
-    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
+    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
   ];
 
   const MAX_PARSE_ATTEMPTS = 3;
@@ -235,9 +234,11 @@ export async function callAnthropic(
       );
     } catch (err) {
       if (isUnsupportedModelError(err)) {
+        // 'claude-sonnet-4-6' is an alias — intentionally kept without date suffix
+        // per project spec (mirrors user-selectable model IDs in constants.ts).
         const fallbackModel = (mode === 'analyze-jd' || model.includes('haiku'))
           ? 'claude-haiku-4-5-20251001'
-          : 'claude-3-5-sonnet-20241022';
+          : 'claude-sonnet-4-6';
         console.warn(`[callAnthropic] Model "${model}" is unsupported. Falling back to "${fallbackModel}"...`);
         response = await withRetry(() =>
           client.beta.messages.create({
