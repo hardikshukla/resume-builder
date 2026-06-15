@@ -11,6 +11,7 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  VerticalAlign,
 } from 'docx';
 
 
@@ -203,7 +204,8 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
               size: 2304, // 1.6 inches
               type: WidthType.DXA,
             },
-            margins: { top: 30, bottom: 30, left: 0, right: 100 },
+            margins: { top: 40, bottom: 40, left: 113, right: 113 },
+            verticalAlign: VerticalAlign.TOP,
             borders: {
               top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
               bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
@@ -229,7 +231,8 @@ export async function generateResumeDOCX(resume: ResumeData, keywords: string[] 
               size: 7056, // 4.9 inches
               type: WidthType.DXA,
             },
-            margins: { top: 30, bottom: 30, left: 0, right: 0 },
+            margins: { top: 40, bottom: 40, left: 113, right: 0 },
+            verticalAlign: VerticalAlign.TOP,
             borders: {
               top: { style: BorderStyle.NONE, size: 0, color: 'auto' },
               bottom: { style: BorderStyle.NONE, size: 0, color: 'auto' },
