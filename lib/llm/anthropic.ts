@@ -179,7 +179,7 @@ export async function callAnthropic(
       {
         type: 'text',
         text: `CANDIDATE RESUME:\n${payload.resume}`,
-        cache_control: { type: 'ephemeral' }
+        cache_control: { type: 'ephemeral', ttl: '1h' }
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
       {
         type: 'text',
@@ -214,7 +214,7 @@ export async function callAnthropic(
   }
 
   const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
-    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
+    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
   ];
 
   const MAX_PARSE_ATTEMPTS = 3;
