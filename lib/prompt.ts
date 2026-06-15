@@ -192,9 +192,7 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
 </output_format>
 `;
 
-export function buildJDExtractionPrompt(jd: string, companyName?: string): string {
-  return `You are an expert ATS parser and technical recruiter. Your task is to analyze the job description and extract structural keywords.
-${companyName ? `The candidate is applying to the company: "${companyName}".` : ''}
+export const JD_EXTRACTION_SYSTEM_PROMPT = `You are an expert ATS parser and technical recruiter. Your task is to analyze the job description and extract structural keywords.
 
 Output a single JSON object matching the following structure. Do NOT include markdown blocks or any text other than the JSON:
 {
@@ -206,6 +204,5 @@ Output a single JSON object matching the following structure. Do NOT include mar
 }
 
 Return ONLY this JSON representation. Do not explain your choices. Ensure all keys are populated.`;
-}
 
 

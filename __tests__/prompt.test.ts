@@ -7,6 +7,7 @@
 import {
   SYSTEM_PROMPT,
   REFINE_SYSTEM_PROMPT,
+  JD_EXTRACTION_SYSTEM_PROMPT,
 } from '../lib/prompt';
 import { ResumeBuilderOutputSchema } from '../lib/llm/schema';
 import { Recommendation } from '../types';
@@ -155,5 +156,35 @@ describe('GapAnalysis schema shape', () => {
     });
 
     expect(parsed.gapAnalysis.extractedCompanyName).toBe('Acme Corp');
+  });
+});
+
+// ── JD_EXTRACTION_SYSTEM_PROMPT ──────────────────────────────────────────────
+
+describe('JD_EXTRACTION_SYSTEM_PROMPT', () => {
+  it('is a non-empty string', () => {
+    expect(typeof JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
+    expect(JD_EXTRACTION_SYSTEM_PROMPT.length).toBeGreaterThan(50);
+  });
+
+  it('contains no dynamic company name placeholder', () => {
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).not.toContain('applying to the company');
+    // The constant should not have dynamic company name references (like The candidate is applying to...)
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).not.toMatch(/The candidate is applying to the company/);
+  });
+
+  it('instructs the model to return the required JSON fields', () => {
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).toContain('seniority');
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).toContain('mustHaveSkills');
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).toContain('niceToHaveSkills');
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).toContain('gapsDetected');
+  });
+
+  it('does not expose the buildJDExtractionPrompt function', () => {
+    // The old function is removed; only the constant export exists.
+    // This test will fail until lib/prompt.ts is updated.
+    const mod = require('../lib/prompt');
+    expect(typeof mod.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
+    expect(mod.buildJDExtractionPrompt).toBeUndefined();
   });
 });

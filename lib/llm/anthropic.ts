@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, buildJDExtractionPrompt } from '@/lib/prompt';
+import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, JD_EXTRACTION_SYSTEM_PROMPT } from '@/lib/prompt';
 import { ResumeBuilderOutputSchema, RefineOutputSchema, JDExtractionResultSchema } from '@/lib/llm/schema';
 import { Recommendation } from '@/types';
 import { ANTHROPIC_DEFAULT_MODEL, MODEL_FALLBACKS } from '@/lib/constants';
@@ -163,11 +163,11 @@ export async function callAnthropic(
     if (!payload.jobDescription) {
       throw new Error('Job Description is required for analyze-jd mode');
     }
-    systemPrompt = buildJDExtractionPrompt(payload.jobDescription, payload.companyName);
+    systemPrompt = JD_EXTRACTION_SYSTEM_PROMPT;
     messagesContent = [
       {
         type: 'text',
-        text: `Please analyze the job description and extract the keywords, seniority, and company name as JSON: ${payload.jobDescription}`,
+        text: `JOB DESCRIPTION:\n${payload.jobDescription}${payload.companyName ? `\n\nCANDIDATE IS APPLYING TO: ${payload.companyName}` : ''}`,
       } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
     ];
   } else if (mode === 'generate') {
