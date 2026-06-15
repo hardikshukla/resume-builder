@@ -181,8 +181,6 @@ describe('JD_EXTRACTION_SYSTEM_PROMPT', () => {
   });
 
   it('does not expose the buildJDExtractionPrompt function', () => {
-    // The old function is removed; only the constant export exists.
-    // This test will fail until lib/prompt.ts is updated.
     const mod = require('../lib/prompt');
     expect(typeof mod.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
     expect(mod.buildJDExtractionPrompt).toBeUndefined();
