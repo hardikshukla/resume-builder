@@ -8,6 +8,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import { ApiErrorResponse } from '../types/error';
 
 const fatalError: ApiErrorResponse = {
+  success: false,
   error: {
     type: 'FATAL',
     message: 'Something went wrong',
@@ -15,6 +16,7 @@ const fatalError: ApiErrorResponse = {
 };
 
 const rateLimitError: ApiErrorResponse = {
+  success: false,
   error: {
     type: 'RATE_LIMIT',
     message: 'Too many requests',

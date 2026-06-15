@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ResumeBuilderOutput, Recommendation, JDExtractionResult } from '@/types';
 import { ApiErrorResponse, toApiErrorResponse } from '@/types/error';
 import { resumeDataToText } from '@/lib/utils/string';
@@ -106,6 +106,9 @@ export function useGenerate() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiErrorResponse | null>(null);
   const clearError = useCallback(() => setError(null), []);
+  const setFatalError = useCallback((message: string) => {
+    setError({ success: false, error: { type: 'FATAL', message } });
+  }, []);
 
   const [manualEdits, setManualEdits] = useState<ManualEdit[]>([]);
   const [orphanedEdits, setOrphanedEdits] = useState<ManualEdit[]>([]);
@@ -502,7 +505,7 @@ export function useGenerate() {
     jdKeywords,
     isLoading,
     error,
-    setError,
+    setFatalError,
     clearError,
     handleGenerate,
     handleRefine,

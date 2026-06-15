@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -62,7 +62,7 @@ export default function Home() {
     jdKeywords,
     isLoading,
     error,
-    setError,
+    setFatalError,
     clearError,
     handleGenerate,
     handleRefine,
@@ -91,6 +91,18 @@ export default function Home() {
   const [dropboxVerifyStatus, setDropboxVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
+
+  const [isGenerationError, setIsGenerationError] = useState(false);
+  const prevIsLoadingRef = useRef(false);
+  useEffect(() => {
+    if (prevIsLoadingRef.current && !isLoading && error) {
+      setIsGenerationError(true);
+    }
+    if (!error) {
+      setIsGenerationError(false);
+    }
+    prevIsLoadingRef.current = isLoading;
+  }, [isLoading, error]);
 
   const [activeStep, setActiveStep] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -324,7 +336,8 @@ export default function Home() {
       URL.revokeObjectURL(url);
       setActiveStep(3);
     } catch (err) {
-      setError({ error: { type: 'FATAL', message: `Download failed: ${err instanceof Error ? err.message : String(err)}` } });
+      setIsGenerationError(false);
+      setFatalError(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -653,7 +666,7 @@ export default function Home() {
 
             {/* Error */}
             {error && !isLoading && (
-              <ErrorBanner error={error} onDismiss={clearError} onRetry={() => handleGenerate(anthropicKey)} />
+              <ErrorBanner error={error} onDismiss={clearError} onRetry={isGenerationError ? () => handleGenerate(anthropicKey) : undefined} />
             )}
 
             {/* Empty state */}
