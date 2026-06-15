@@ -168,7 +168,7 @@ export async function callAnthropic(
       {
         type: 'text',
         text: `JOB DESCRIPTION:\n${payload.jobDescription}${payload.companyName ? `\n\nCANDIDATE IS APPLYING TO: ${payload.companyName}` : ''}`,
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
+      },
     ];
   } else if (mode === 'generate') {
     if (!payload.resume || !payload.jobDescription) {
@@ -179,19 +179,19 @@ export async function callAnthropic(
       {
         type: 'text',
         text: `CANDIDATE RESUME:\n${payload.resume}`,
-        cache_control: { type: 'ephemeral', ttl: '1h' }
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+      },
       {
         type: 'text',
-        text: `JOB DESCRIPTION:\n${payload.jobDescription}\n${payload.companyName ? `COMPANY NAME: ${payload.companyName}\n` : ''}`
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam
+        text: `JOB DESCRIPTION:\n${payload.jobDescription}\n${payload.companyName ? `COMPANY NAME: ${payload.companyName}\n` : ''}`,
+      },
     ];
 
     if (payload.jdKeywords) {
       messagesContent.push({
         type: 'text',
         text: `<jd_keywords>\n${JSON.stringify(payload.jdKeywords, null, 2)}\n</jd_keywords>`,
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam);
+      });
     }
   } else if (mode === 'refine') {
     if (!payload.currentOutput || !payload.selectedRecommendations) {
@@ -204,17 +204,17 @@ export async function callAnthropic(
     messagesContent = [
       {
         type: 'text',
-        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam,
+        text: `CURRENT RESUME AND COVER LETTER (JSON):\n${JSON.stringify(payload.currentOutput, null, 2)}`,
+      },
       {
         type: 'text',
-        text: `SELECTED IMPROVEMENTS TO APPLY:\n${recList}`
-      } as unknown as Anthropic.Beta.Messages.BetaContentBlockParam
+        text: `SELECTED IMPROVEMENTS TO APPLY:\n${recList}`,
+      },
     ];
   }
 
   const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
-    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } } as unknown as Anthropic.Beta.Messages.BetaTextBlockParam
+    { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
   ];
 
   const MAX_PARSE_ATTEMPTS = 3;
