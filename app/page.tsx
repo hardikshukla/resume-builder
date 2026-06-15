@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -63,6 +63,7 @@ export default function Home() {
     jdKeywords,
     isLoading,
     error,
+    isGenerationError,
     setFatalError,
     clearError,
     handleGenerate,
@@ -93,21 +94,6 @@ export default function Home() {
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
 
-  const [isGenerationError, setIsGenerationError] = useState(false);
-  const prevIsLoadingRef = useRef(false);
-  const isGenerateFlowRef = useRef(false);
-  useEffect(() => {
-    if (prevIsLoadingRef.current && !isLoading && error && isGenerateFlowRef.current) {
-      setIsGenerationError(true);
-      isGenerateFlowRef.current = false;
-    }
-    if (!error) {
-      setIsGenerationError(false);
-      isGenerateFlowRef.current = false;
-    }
-    prevIsLoadingRef.current = isLoading;
-  }, [isLoading, error]);
-
   const [activeStep, setActiveStep] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useTheme();
@@ -127,7 +113,6 @@ export default function Home() {
   };
 
   const handleGenerateClick = async () => {
-    isGenerateFlowRef.current = true;
     setActiveStep(1);
     if (isMobile) {
       setDrawerOpen(false);
@@ -341,7 +326,6 @@ export default function Home() {
       URL.revokeObjectURL(url);
       setActiveStep(3);
     } catch (err) {
-      setIsGenerationError(false);
       setFatalError(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
