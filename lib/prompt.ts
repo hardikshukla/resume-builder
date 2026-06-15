@@ -194,6 +194,8 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
 
 export const JD_EXTRACTION_SYSTEM_PROMPT = `You are an expert ATS parser and technical recruiter. Your task is to analyze the job description and extract structural keywords.
 
+If the user message contains a line starting with "CANDIDATE IS APPLYING TO:", use that value as the companyName — this takes priority over any company name found in the JD body (e.g. a staffing agency that posted on behalf of a client).
+
 Output a single JSON object matching the following structure. Do NOT include markdown blocks or any text other than the JSON:
 {
   "seniority": "string (e.g. 'Senior', 'Entry', 'Mid')",
