@@ -869,6 +869,7 @@ export default function Home() {
             margin: 0 !important;
           }
           .skills-row { page-break-inside: avoid; }
+          .skills-grid { display: grid; grid-template-columns: 154px 1fr; }
         }
       ` }} />
     </Box>
