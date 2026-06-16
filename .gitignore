@@ -34,7 +34,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code — personal local overrides (shared settings.json is committed)
+.claude/settings.local.json
+
+# test artifacts / ad-hoc output files
+partial_smoke_test.json
+smoke_test_output.json
+
+# planning and research docs (not part of the codebase)
 implementation_plan.md
-.gitignore
 implementation.md
 deep-research-report.md
