@@ -283,3 +283,93 @@ describe('useGenerate — clearError', () => {
     expect(result.current.error).toBeNull();
   });
 });
+
+// ── isGenerationError ─────────────────────────────────────────────────────────
+
+describe('useGenerate — isGenerationError', () => {
+  it('starts as false', () => {
+    const { result } = renderHook(() => useGenerate());
+    expect(result.current.isGenerationError).toBe(false);
+  });
+
+  it('is true after handleGenerate fails with an API error response', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/analyze-jd')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { seniority: 'Mid', companyName: null, mustHaveSkills: [], niceToHaveSkills: [], gapsDetected: [] },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          success: false,
+          error: { type: 'FATAL', message: 'Internal server error' },
+        }),
+      });
+    });
+
+    const { result } = renderHook(() => useGenerate());
+    await act(async () => {
+      result.current.handleResumeChange('Resume text');
+      result.current.setJD('JD text');
+    });
+
+    await act(async () => {
+      await result.current.handleGenerate('sk-ant-test');
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.error).not.toBeNull();
+    expect(result.current.isGenerationError).toBe(true);
+  });
+
+  it('is true after handleGenerate fails with a network error', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('fetch failed'));
+
+    const { result } = renderHook(() => useGenerate());
+    await act(async () => {
+      result.current.handleResumeChange('Resume text');
+      result.current.setJD('JD text');
+    });
+
+    await act(async () => {
+      await result.current.handleGenerate('sk-ant-test');
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.error).not.toBeNull();
+    expect(result.current.isGenerationError).toBe(true);
+  });
+
+  it('resets to false when handleGenerate is called again', async () => {
+    // First call fails
+    mockFetch.mockRejectedValueOnce(new Error('network down'));
+
+    const { result } = renderHook(() => useGenerate());
+    await act(async () => {
+      result.current.handleResumeChange('Resume text');
+      result.current.setJD('JD text');
+    });
+
+    await act(async () => {
+      await result.current.handleGenerate('sk-ant-test');
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isGenerationError).toBe(true);
+
+    // Second call also fails — isGenerationError should be true again (not permanently cleared)
+    mockFetch.mockRejectedValueOnce(new Error('still down'));
+    await act(async () => {
+      await result.current.handleGenerate('sk-ant-test');
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.isGenerationError).toBe(true);
+  });
+});

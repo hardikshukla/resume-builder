@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ResumeBuilderOutput, Recommendation, JDExtractionResult } from '@/types';
 import { ApiErrorResponse, toApiErrorResponse } from '@/types/error';
 import { resumeDataToText } from '@/lib/utils/string';
@@ -110,6 +110,8 @@ export function useGenerate() {
     setError({ success: false, error: { type: 'FATAL', message } });
   }, []);
 
+  const [isGenerationError, setIsGenerationError] = useState(false);
+
   const [manualEdits, setManualEdits] = useState<ManualEdit[]>([]);
   const [orphanedEdits, setOrphanedEdits] = useState<ManualEdit[]>([]);
   const clearOrphanedEdits = useCallback((prefix?: 'resume' | 'coverLetter') => {
@@ -193,6 +195,7 @@ export function useGenerate() {
 
   const handleGenerate = useCallback(
     async (anthropicKey?: string) => {
+      setIsGenerationError(false);
       setError(null);
       setManualEdits([]);
       setOrphanedEdits([]);
@@ -238,6 +241,7 @@ export function useGenerate() {
 
           const jdJson = await jdRes.json();
           if (!jdJson.success) {
+            setIsGenerationError(true);
             setError(jdJson as ApiErrorResponse);
             return;
           }
@@ -264,6 +268,7 @@ export function useGenerate() {
 
         const json = await res.json();
         if (!json.success) {
+          setIsGenerationError(true);
           setError(json as ApiErrorResponse);
           return;
         }
@@ -274,6 +279,7 @@ export function useGenerate() {
         setOriginalOutput(data);
         setCachedData(fullCacheHash, data);
       } catch (e) {
+        setIsGenerationError(true);
         setError(toApiErrorResponse(e));
       } finally {
         setIsLoading(false);
@@ -505,6 +511,7 @@ export function useGenerate() {
     jdKeywords,
     isLoading,
     error,
+    isGenerationError,
     setFatalError,
     clearError,
     handleGenerate,

@@ -185,4 +185,8 @@ describe('JD_EXTRACTION_SYSTEM_PROMPT', () => {
     expect(typeof mod.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
     expect(mod.buildJDExtractionPrompt).toBeUndefined();
   });
+
+  it('instructs the model to use the CANDIDATE IS APPLYING TO hint', () => {
+    expect(JD_EXTRACTION_SYSTEM_PROMPT).toContain('CANDIDATE IS APPLYING TO');
+  });
 });

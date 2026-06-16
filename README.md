@@ -69,12 +69,13 @@ Toggle **Show Highlights** to see word-level diffs (🟢 added · 🔴 removed).
 | **Mobile Drawer Layout** | On small screens, parameters panel collapses into a slide-in drawer opened by a floating ⚙️ FAB |
 | **DOCX Upload** | Upload your existing `.docx` or `.txt` resume for auto-parsing |
 | **10-Entry LRU Cache** | Recent generations cached client-side in `sessionStorage`; switching between JDs is instant |
+| **Blind-Posting Company Name** | When the JD is recruiter-anonymised (no company in body text), the app passes the user-entered company name as a `CANDIDATE IS APPLYING TO:` hint so Claude can still populate `companyName` correctly |
 | **Cover Letter** | 3–4 paragraphs tailored to JD + company, editable inline |
 | **`.docx` Download** | ATS-clean Word files generated entirely in the browser |
 | **Print / PDF Export** | Print-to-PDF from any browser |
 | **Dropbox Sync** | Upload directly to Dropbox — token never touches the server |
 | **LLM Retry with Back-off** | Transient Anthropic errors (429, 5xx, network) retried up to 3× with exponential back-off |
-| **Structured Error Banners** | API errors surface as dismissable banners; rate-limit errors include a live countdown timer |
+| **Structured Error Banners** | API errors surface as dismissable banners with a **Retry** button; rate-limit errors include a live countdown timer. Retry correctly re-shows the button on repeated failures |
 | **Rate Limiting** | 15 requests / 60 s per IP with `Retry-After` header on `429` |
 | **Zero Data Liability** | API keys live in `sessionStorage` only — cleared on tab close and after 40 min of inactivity |
 
@@ -296,7 +297,7 @@ resume-builder/
 │
 ├── hooks/
 │   ├── useGenerate.ts                  # Core orchestration: generate, refine, refresh, revert,
-│   │                                   #   manualEdits, orphanedEdits, fuzzy merge
+│   │                                   #   manualEdits, orphanedEdits, fuzzy merge, isGenerationError
 │   ├── useApiKey.ts                    # API key + Dropbox token state (sessionStorage)
 │   └── useInactivityTimeout.ts         # Auto-clears sessionStorage after 40 min
 │
@@ -441,17 +442,17 @@ npm test               # Run all tests
 npm run test:coverage  # With coverage report
 ```
 
-**17 suites · 127 tests**
+**18 suites · 144 tests**
 
 | Suite | What It Covers |
 |-------|----------------|
 | `EditableField.test.tsx` | Click-to-edit, Enter save, blur save, Escape cancel without onBlur save |
-| `useGenerate.test.ts` | Initial state, setJD/setCompany, handleGenerate success/error, handleRevert |
+| `useGenerate.test.ts` | Initial state, setJD/setCompany, handleGenerate success/error, handleRevert, isGenerationError flag (reset on retry, set on all 3 error paths) |
 | `useGenerate.manualEdit.test.ts` | Inline edits, multi-edit on same path, fuzzy merge, orphaned edits, skills comma split, cover letter paragraph indexing |
 | `path.test.ts` | `getAtPath`, `setAtPath`, `levenshtein` distance calculations |
 | `schema.test.ts` | Zod schema accepts valid payloads, rejects missing required fields |
 | `hallucinationGuard.test.ts` | Claim verification against source resume, flagging unsupported claims |
-| `prompt.test.ts` | System prompt rules, JD extraction prompt includes JD text |
+| `prompt.test.ts` | System prompt rules, JD extraction prompt includes JD text and `CANDIDATE IS APPLYING TO` hint |
 | `docx.test.ts` | DOCX generators return valid ZIP blobs with PK magic bytes, > 5 KB |
 | `generateValidation.test.ts` | Request validation edge cases (missing fields, oversized inputs) |
 | `filename.test.ts` | Download filename sanitisation and formatting |
