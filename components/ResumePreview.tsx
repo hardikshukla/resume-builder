@@ -102,6 +102,10 @@ export default function ResumePreview({
         </Box>
       </Box>
 
+      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -1 }}>
+        In the print dialog, open &ldquo;More settings&rdquo; and turn off <strong>Headers and footers</strong> to avoid the browser stamping a date/URL onto the PDF.
+      </Typography>
+
       {dropboxStatus && (
         <Alert severity={dropboxStatus.type} onClose={() => setDropboxStatus(null)}>{dropboxStatus.message}</Alert>
       )}

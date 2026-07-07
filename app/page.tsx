@@ -831,13 +831,14 @@ export default function Home() {
           50% { transform: scale(1.15); opacity: 0.7; }
         }
         @media print {
+          @page { size: letter; margin: 0.5in; }
           body > * { visibility: hidden !important; }
           #resume-print-area, #resume-print-area * { visibility: visible !important; }
           #resume-print-area {
             position: absolute !important; left: 0 !important; top: 0 !important;
             width: 100% !important; max-width: 100% !important;
             box-shadow: none !important; border: none !important;
-            padding: 0.75in !important; margin: 0 !important;
+            padding: 0 !important; margin: 0 !important;
             background: white !important; color: black !important;
           }
           ins { background: none !important; color: black !important; text-decoration: none !important; }
