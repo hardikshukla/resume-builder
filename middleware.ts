@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ROUTES: Record<string, { limit: number; windowMs: number }> = {
-  '/api/generate': { limit: 15, windowMs: 60_000 },
-  '/api/analyze-jd': { limit: 15, windowMs: 60_000 },
+const ROUTES: Record<string, { limit: number; windowMs: number; message: string }> = {
+  '/api/generate': {
+    limit: 15,
+    windowMs: 60_000,
+    message: 'Too many requests. Please wait before generating or refining again.',
+  },
+  '/api/analyze-jd': {
+    limit: 15,
+    windowMs: 60_000,
+    message: 'Too many requests. Please wait before generating or refining again.',
+  },
+  // Credential checks are fired by a blur handler rather than a button, so they
+  // need a ceiling of their own — this proxies a bearer token to Dropbox.
+  '/api/dropbox/verify': {
+    limit: 10,
+    windowMs: 60_000,
+    message: 'Too many token checks. Please wait a moment before trying again.',
+  },
 };
 
 interface WindowEntry {
@@ -62,7 +77,7 @@ export function middleware(req: NextRequest) {
         success: false,
         error: {
           type: 'RATE_LIMIT',
-          message: 'Too many requests. Please wait before generating or refining again.',
+          message: ROUTES[pathname].message,
           retryAfterSeconds,
         },
       },
@@ -84,5 +99,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/generate', '/api/analyze-jd'],
+  matcher: ['/api/generate', '/api/analyze-jd', '/api/dropbox/verify'],
 };

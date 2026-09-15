@@ -50,3 +50,4 @@ CLAUDE.md
 
 # Editor swap files
 *.swp
+.gstack/

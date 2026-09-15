@@ -33,16 +33,59 @@ const REQUIRED_SCOPES: ReadonlyArray<{ scope: string; usedFor: string }> = [
  */
 export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  /** Whatever had focus before we opened, so we can hand it back on close. */
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Callers pass an inline arrow, so onClose changes identity on every parent
+  // render. Holding it in a ref keeps that churn out of the effects below —
+  // re-running the focus effect would yank focus back to Close mid-interaction.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Focus moves in on open and back out on close — once each, not per render.
+  useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    return () => {
+      restoreFocusRef.current?.focus?.();
+      restoreFocusRef.current = null;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    closeRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      // aria-modal only tells assistive tech the rest of the page is inert; it
+      // does nothing for Tab. Without this, Tab walks out of the dialog and
+      // into controls the backdrop is covering.
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panel.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !panel.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -66,6 +109,7 @@ export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialog
       }}
     >
       <Paper
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dropbox-setup-title"

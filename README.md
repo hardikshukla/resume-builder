@@ -74,10 +74,10 @@ Toggle **Show Highlights** to see word-level diffs (🟢 added · 🔴 removed).
 | **`.docx` Download** | ATS-clean Word files generated entirely in the browser |
 | **Print / PDF Export** | Print-to-PDF from any browser |
 | **Dropbox Sync** | Upload directly to Dropbox — token never touches the server |
-| **Dropbox Setup Guide** | An ⓘ button next to the token field opens a 3-step **Connect Dropbox** walkthrough; **Get a token ↗** jumps straight to the App Console — see [Dropbox Setup](#dropbox-setup) |
+| **Dropbox Setup Guide** | A **How do I get a token?** link under the token field opens a 3-step **Connect Dropbox** walkthrough, with **Open App Console** in step 1 — see [Dropbox Setup](#dropbox-setup) |
 | **LLM Retry with Back-off** | Transient Anthropic errors (429, 5xx, network) retried up to 3× with exponential back-off |
 | **Structured Error Banners** | API errors surface as dismissable banners with a **Retry** button; rate-limit errors include a live countdown timer. Retry correctly re-shows the button on repeated failures |
-| **Rate Limiting** | 15 requests / 60 s per IP with `Retry-After` header on `429` |
+| **Rate Limiting** | 15 requests / 60 s per IP on the LLM routes, 10 / 60 s on the Dropbox token check, with `Retry-After` header on `429` |
 | **Zero Data Liability** | API keys live in `sessionStorage` only — cleared on tab close and after 40 min of inactivity |
 
 ---
@@ -126,7 +126,7 @@ user brings their own Dropbox access token, entered in the UI and held in
 `sessionStorage` only. Dropbox has no "shared" key: an access token is tied to one
 Dropbox account and one Dropbox app, so every user creates their own.
 
-In the app, the **ⓘ** button beside the Dropbox token field opens these same steps.
+In the app, the **How do I get a token?** link beneath the Dropbox token field opens these same steps.
 
 **One-time setup (~2 minutes):**
 
@@ -217,6 +217,7 @@ In the app, the **ⓘ** button beside the Dropbox token field opens these same s
 |-------|-------|--------|
 | `/api/generate` | 15 requests | 60 s per IP |
 | `/api/analyze-jd` | 15 requests | 60 s per IP |
+| `/api/dropbox/verify` | 10 requests | 60 s per IP |
 
 Returns `429` with a `Retry-After` header and `retryAfterSeconds` in the JSON body.
 
@@ -464,7 +465,7 @@ HTTPS request body only  ──►  Next.js API Route  ──►  Anthropic
 
 | Control | Detail |
 |---------|--------|
-| **Rate limiting** | Sliding-window per-IP counter in `middleware.ts` (15 req/60 s) |
+| **Rate limiting** | Sliding-window per-IP counter in `middleware.ts` (15 req/60 s; 10 req/60 s for the Dropbox token check) |
 | **Input length caps** | `MAX_RESUME_CHARS` and `MAX_JD_CHARS` enforced before LLM call |
 | **Request validation** | All API routes use Zod schemas to validate and strip unknown fields |
 | **LLM output validation** | All LLM responses validated against Zod schemas before reaching the UI |

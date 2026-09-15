@@ -74,4 +74,50 @@ describe('DropboxSetupDialog', () => {
     render(<DropboxSetupDialog open onClose={jest.fn()} />);
     expect(screen.getByRole('button', { name: /close/i })).toHaveFocus();
   });
+
+  it('leaves focus alone when the parent re-renders', () => {
+    // Callers pass an inline arrow for onClose, so its identity changes on
+    // every parent render. That must not drag focus back to Close while the
+    // user is partway through the dialog.
+    const { rerender } = render(<DropboxSetupDialog open onClose={() => {}} />);
+    const consoleLink = screen.getByRole('link', { name: /open app console/i });
+    consoleLink.focus();
+
+    rerender(<DropboxSetupDialog open onClose={() => {}} />);
+
+    expect(consoleLink).toHaveFocus();
+  });
+
+  it('keeps Tab inside the dialog', () => {
+    render(<DropboxSetupDialog open onClose={jest.fn()} />);
+    const gotIt = screen.getByRole('button', { name: /got it/i });
+    gotIt.focus();
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+
+    expect(screen.getByRole('button', { name: /close/i })).toHaveFocus();
+  });
+
+  it('wraps backwards from the first element', () => {
+    render(<DropboxSetupDialog open onClose={jest.fn()} />);
+    screen.getByRole('button', { name: /close/i }).focus();
+
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+
+    expect(screen.getByRole('button', { name: /got it/i })).toHaveFocus();
+  });
+
+  it('returns focus to whatever opened it', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { rerender } = render(<DropboxSetupDialog open onClose={jest.fn()} />);
+    expect(screen.getByRole('button', { name: /close/i })).toHaveFocus();
+
+    rerender(<DropboxSetupDialog open={false} onClose={jest.fn()} />);
+
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
 });

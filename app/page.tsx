@@ -35,6 +35,7 @@ import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
 import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
+import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
 import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
@@ -102,6 +103,9 @@ export default function Home() {
   const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
   /** Token of the last completed Dropbox check — blur re-checks only on change. */
   const lastCheckedDropboxToken = useRef<string | null>(null);
+  /** Read inside the models effect, which must not re-run when the model changes. */
+  const selectedModelRef = useRef(selectedModel);
+  selectedModelRef.current = selectedModel;
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
 
@@ -140,7 +144,6 @@ export default function Home() {
             : null;
 
   const handleGenerateClick = async () => {
-    if (missingAnthropicKey) setAnthropicKeyTouched(true);
     setActiveStep(1);
     if (isMobile) {
       setDrawerOpen(false);
@@ -191,6 +194,11 @@ export default function Home() {
     const reportsStatus = !!anthropicKey;
     if (reportsStatus) setIsCheckingAnthropicKey(true);
 
+    // Editing the key again supersedes this check. Without the guard, a slow
+    // response for the old key lands after the new one and reports its verdict
+    // against whatever is in the field now.
+    let superseded = false;
+
     const timer = setTimeout(() => {
       fetch('/api/models', {
         method: 'POST',
@@ -199,26 +207,39 @@ export default function Home() {
       })
         .then((res) => res.json())
         .then((data) => {
+          if (superseded) return;
           if (data.success && data.models && data.models.length > 0) {
             setAvailableModels(data.models);
+            // The account may not carry the model we defaulted to; without this
+            // the Select renders blank with nothing chosen.
+            if (!data.models.some((m: { id: string }) => m.id === selectedModelRef.current)) {
+              setSelectedModel(data.models[0].id);
+            }
             if (reportsStatus) setAnthropicKeyStatus({ ok: true, message: 'Key accepted' });
           } else if (reportsStatus) {
-            setAnthropicKeyStatus({ ok: false, message: 'This key was rejected by Anthropic' });
+            setAnthropicKeyStatus({ ok: false, message: describeKeyCheckFailure(data) });
           }
         })
         .catch((err) => {
+          if (superseded) return;
           console.error('Failed to fetch models:', err);
           if (reportsStatus) {
-            setAnthropicKeyStatus({ ok: false, message: "Couldn't reach Anthropic to check this key" });
+            setAnthropicKeyStatus({ ok: false, message: UNREACHABLE_KEY_MESSAGE });
           }
         })
         .finally(() => {
+          if (superseded) return;
           if (reportsStatus) setIsCheckingAnthropicKey(false);
         });
     }, 500);
 
-    return () => clearTimeout(timer);
-  }, [anthropicKey, hasServerKey]);
+    return () => {
+      superseded = true;
+      clearTimeout(timer);
+    };
+    // selectedModel is read through a ref so picking a model doesn't refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anthropicKey, hasServerKey, setSelectedModel]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -252,6 +273,10 @@ export default function Home() {
   const verifyDropboxToken = async (token: string) => {
     setIsVerifyingDropbox(true);
     setDropboxStatusMsg(null);
+    // Record the attempt up front. Every outcome, including failure, counts as
+    // "this token has been checked" — otherwise each focus/blur re-fires the
+    // request for a token we already know about. "Try again" clears the ref.
+    lastCheckedDropboxToken.current = token;
     try {
       const res = await fetch('/api/dropbox/verify', {
         method: 'POST',
@@ -260,22 +285,28 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        lastCheckedDropboxToken.current = token;
         setDropboxStatusMsg({ ok: true, message: `Connected as ${data.account}` });
+      } else if (res.status === 429) {
+        // Our own rate limiter, not Dropbox's verdict on the token.
+        setDropboxStatusMsg({ ok: false, message: 'Too many checks in a row. Wait a moment, then try again.' });
       } else {
         const rawError = typeof data.error === 'object' && data.error ? data.error.message : data.error;
-        const errMsg = toDropboxErrorMessage(rawError ?? data.error_summary);
-        // Leave the token unrecorded so a retry actually re-checks it.
-        lastCheckedDropboxToken.current = null;
-        setDropboxStatusMsg({ ok: false, message: errMsg });
+        setDropboxStatusMsg({ ok: false, message: toDropboxErrorMessage(rawError) });
       }
     } catch (err) {
       console.error('Dropbox token verification error:', err);
-      lastCheckedDropboxToken.current = null;
       setDropboxStatusMsg({ ok: false, message: "Couldn't reach Dropbox to check this token" });
     } finally {
       setIsVerifyingDropbox(false);
     }
+  };
+
+  /** Re-checks a token we have already seen — used by the "Try again" link. */
+  const retryDropboxToken = () => {
+    const token = dropboxToken?.trim();
+    if (!token || isVerifyingDropbox) return;
+    lastCheckedDropboxToken.current = null;
+    void verifyDropboxToken(token);
   };
 
   /**
@@ -431,7 +462,9 @@ export default function Home() {
       const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${dropboxToken}`,
+          // Must match what verifyDropboxToken checked, or a token that passed
+          // the check can still be rejected here.
+          Authorization: `Bearer ${dropboxToken.trim()}`,
           'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', autorename: true, mute: false }),
           'Content-Type': 'application/octet-stream',
         },
@@ -600,7 +633,11 @@ export default function Home() {
           label="Dropbox access token"
           type={showDropboxToken ? 'text' : 'password'} fullWidth
           value={dropboxToken || ''}
-          onChange={(e) => setDropboxToken(e.target.value)}
+          onChange={(e) => {
+            setDropboxToken(e.target.value);
+            // The old verdict described the old token. Go quiet until blur re-checks.
+            setDropboxStatusMsg(null);
+          }}
           onBlur={handleDropboxBlur}
           placeholder="Paste to save exports to Dropbox"
           helperText={dropboxStatusMsg?.message ?? ' '}
@@ -644,7 +681,7 @@ export default function Home() {
               type="button"
               variant="caption"
               underline="hover"
-              onClick={() => { const t = dropboxToken?.trim(); if (t) void verifyDropboxToken(t); }}
+              onClick={retryDropboxToken}
             >
               Try again
             </Link>

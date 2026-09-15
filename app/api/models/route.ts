@@ -29,7 +29,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Anthropic API returned status ${res.status}: ${body}`);
+      // Surface the upstream status so the client can tell "your key is bad"
+      // (401/403) from "Anthropic is busy or unreachable" (429/5xx). Collapsing
+      // both into a 500 made every transient blip look like a rejected key.
+      const isAuthFailure = res.status === 401 || res.status === 403;
+      return NextResponse.json(
+        {
+          success: false,
+          upstreamStatus: res.status,
+          error: {
+            type: isAuthFailure
+              ? 'VALIDATION_FAILED'
+              : res.status === 429
+                ? 'RATE_LIMIT'
+                : 'TIMEOUT',
+            message: `Anthropic API returned status ${res.status}: ${body}`,
+          },
+        },
+        { status: isAuthFailure ? 401 : 502 }
+      );
     }
 
     const data = (await res.json()) as {
