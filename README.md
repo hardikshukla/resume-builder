@@ -135,22 +135,22 @@ In the app, the **ⓘ** button beside the Dropbox token field opens these same s
 2. Choose **Scoped access** → **App folder** (the app only ever sees its own folder) →
    give it any name.
 3. Open the app's **Permissions** tab and tick:
-   - `account_info.read` — used by the **Verify Token** button
+   - `account_info.read` — used to confirm the token works
    - `files.content.write` — used to upload your `.docx` files
 
    Click **Submit**. *(Set permissions before generating the token — a token only carries
    the scopes that existed when it was created.)*
 4. Back on the **Settings** tab, find **OAuth 2 → Generated access token** and click
    **Generate**.
-5. Paste the token into the **Dropbox Access Token** field in the app and hit
-   **Verify Token**.
+5. Paste the token into the **Dropbox access token** field in the app. It is checked
+   automatically as soon as you click away from the field.
 
 **Notes**
 
 - Generated tokens are short-lived by default. If uploads start failing with `401`,
   return to step 4 and generate a fresh one. To avoid this, set **Access token expiration**
   to *No expiration* in the app's Settings before generating.
-- `missing_scope` on **Verify Token** means step 3 was done after step 4 — re-generate the
+- `missing_scope` on the token check means step 3 was done after step 4 — re-generate the
   token.
 - The token never reaches this app's server for uploads; the browser posts directly to
   `content.dropboxapi.com`. The `/api/dropbox/verify` route forwards it to Dropbox once to

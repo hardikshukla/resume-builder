@@ -1,9 +1,8 @@
 /** @jest-environment jsdom */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Home from '../app/page';
-import { DROPBOX_APP_CONSOLE_URL } from '@/lib/constants';
 
 // Mock hooks
 jest.mock('@/hooks/useApiKey', () => ({
@@ -56,6 +55,10 @@ global.fetch = jest.fn().mockImplementation(() =>
   })
 ) as jest.Mock;
 
+/** Calls the page made to the Dropbox verify endpoint. */
+const dropboxVerifyCalls = () =>
+  (global.fetch as jest.Mock).mock.calls.filter(([url]) => url === '/api/dropbox/verify');
+
 describe('Home Page Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -70,37 +73,82 @@ describe('Home Page Component', () => {
     // Check fields / sections
     expect(screen.getByText(/Candidate Resume/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Job Description/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Company Name \(Optional\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Company name/i)).toBeInTheDocument();
   });
 
   it('renders API key sections', () => {
     render(<Home />);
-    expect(screen.getByLabelText(/Claude Model/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Claude model/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Anthropic API key')).toBeInTheDocument();
   });
 
-  it('renders a "Get a token" link to the Dropbox app console', () => {
-    render(<Home />);
-    const link = screen.getByRole('link', { name: /get a token/i });
-    expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', DROPBOX_APP_CONSOLE_URL);
-    expect(link).toHaveAttribute('href', 'https://www.dropbox.com/developers/apps');
-    // The console link must not be personalised with a build-time app key —
-    // it would point every visitor at an app only the owner can open.
-    expect(link.getAttribute('href')).not.toContain('app_key');
-  });
-
-  it('opens the Dropbox token link safely in a new tab', () => {
-    render(<Home />);
-    const link = screen.getByRole('link', { name: /get a token/i });
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
-  });
-
-  it('opens the Dropbox setup dialog from the info button', () => {
+  it('opens the Dropbox setup dialog from the help link', () => {
     render(<Home />);
     expect(screen.queryByRole('dialog', { name: /connect dropbox/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /how to get a dropbox token/i }));
+    fireEvent.click(screen.getByRole('button', { name: /how do i get a token/i }));
     expect(screen.getByRole('dialog', { name: /connect dropbox/i })).toBeInTheDocument();
+  });
+
+  it('does not show a Verify Token button — the check runs on blur', () => {
+    render(<Home />);
+    expect(screen.queryByRole('button', { name: /verify token/i })).not.toBeInTheDocument();
+  });
+
+  it('checks the Dropbox token when the field loses focus', async () => {
+    render(<Home />);
+    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/dropbox/verify',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+  });
+
+  it('does not re-check an unchanged token on a second blur', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      url === '/api/dropbox/verify'
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve({ valid: true, account: 'Test User' }) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve({ hasServerKey: false }) })
+    );
+
+    render(<Home />);
+    const field = screen.getByLabelText(/Dropbox access token/i);
+
+    fireEvent.blur(field);
+    await waitFor(() => expect(dropboxVerifyCalls()).toHaveLength(1));
+
+    fireEvent.blur(field);
+    await waitFor(() => expect(screen.getByTestId('field-status-ok')).toBeInTheDocument());
+    expect(dropboxVerifyCalls()).toHaveLength(1);
+  });
+
+  it('keeps generation available when the Dropbox check fails', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      url === '/api/dropbox/verify'
+        ? Promise.resolve({ ok: false, json: () => Promise.resolve({ valid: false, error: 'Invalid token' }) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve({ hasServerKey: false }) })
+    );
+
+    render(<Home />);
+    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+
+    await waitFor(() => expect(screen.getByTestId('field-status-error')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /generate tailored resume/i })).toBeEnabled();
+  });
+
+  it('offers a retry only after a failed check', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      url === '/api/dropbox/verify'
+        ? Promise.resolve({ ok: false, json: () => Promise.resolve({ valid: false, error: 'Invalid token' }) })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve({ hasServerKey: false }) })
+    );
+
+    render(<Home />);
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+
+    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument());
   });
 });

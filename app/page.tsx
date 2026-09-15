@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -18,24 +18,24 @@ import Skeleton from '@mui/material/Skeleton';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
+import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import Tooltip from '@mui/material/Tooltip';
 
 import { useApiKey } from '@/hooks/useApiKey';
-import { Recommendation } from '@/types';
+import { Recommendation, FieldStatus } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, DROPBOX_APP_CONSOLE_URL } from '@/lib/constants';
+import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -50,6 +50,7 @@ import { ContextPill } from '@/components/ContextPill';
 import { useBackButtonPrevention } from '@/hooks/useBackButtonPrevention';
 import BackNavigationDialog from '@/components/BackNavigationDialog';
 import DropboxSetupDialog from '@/components/DropboxSetupDialog';
+import FieldStatusAdornment from '@/components/FieldStatusAdornment';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -95,7 +96,12 @@ export default function Home() {
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [isVerifyingDropbox, setIsVerifyingDropbox] = useState(false);
-  const [dropboxVerifyStatus, setDropboxVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [dropboxStatusMsg, setDropboxStatusMsg] = useState<FieldStatus | null>(null);
+  const [anthropicKeyTouched, setAnthropicKeyTouched] = useState(false);
+  const [isCheckingAnthropicKey, setIsCheckingAnthropicKey] = useState(false);
+  const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
+  /** Token of the last completed Dropbox check — blur re-checks only on change. */
+  const lastCheckedDropboxToken = useRef<string | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
   const [parseError, setParseError] = useState('');
 
@@ -117,7 +123,24 @@ export default function Home() {
     }
   };
 
+  const missingAnthropicKey = !hasServerKey && !anthropicKey;
+  // Only scold once the user has actually left the field or tried to generate.
+  const showAnthropicKeyError = missingAnthropicKey && anthropicKeyTouched;
+
+  const blockedReason = missingAnthropicKey
+    ? 'Add your API key to generate'
+    : resume.length === 0
+      ? 'Paste your resume to generate'
+      : jobDescription.length === 0
+        ? 'Paste a job description to generate'
+        : resume.length > MAX_RESUME_CHARS
+          ? 'Resume is over the character limit'
+          : jobDescription.length > MAX_JD_CHARS
+            ? 'Job description is over the character limit'
+            : null;
+
   const handleGenerateClick = async () => {
+    if (missingAnthropicKey) setAnthropicKeyTouched(true);
     setActiveStep(1);
     if (isMobile) {
       setDrawerOpen(false);
@@ -158,8 +181,15 @@ export default function Home() {
     const key = anthropicKey || (hasServerKey ? 'server' : '');
     if (!key) {
       setAvailableModels(DEFAULT_MODELS);
+      setAnthropicKeyStatus(null);
+      setIsCheckingAnthropicKey(false);
       return;
     }
+
+    // A model listing that comes back is also proof the key works, so this
+    // doubles as the key check — an invalid key used to fail silently here.
+    const reportsStatus = !!anthropicKey;
+    if (reportsStatus) setIsCheckingAnthropicKey(true);
 
     const timer = setTimeout(() => {
       fetch('/api/models', {
@@ -171,9 +201,20 @@ export default function Home() {
         .then((data) => {
           if (data.success && data.models && data.models.length > 0) {
             setAvailableModels(data.models);
+            if (reportsStatus) setAnthropicKeyStatus({ ok: true, message: 'Key accepted' });
+          } else if (reportsStatus) {
+            setAnthropicKeyStatus({ ok: false, message: 'This key was rejected by Anthropic' });
           }
         })
-        .catch((err) => console.error('Failed to fetch models:', err));
+        .catch((err) => {
+          console.error('Failed to fetch models:', err);
+          if (reportsStatus) {
+            setAnthropicKeyStatus({ ok: false, message: "Couldn't reach Anthropic to check this key" });
+          }
+        })
+        .finally(() => {
+          if (reportsStatus) setIsCheckingAnthropicKey(false);
+        });
     }, 500);
 
     return () => clearTimeout(timer);
@@ -208,29 +249,49 @@ export default function Home() {
     }
   };
 
-  const handleVerifyDropboxToken = async () => {
-    if (!dropboxToken) return;
+  const verifyDropboxToken = async (token: string) => {
     setIsVerifyingDropbox(true);
-    setDropboxVerifyStatus(null);
+    setDropboxStatusMsg(null);
     try {
       const res = await fetch('/api/dropbox/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: dropboxToken }),
+        body: JSON.stringify({ token }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setDropboxVerifyStatus({ success: true, message: `Connected: ${data.account}` });
+        lastCheckedDropboxToken.current = token;
+        setDropboxStatusMsg({ ok: true, message: `Connected as ${data.account}` });
       } else {
-        const errMsg = typeof data.error === 'object' && data.error ? data.error.message : (data.error || 'Verification failed.');
-        setDropboxVerifyStatus({ success: false, message: errMsg });
+        const rawError = typeof data.error === 'object' && data.error ? data.error.message : data.error;
+        const errMsg = toDropboxErrorMessage(rawError ?? data.error_summary);
+        // Leave the token unrecorded so a retry actually re-checks it.
+        lastCheckedDropboxToken.current = null;
+        setDropboxStatusMsg({ ok: false, message: errMsg });
       }
     } catch (err) {
       console.error('Dropbox token verification error:', err);
-      setDropboxVerifyStatus({ success: false, message: 'Server verification failed.' });
+      lastCheckedDropboxToken.current = null;
+      setDropboxStatusMsg({ ok: false, message: "Couldn't reach Dropbox to check this token" });
     } finally {
       setIsVerifyingDropbox(false);
     }
+  };
+
+  /**
+   * Checks the token once the field is done being edited. Tokens are ~130
+   * characters, so checking mid-typing would flash a false failure — and the
+   * IP rate limit in middleware.ts is shared with generation.
+   */
+  const handleDropboxBlur = () => {
+    const token = dropboxToken?.trim();
+    if (!token) {
+      setDropboxStatusMsg(null);
+      lastCheckedDropboxToken.current = null;
+      return;
+    }
+    if (token === lastCheckedDropboxToken.current || isVerifyingDropbox) return;
+    void verifyDropboxToken(token);
   };
 
   // Inactivity session lock (40 min) using custom hook
@@ -464,27 +525,47 @@ export default function Home() {
       </Box>
 
       {/* Company Name */}
-      <TextField label="Company Name (Optional)" fullWidth value={companyName}
+      <TextField label="Company name" fullWidth value={companyName}
         onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google"
         sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
 
+      <Divider sx={{ borderColor: 'divider' }} />
+
       {/* Anthropic Key */}
       <TextField
-        label={hasServerKey ? 'Anthropic API Key (Configured on Server)' : 'Anthropic API Key (Mandatory)'}
+        label="Anthropic API key"
         type={showAnthropicKey ? 'text' : 'password'} fullWidth
         value={hasServerKey ? '' : anthropicKey}
         onChange={(e) => setAnthropicKey(e.target.value)}
-        placeholder={hasServerKey ? 'Configured on server via environment variable.' : 'Enter your Anthropic API Key...'}
+        onBlur={() => setAnthropicKeyTouched(true)}
+        placeholder={hasServerKey ? 'Configured on the server' : 'sk-ant-...'}
         disabled={hasServerKey}
-        error={!hasServerKey && !anthropicKey}
-        helperText={!hasServerKey && !anthropicKey ? 'Anthropic API Key is required to run LLM operations.' : ''}
+        error={showAnthropicKeyError}
+        helperText={
+          hasServerKey
+            ? 'Configured on the server — nothing to enter.'
+            : showAnthropicKeyError
+              ? 'Required to run any generation.'
+              : anthropicKeyStatus && !anthropicKeyStatus.ok
+                ? anthropicKeyStatus.message
+                : 'Kept in this tab only, never logged server-side.'
+        }
         sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
         slotProps={{ input: {
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
-                {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-              </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {!hasServerKey && (
+                  <FieldStatusAdornment
+                    checking={isCheckingAnthropicKey}
+                    status={anthropicKeyStatus}
+                    label="Anthropic API key"
+                  />
+                )}
+                <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
+                  {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </Box>
             </InputAdornment>
           ),
         }}}
@@ -492,11 +573,11 @@ export default function Home() {
 
       {/* Claude Model Selection */}
       <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
-        <InputLabel id="model-select-label">Claude Model</InputLabel>
+        <InputLabel id="model-select-label">Claude model</InputLabel>
         <Select
           labelId="model-select-label"
           value={selectedModel}
-          label="Claude Model"
+          label="Claude model"
           onChange={(e) => setSelectedModel(e.target.value as string)}
         >
           {availableModels.map((m) => (
@@ -507,80 +588,97 @@ export default function Home() {
         </Select>
       </FormControl>
 
-      {/* Dropbox (Optional) */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Divider sx={{ '&::before, &::after': { borderColor: 'divider' } }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          Optional
+        </Typography>
+      </Divider>
+
+      {/* Dropbox — checked on blur, never blocks generation */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         <TextField
-          label="Dropbox Access Token (Optional)"
+          label="Dropbox access token"
           type={showDropboxToken ? 'text' : 'password'} fullWidth
           value={dropboxToken || ''}
           onChange={(e) => setDropboxToken(e.target.value)}
-          placeholder="Enter Dropbox Access Token..."
-          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
+          onBlur={handleDropboxBlur}
+          placeholder="Paste to save exports to Dropbox"
+          helperText={dropboxStatusMsg?.message ?? ' '}
+          sx={{
+            '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' },
+            '& .MuiFormHelperText-root': {
+              color: dropboxStatusMsg ? (dropboxStatusMsg.ok ? 'success.main' : 'error.main') : 'text.secondary',
+            },
+          }}
           slotProps={{ input: {
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
-                  {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                </IconButton>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <FieldStatusAdornment
+                    checking={isVerifyingDropbox}
+                    status={dropboxStatusMsg}
+                    label="Dropbox token"
+                  />
+                  <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
+                    {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </Box>
               </InputAdornment>
             ),
           }}}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleVerifyDropboxToken}
-            disabled={isVerifyingDropbox}
-          >
-            {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
-          </Button>
-          <Button
-            variant="text"
-            size="small"
-            href={DROPBOX_APP_CONSOLE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-            sx={{ color: 'text.secondary', textTransform: 'none' }}
-          >
-            Get a token
-          </Button>
-          <Tooltip title="How to get a token">
-            <IconButton
-              size="small"
-              aria-label="How to get a Dropbox token"
-              onClick={() => setDropboxSetupOpen(true)}
-              sx={{ color: 'text.secondary' }}
-            >
-              <InfoOutlinedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        {dropboxVerifyStatus && (
-          <Typography
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Link
+            component="button"
+            type="button"
             variant="caption"
-            sx={{
-              color: dropboxVerifyStatus.success ? 'success.main' : 'error.main',
-              fontWeight: 600,
-            }}
+            underline="hover"
+            onClick={() => setDropboxSetupOpen(true)}
+            sx={{ color: 'text.secondary' }}
           >
-            {dropboxVerifyStatus.success ? '✓ ' : '✗ '}{dropboxVerifyStatus.message}
-          </Typography>
-        )}
+            How do I get a token?
+          </Link>
+          {dropboxStatusMsg && !dropboxStatusMsg.ok && !isVerifyingDropbox && (
+            <Link
+              component="button"
+              type="button"
+              variant="caption"
+              underline="hover"
+              onClick={() => { const t = dropboxToken?.trim(); if (t) void verifyDropboxToken(t); }}
+            >
+              Try again
+            </Link>
+          )}
+        </Box>
       </Box>
 
       {/* Generate Button */}
       <Button variant="contained" size="large" fullWidth
         onClick={handleGenerateClick}
-        disabled={isLoading || resume.length === 0 || jobDescription.length === 0 || resume.length > MAX_RESUME_CHARS || jobDescription.length > MAX_JD_CHARS || (!hasServerKey && !anthropicKey)}
-        sx={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', boxShadow: '0 4px 20px rgba(108,99,255,0.4)', py: 1.5, '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' } }}>
-        {isLoading ? <CircularProgress size={24} sx={{ color: '#fff' }} /> : '✨ Generate Tailored Resume'}
+        disabled={isLoading || !!blockedReason}
+        sx={{
+          py: 1.5,
+          ...(blockedReason
+            ? {
+                '&.Mui-disabled': {
+                  background: 'transparent',
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  boxShadow: 'none',
+                  color: 'text.secondary',
+                },
+              }
+            : {
+                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+                boxShadow: '0 4px 20px rgba(108,99,255,0.4)',
+                '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' },
+              }),
+        }}>
+        {isLoading
+          ? <CircularProgress size={24} sx={{ color: '#fff' }} />
+          : blockedReason ?? '✨ Generate Tailored Resume'}
       </Button>
 
-      <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'center' }}>
-        API keys stored in session only · Never logged server-side
-      </Typography>
     </Paper>
   );
 

@@ -142,3 +142,12 @@ export interface GenerateRequest {
   jdKeywords?: JDExtractionResult; // pre-extracted keywords context
 }
 
+
+/**
+ * Result of a background credential check (Anthropic key, Dropbox token).
+ * `checking` drives the inline spinner; a null status means "not checked yet".
+ */
+export interface FieldStatus {
+  ok: boolean;
+  message: string;
+}

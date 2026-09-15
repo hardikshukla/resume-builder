@@ -19,7 +19,7 @@ interface DropboxSetupDialogProps {
 
 /** The two OAuth scopes this app actually calls. */
 const REQUIRED_SCOPES: ReadonlyArray<{ scope: string; usedFor: string }> = [
-  { scope: 'account_info.read', usedFor: 'Verify Token' },
+  { scope: 'account_info.read', usedFor: 'confirming the token works' },
   { scope: 'files.content.write', usedFor: 'uploading your .docx' },
 ];
 
@@ -149,7 +149,7 @@ export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialog
           </Box>
           <Alert severity="warning" sx={{ mt: 1.5, py: 0.5 }}>
             Do this <strong>before</strong> step 3. A token only carries the scopes that
-            existed when it was generated — otherwise Verify Token fails with{' '}
+            existed when it was generated — otherwise the check fails with{' '}
             <Box component="code" sx={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
               missing_scope
             </Box>
@@ -160,7 +160,7 @@ export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialog
         <Step
           number={3}
           title="Generate and paste"
-          body="Back on the Settings tab, under OAuth 2 → Generated access token, click Generate. Paste the token into the panel and hit Verify Token."
+          body="Back on the Settings tab, under OAuth 2 → Generated access token, click Generate. Paste the token into the panel — it is checked as soon as you click away."
         >
           <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5 }}>
             Tokens expire by default. Set <strong>Access token expiration</strong> to
