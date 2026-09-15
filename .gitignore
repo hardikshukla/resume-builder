@@ -46,3 +46,7 @@ smoke_test_output.json
 implementation_plan.md
 implementation.md
 deep-research-report.md
+CLAUDE.md
+
+# Editor swap files
+*.swp

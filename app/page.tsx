@@ -24,6 +24,9 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import Tooltip from '@mui/material/Tooltip';
 
 import { useApiKey } from '@/hooks/useApiKey';
 import { Recommendation } from '@/types';
@@ -32,7 +35,7 @@ import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, DROPBOX_APP_CONSOLE_URL } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -46,6 +49,7 @@ import { WorkflowStepper } from '@/components/WorkflowStepper';
 import { ContextPill } from '@/components/ContextPill';
 import { useBackButtonPrevention } from '@/hooks/useBackButtonPrevention';
 import BackNavigationDialog from '@/components/BackNavigationDialog';
+import DropboxSetupDialog from '@/components/DropboxSetupDialog';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -86,6 +90,7 @@ export default function Home() {
   const [customRecText, setCustomRecText] = useState('');
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showDropboxToken, setShowDropboxToken] = useState(false);
+  const [dropboxSetupOpen, setDropboxSetupOpen] = useState(false);
   const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [hasServerKey, setHasServerKey] = useState(false);
@@ -521,15 +526,37 @@ export default function Home() {
             ),
           }}}
         />
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={handleVerifyDropboxToken}
-          disabled={isVerifyingDropbox}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleVerifyDropboxToken}
+            disabled={isVerifyingDropbox}
+          >
+            {isVerifyingDropbox ? <CircularProgress size={16} /> : 'Verify Token'}
+          </Button>
+          <Button
+            variant="text"
+            size="small"
+            href={DROPBOX_APP_CONSOLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+            sx={{ color: 'text.secondary', textTransform: 'none' }}
+          >
+            Get a token
+          </Button>
+          <Tooltip title="How to get a token">
+            <IconButton
+              size="small"
+              aria-label="How to get a Dropbox token"
+              onClick={() => setDropboxSetupOpen(true)}
+              sx={{ color: 'text.secondary' }}
+            >
+              <InfoOutlinedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
         {dropboxVerifyStatus && (
           <Typography
             variant="caption"
@@ -807,6 +834,7 @@ export default function Home() {
 
       {/* Back Navigation Guard */}
       <BackNavigationDialog open={showBackDialog} onStay={cancelLeave} onLeave={confirmLeave} />
+      <DropboxSetupDialog open={dropboxSetupOpen} onClose={() => setDropboxSetupOpen(false)} />
 
       {/* Session Expired Overlay */}
       {isSessionExpired && (

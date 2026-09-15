@@ -1,8 +1,9 @@
 /** @jest-environment jsdom */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Home from '../app/page';
+import { DROPBOX_APP_CONSOLE_URL } from '@/lib/constants';
 
 // Mock hooks
 jest.mock('@/hooks/useApiKey', () => ({
@@ -75,5 +76,31 @@ describe('Home Page Component', () => {
   it('renders API key sections', () => {
     render(<Home />);
     expect(screen.getByLabelText(/Claude Model/i)).toBeInTheDocument();
+  });
+
+  it('renders a "Get a token" link to the Dropbox app console', () => {
+    render(<Home />);
+    const link = screen.getByRole('link', { name: /get a token/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', DROPBOX_APP_CONSOLE_URL);
+    expect(link).toHaveAttribute('href', 'https://www.dropbox.com/developers/apps');
+    // The console link must not be personalised with a build-time app key —
+    // it would point every visitor at an app only the owner can open.
+    expect(link.getAttribute('href')).not.toContain('app_key');
+  });
+
+  it('opens the Dropbox token link safely in a new tab', () => {
+    render(<Home />);
+    const link = screen.getByRole('link', { name: /get a token/i });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
+  });
+
+  it('opens the Dropbox setup dialog from the info button', () => {
+    render(<Home />);
+    expect(screen.queryByRole('dialog', { name: /connect dropbox/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /how to get a dropbox token/i }));
+    expect(screen.getByRole('dialog', { name: /connect dropbox/i })).toBeInTheDocument();
   });
 });

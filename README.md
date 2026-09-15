@@ -74,6 +74,7 @@ Toggle **Show Highlights** to see word-level diffs (🟢 added · 🔴 removed).
 | **`.docx` Download** | ATS-clean Word files generated entirely in the browser |
 | **Print / PDF Export** | Print-to-PDF from any browser |
 | **Dropbox Sync** | Upload directly to Dropbox — token never touches the server |
+| **Dropbox Setup Guide** | An ⓘ button next to the token field opens a 3-step **Connect Dropbox** walkthrough; **Get a token ↗** jumps straight to the App Console — see [Dropbox Setup](#dropbox-setup) |
 | **LLM Retry with Back-off** | Transient Anthropic errors (429, 5xx, network) retried up to 3× with exponential back-off |
 | **Structured Error Banners** | API errors surface as dismissable banners with a **Retry** button; rate-limit errors include a live countdown timer. Retry correctly re-shows the button on repeated failures |
 | **Rate Limiting** | 15 requests / 60 s per IP with `Retry-After` header on `429` |
@@ -115,6 +116,45 @@ The app works without any `.env.local` configuration — users paste their own A
 | `SENTRY_PROJECT` | *(unset)* | Sentry project name — only needed for CI source-map upload |
 
 > **API keys never go in `.env` permanently.** If `ANTHROPIC_API_KEY` is not set, users bring their own key via the UI. Keys travel only in HTTPS request bodies and are never logged, stored, or returned by the server.
+
+---
+
+## Dropbox Setup
+
+Saving to Dropbox is optional, and there is **nothing to configure in `.env`** — each
+user brings their own Dropbox access token, entered in the UI and held in
+`sessionStorage` only. Dropbox has no "shared" key: an access token is tied to one
+Dropbox account and one Dropbox app, so every user creates their own.
+
+In the app, the **ⓘ** button beside the Dropbox token field opens these same steps.
+
+**One-time setup (~2 minutes):**
+
+1. Go to the [Dropbox App Console](https://www.dropbox.com/developers/apps) and click
+   **Create app**.
+2. Choose **Scoped access** → **App folder** (the app only ever sees its own folder) →
+   give it any name.
+3. Open the app's **Permissions** tab and tick:
+   - `account_info.read` — used by the **Verify Token** button
+   - `files.content.write` — used to upload your `.docx` files
+
+   Click **Submit**. *(Set permissions before generating the token — a token only carries
+   the scopes that existed when it was created.)*
+4. Back on the **Settings** tab, find **OAuth 2 → Generated access token** and click
+   **Generate**.
+5. Paste the token into the **Dropbox Access Token** field in the app and hit
+   **Verify Token**.
+
+**Notes**
+
+- Generated tokens are short-lived by default. If uploads start failing with `401`,
+  return to step 4 and generate a fresh one. To avoid this, set **Access token expiration**
+  to *No expiration* in the app's Settings before generating.
+- `missing_scope` on **Verify Token** means step 3 was done after step 4 — re-generate the
+  token.
+- The token never reaches this app's server for uploads; the browser posts directly to
+  `content.dropboxapi.com`. The `/api/dropbox/verify` route forwards it to Dropbox once to
+  check validity, and never logs or stores it.
 
 ---
 
