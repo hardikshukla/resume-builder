@@ -60,9 +60,12 @@ function fallbackModelFor(mode: 'generate' | 'refine' | 'analyze-jd', model: str
 // Retry helper
 // ---------------------------------------------------------------------------
 
-/** HTTP status codes that are safe to retry. */
+/**
+ * HTTP status codes that are safe to retry. Mirrors the SDK's own list
+ * (408, 409, 429, 5xx), since the SDK's built-in retries are turned off below.
+ */
 function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 529 || status >= 500;
+  return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
 /** Network-level error messages that are safe to retry. */
@@ -111,9 +114,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       if (err instanceof Anthropic.APIError) {
         if (isRetryableStatus(err.status)) {
           retryable = true;
-          // Honour the Retry-After header when present on 429 responses
-          const headers = err.headers as Record<string, string> | undefined;
-          const retryAfterHeader = headers?.['retry-after'];
+          // Honour the Retry-After header when present on 429 responses.
+          // The SDK exposes headers as a Fetch `Headers` object, so use .get().
+          const retryAfterHeader = err.headers?.get('retry-after');
           if (retryAfterHeader) {
             const seconds = parseFloat(retryAfterHeader);
             if (!isNaN(seconds)) {
@@ -182,7 +185,9 @@ export async function callAnthropic(
     jdKeywords?: unknown;
   }
 ): Promise<unknown> {
-  const client = new Anthropic({ apiKey });
+  // withRetry owns retries (with Retry-After support). Leaving the SDK's
+  // default of 2 retries on as well would multiply them: up to 9 calls.
+  const client = new Anthropic({ apiKey, maxRetries: 0 });
   let model = payload.modelOverride || DEFAULT_MODEL;
   if (MODEL_FALLBACKS[model]) {
     model = MODEL_FALLBACKS[model];

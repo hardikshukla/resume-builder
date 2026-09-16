@@ -15,12 +15,15 @@ import { MODEL_IDS } from '@/lib/constants';
 const mockCreate = jest.fn();
 // Separate mock for the beta namespace, so a test can assert it is never used.
 const mockBetaCreate = jest.fn();
+// Options each client was constructed with, to check retry settings.
+const mockClientOptions: unknown[] = [];
 
 jest.mock('@anthropic-ai/sdk', () => {
   const actual = jest.requireActual('@anthropic-ai/sdk');
   class MockAnthropic extends actual.default {
     constructor(options: unknown) {
       super(options);
+      mockClientOptions.push(options);
       Object.assign(this, { messages: { create: mockCreate }, beta: { messages: { create: mockBetaCreate } } });
     }
   }
@@ -177,5 +180,40 @@ describe('callAnthropic — request shape', () => {
     expect(params).not.toHaveProperty('betas');
     expect(params.system[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     expect(params.max_tokens).toBe(16_000);
+  });
+});
+
+// ── Retries ──────────────────────────────────────────────────────────────────
+
+describe('callAnthropic — retries', () => {
+  it('turns off the SDK retries so they do not stack with withRetry', async () => {
+    mockCreate.mockResolvedValueOnce(textResponse(JD_RESULT));
+    await analyzeJd();
+    expect(mockClientOptions.at(-1)).toMatchObject({ maxRetries: 0 });
+  });
+
+  it('retries a rate-limited request, honouring Retry-After', async () => {
+    const rateLimited = new Anthropic.RateLimitError(
+      429,
+      { type: 'error', error: { type: 'rate_limit_error', message: 'slow down' } },
+      undefined,
+      new Headers({ 'retry-after': '0' })
+    );
+    mockCreate.mockRejectedValueOnce(rateLimited).mockResolvedValueOnce(textResponse(JD_RESULT));
+
+    const started = Date.now();
+    await expect(analyzeJd()).resolves.toEqual(JD_RESULT);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    // Retry-After: 0 means no wait; without it the back-off would be 500 ms.
+    expect(Date.now() - started).toBeLessThan(400);
+  });
+
+  it('gives up after three attempts', async () => {
+    const overloaded = () =>
+      new Anthropic.InternalServerError(529, { type: 'error', error: { type: 'overloaded_error', message: 'busy' } }, undefined, new Headers({ 'retry-after': '0' }));
+    mockCreate.mockRejectedValueOnce(overloaded()).mockRejectedValueOnce(overloaded()).mockRejectedValueOnce(overloaded());
+
+    await expect(analyzeJd()).rejects.toBeInstanceOf(Anthropic.InternalServerError);
+    expect(mockCreate).toHaveBeenCalledTimes(3);
   });
 });

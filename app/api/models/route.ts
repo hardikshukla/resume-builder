@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toApiErrorResponse } from '@/types/error';
+import { errorResponse } from '@/lib/api/routeErrors';
 import { ModelOption } from '@/types';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -8,16 +9,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const apiKey = anthropicKey || process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            type: 'VALIDATION_FAILED',
-            message: 'Anthropic API key is required to fetch models.',
-          },
-        },
-        { status: 400 }
-      );
+      return errorResponse('VALIDATION_FAILED', 'Anthropic API key is required to fetch models.');
     }
 
     const res = await fetch('https://api.anthropic.com/v1/models', {

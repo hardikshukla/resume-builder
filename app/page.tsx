@@ -34,7 +34,7 @@ import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
-import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
+import { toDropboxErrorMessage, toDropboxUploadErrorMessage } from '@/lib/utils/dropboxError';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
 import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
@@ -475,7 +475,8 @@ export default function Home() {
         },
         body: blob,
       });
-      if (!res.ok) throw new Error(await res.text() || 'Upload failed');
+      // Dropbox answers with JSON jargon; translate it before it reaches the banner.
+      if (!res.ok) throw new Error(toDropboxUploadErrorMessage(await res.text()));
       setDropboxStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
       setActiveStep(3);
     } catch (err) {
