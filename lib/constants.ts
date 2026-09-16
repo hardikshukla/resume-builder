@@ -68,6 +68,16 @@ export const getModelCapabilities = (modelId: string): ModelCapability => {
   return { recommendedFor: 'legacy', supportsPromptCaching: false };
 };
 
+/**
+ * Dropbox App Console. Every user needs their own Dropbox app to mint a
+ * personal access token, so this is deliberately not deep-linked to any
+ * single app — it lands on the visitor's own app list.
+ */
+export const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps';
+
+/** App version from package.json, injected at build time by next.config.mjs. */
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+
 /** Maximum file upload size in bytes (5 MB). */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
