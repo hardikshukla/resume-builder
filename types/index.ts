@@ -19,13 +19,6 @@ export interface Recommendation {
   resolvesDealbreakers: string[]; // references IDs of Dealbreakers resolved
 }
 
-export interface MissingKeyword {
-  id: string;               // e.g. "kw-kubernetes"
-  keyword: string;          // e.g. "Kubernetes"
-  suggestedSection: string; // e.g. "Core Competencies"
-  suggestedBullet: string;  // e.g. "Orchestrated containerised workloads using Kubernetes"
-}
-
 export interface ScoreBreakdown {
   summary: number;
   skills: number;
@@ -37,11 +30,9 @@ export interface GapAnalysis {
   matchScore: number;
   scoreBreakdown?: ScoreBreakdown;
   strongMatches: string[];    // PRESENT — keyword already in resume
-  gaps: string[];             // IMPLIED — experience existed, term was added
   dealbreakers: Dealbreaker[]; // MISSING — no evidence in candidate background
   recommendations: Recommendation[]; // Actionable suggestions the candidate can selectively apply
   keywordsAdded: string[];          // Implied keywords that were woven into the resume rewrite
-  missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
   extractedCompanyName?: string | null; // Extracted company name from the JD
 }

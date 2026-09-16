@@ -59,11 +59,9 @@ const successfulOutput = {
   gapAnalysis: {
     matchScore: 80,
     strongMatches: ['Python'],
-    gaps: [],
     dealbreakers: [],
     recommendations: [],
     keywordsAdded: [],
-    missingKeywords: [],
     summaryChanges: 'None.',
     extractedCompanyName: 'Acme Corp',
   },

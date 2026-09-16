@@ -19,14 +19,14 @@ Do not override this data unless the raw JD contains a clear factual contradicti
 
 <steps>
 1. Analyze the Job Description (JD): If no <jd_keywords> block is provided, extract must-have keywords, soft skills, seniority/role signals, scale, and company name. If <jd_keywords> is provided, skip this step and use those values directly.
-2. Keyword Gap Analysis: Classify keywords as PRESENT (already in resume), IMPLIED (evidence-backed but terms missing; weave into resume summary/experience/skills, and add to gaps), or MISSING (no evidence; DO NOT add to resume, add to missingKeywords).
+2. Keyword Gap Analysis: Classify keywords as PRESENT (already in resume), IMPLIED (evidence-backed but terms missing; weave into resume summary/experience/skills), or MISSING (no evidence; DO NOT add to resume).
 3. Section-specific rewriting:
    - Summary: Max 4 sentences, JD-tailored, no target company name, no buzzwords.
    - Skills: Retain all existing skills. Implied keywords may be added to Skills ONLY if there is clear, concrete supporting evidence in the resume experience/projects body.
    - Experience & Projects: Preserve all jobs, projects, exact dates, and titles (no merging/deletion). Reframe bullet language with strong action verbs. Quantify only if original resume supports it. NEVER invent metrics or import JD scale. Max 1-2 lines per bullet, no em-dashes, max 3 uses of any keyword. Tech array must only contain tools present in the original resume for that role.
    - Education/Certifications: Reproduce exactly.
 4. Format: Times New Roman, justified, no columns/tables, single-line contact block.
-5. Populate Gap Analysis: Calculate matchScore, strongMatches, gaps, dealbreakers, recommendations (following <recommendations_guidelines>), keywordsAdded, missingKeywords, summaryChanges, extractedCompanyName.
+5. Populate Gap Analysis: Calculate matchScore, strongMatches, dealbreakers, recommendations (following <recommendations_guidelines>), keywordsAdded, summaryChanges, extractedCompanyName.
 6. Cover Letter: Plain text subject and body (3-4 paragraphs, no salutations, highlights relevant personal/GitHub projects).
 </steps>
 
@@ -75,7 +75,6 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
       "dealbreakersDeducted": integer (>=0)
     },
     "strongMatches": ["keyword"],
-    "gaps": ["keyword"],
     "dealbreakers": [
       { "id": "db-1", "text": "No Kubernetes experience" }
     ],
@@ -91,14 +90,6 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
       }
     ],
     "keywordsAdded": ["keyword (Section)"],
-    "missingKeywords": [
-      {
-        "id": "kw-kubernetes",
-        "keyword": "Kubernetes",
-        "suggestedSection": "Core Competencies",
-        "suggestedBullet": "Orchestrated containerised workloads using Kubernetes"
-      }
-    ],
     "summaryChanges": "one sentence summary of changes",
     "extractedCompanyName": "company name or null"
   },

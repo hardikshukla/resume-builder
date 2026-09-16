@@ -64,13 +64,6 @@ const RecommendationSchema = z.object({
   resolvesDealbreakers: z.array(z.string()).default([]),
 });
 
-const MissingKeywordSchema = z.object({
-  id:               z.string(),
-  keyword:          z.string(),
-  suggestedSection: z.string(),
-  suggestedBullet:  z.string(),
-});
-
 // ── Shared Resume Schema ─────────────────────────────────────────────────────
 
 const ResumeSchema = z.object({
@@ -123,17 +116,17 @@ export const JDExtractionResultSchema = z.object({
 });
 
 // ── Top-level output ─────────────────────────────────────────────────────────
+// z.object strips unknown keys, so a response that still carries fields this
+// app no longer asks for (e.g. `gaps`, `missingKeywords`) validates cleanly.
 
 export const ResumeBuilderOutputSchema = z.object({
   gapAnalysis: z.object({
     matchScore:      z.number().int().min(0).max(100),
     scoreBreakdown:  ScoreBreakdownSchema.optional(),
     strongMatches:   z.array(z.string()),
-    gaps:            z.array(z.string()),
     dealbreakers:    z.array(DealbreakerSchema),
     recommendations: z.array(RecommendationSchema),
     keywordsAdded:   z.array(z.string()),
-    missingKeywords: z.array(MissingKeywordSchema),
     summaryChanges:  z.string(),
     extractedCompanyName: z.string().nullable().optional(),
   }),

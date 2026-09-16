@@ -12,11 +12,9 @@ import { ResumeBuilderOutputSchema, RefineOutputSchema } from '../lib/llm/schema
 const minimalGapAnalysis = {
   matchScore: 75,
   strongMatches: ['Python', 'AWS'],
-  gaps: ['Kubernetes'],
   dealbreakers: [],
   recommendations: [],
   keywordsAdded: ['Kubernetes'],
-  missingKeywords: [],
   summaryChanges: 'Added Kubernetes.',
 };
 
@@ -62,6 +60,23 @@ describe('ResumeBuilderOutputSchema', () => {
       resume: minimalResume,
     });
     expect(result.success).toBe(true);
+  });
+
+  it('accepts and strips fields the app no longer requests', () => {
+    // A cached prompt or older model output may still include these.
+    const result = ResumeBuilderOutputSchema.safeParse({
+      gapAnalysis: {
+        ...minimalGapAnalysis,
+        gaps: ['Kubernetes'],
+        missingKeywords: [{ id: 'kw-1', keyword: 'Terraform', suggestedSection: 'Skills', suggestedBullet: 'Used Terraform' }],
+      },
+      resume: minimalResume,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.gapAnalysis).not.toHaveProperty('gaps');
+      expect(result.data.gapAnalysis).not.toHaveProperty('missingKeywords');
+    }
   });
 
   it('fails when gapAnalysis is missing', () => {
