@@ -11,6 +11,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { ResumeBuilderOutput } from '@/types';
 import { renderDiffText } from '@/lib/utils/highlight';
+import { contactParts } from '@/lib/utils/contact';
 import { capitalizeName } from '@/lib/utils/string';
 import { EditableField } from './EditableField';
 
@@ -123,7 +124,8 @@ export default function CoverLetterPreview({
               {output.resume.name || 'Candidate Name'}
             </Typography>
             <Typography sx={{ ...BODY_TEXT_SX, mt: 0.5 }}>
-              {[output.resume.contact?.email, output.resume.contact?.phone, output.resume.contact?.linkedin, output.resume.contact?.github, output.resume.contact?.location].filter(Boolean).join('  |  ')}
+              {/* Same shortened links as the Word export, so preview and download match. */}
+              {contactParts(output.resume.contact, { shortenUrls: true }).join('  |  ')}
             </Typography>
             <Divider sx={{ mt: 1, borderColor: '#000', borderBottomWidth: 1.5 }} />
           </Box>

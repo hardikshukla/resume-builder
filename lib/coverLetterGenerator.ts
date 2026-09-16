@@ -1,126 +1,15 @@
+import { AlignmentType, Document, Packer, Paragraph, TextRun } from 'docx';
 import { ResumeData, CoverLetterData } from '@/types';
 import { capitalizeName } from '@/lib/utils/string';
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-  BorderStyle,
-} from 'docx';
+import { BODY_RUN, LETTER_PAGE, buildCandidateHeader, buildTextRunsWithBolding } from '@/lib/docx/shared';
 
-/**
- * Strips protocol, www, and trailing slash from a URL so it displays cleanly.
- */
-function shortenUrl(url: string): string {
-  return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-}
-
-/**
- * Shared candidate header function.
- */
-function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): Paragraph[] {
-  const children: Paragraph[] = [];
-
-  const formattedName = name ? name.toUpperCase() : 'FIRST LAST';
-
-  // Name (Bold, 14pt, centered)
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 60 },
-      children: [
-        new TextRun({
-          text: formattedName,
-          font: 'Times New Roman',
-          size: 28, // 14pt (half-points)
-          bold: true,
-        }),
-      ],
-    })
-  );
-
-  // Contact line (11pt, centered, pipe-separated)
-  const contactParts: string[] = [];
-  if (contact?.email) contactParts.push(contact.email);
-  if (contact?.phone) contactParts.push(contact.phone);
-  if (contact?.linkedin) contactParts.push(shortenUrl(contact.linkedin));
-  if (contact?.github) contactParts.push(shortenUrl(contact.github));
-  if (contact?.location) contactParts.push(contact.location);
-
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 120 },
-      children: [
-        new TextRun({
-          text: contactParts.join('  |  '),
-          font: 'Times New Roman',
-          size: 22, // 11pt
-        }),
-      ],
-    })
-  );
-
-  // Thin horizontal rule
-  children.push(
-    new Paragraph({
-      border: {
-        bottom: {
-          style: BorderStyle.SINGLE,
-          size: 6,
-          color: 'A0A0A0',
-          space: 1,
-        },
-      },
-      spacing: { before: 0, after: 200 },
-      children: [],
-    })
-  );
-
-  return children;
-}
-
-/**
- * Splits `text` into TextRuns, bolding any whole-word match of `keywords`.
- * `baseOptions` (font, size, italics) apply to every run.
- */
-function buildTextRunsWithBolding(
-  text: string,
-  keywords: string[] = [],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  baseOptions: any = {}
-): TextRun[] {
-  if (!text) return [];
-  if (keywords.length === 0) {
-    return [new TextRun({ ...baseOptions, text })];
-  }
-
-  // Construct regex pattern using safe word boundary matching
-  const patterns = keywords.map(kw => {
-    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const startsWithWord = /^\w/.test(kw);
-    const endsWithWord = /\w$/.test(kw);
-    let pattern = escaped;
-    if (startsWithWord) pattern = '(?<!\\w)' + pattern;
-    if (endsWithWord) pattern = pattern + '(?!\\w)';
-    return pattern;
+/** A left-aligned paragraph holding a single run. */
+function leftParagraph(text: string, spacing: { before: number; after: number }, bold?: boolean): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.LEFT,
+    spacing,
+    children: [new TextRun({ text, ...BODY_RUN, bold })],
   });
-
-  const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
-  const parts = text.split(regex);
-  const lowercaseKeywords = new Set(keywords.map(k => k.toLowerCase()));
-
-  return parts
-    .filter(part => part !== '')
-    .map(part => {
-      const isKeyword = lowercaseKeywords.has(part.toLowerCase());
-      return new TextRun({
-        ...baseOptions,
-        text: part,
-        bold: isKeyword ? true : baseOptions.bold,
-      });
-    });
 }
 
 /**
@@ -135,106 +24,31 @@ export async function generateCoverLetterDOCX(
   resume: ResumeData,
   keywords: string[] = []
 ): Promise<Blob> {
-  const children: Paragraph[] = [];
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  // Header
-  children.push(...buildCandidateHeader(resume.name, resume.contact));
-
-  // Date
-  const dateStr = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      spacing: { before: 120, after: 120 },
-      children: [
-        new TextRun({ text: dateStr, font: 'Times New Roman', size: 22 }),
-      ],
-    })
-  );
-
-  // Subject line
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      spacing: { before: 120, after: 200 },
-      children: [
-        new TextRun({
-          text: `Subject: ${coverLetter.subject}`,
-          font: 'Times New Roman',
-          size: 22,
-          bold: true,
-        }),
-      ],
-    })
-  );
-
-  // Greeting
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
+  // Each blank-line-separated block of the body becomes a justified paragraph.
+  const bodyParagraphs = coverLetter.body
+    .split(/\n+/)
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .map((text) => new Paragraph({
+      alignment: AlignmentType.BOTH,
       spacing: { before: 0, after: 120 },
-      children: [
-        new TextRun({ text: 'Dear Hiring Manager,', font: 'Times New Roman', size: 22 }),
-      ],
-    })
-  );
+      children: buildTextRunsWithBolding(text, keywords, BODY_RUN),
+    }));
 
-  // Body paragraphs
-  for (const paraText of coverLetter.body.split(/\n+/)) {
-    const trimmed = paraText.trim();
-    if (!trimmed) continue;
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.BOTH,
-        spacing: { before: 0, after: 120 },
-        children: buildTextRunsWithBolding(trimmed, keywords, { font: 'Times New Roman', size: 22 }),
-      })
-    );
-  }
-
-  // Sign off
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      spacing: { before: 200, after: 40 },
-      children: [
-        new TextRun({ text: 'Sincerely,', font: 'Times New Roman', size: 22 }),
-      ],
-    })
-  );
-
-  children.push(
-    new Paragraph({
-      alignment: AlignmentType.LEFT,
-      spacing: { before: 200, after: 0 },
-      children: [
-        new TextRun({
-          text: resume.name ? capitalizeName(resume.name) : 'Candidate Name',
-          font: 'Times New Roman',
-          size: 22,
-          bold: true,
-        }),
-      ],
-    })
-  );
+  const children: Paragraph[] = [
+    ...buildCandidateHeader(resume.name, resume.contact),
+    leftParagraph(today, { before: 120, after: 120 }),
+    leftParagraph(`Subject: ${coverLetter.subject}`, { before: 120, after: 200 }, true),
+    leftParagraph('Dear Hiring Manager,', { before: 0, after: 120 }),
+    ...bodyParagraphs,
+    leftParagraph('Sincerely,', { before: 200, after: 40 }),
+    leftParagraph(resume.name ? capitalizeName(resume.name) : 'Candidate Name', { before: 200, after: 0 }, true),
+  ];
 
   const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            size: { width: 12240, height: 15840 }, // US Letter
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1-inch margins
-          },
-        },
-        children,
-      },
-    ],
+    sections: [{ properties: { page: LETTER_PAGE }, children }],
   });
 
   return await Packer.toBlob(doc);

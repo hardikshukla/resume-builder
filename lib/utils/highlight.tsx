@@ -1,11 +1,16 @@
 import React from 'react';
+import { createKeywordMatcher } from '@/lib/utils/keywords';
+
+/** Inline styles for words added or removed by a refinement. */
+const INSERTED_STYLE: React.CSSProperties = { textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' };
+const DELETED_STYLE: React.CSSProperties = { background: 'rgba(239,68,68,0.2)', color: '#f87171', textDecoration: 'line-through' };
 
 // ── Simple word-level diff for highlights ────────────────────────────────────
 export function diffWords(original: string, current: string): React.ReactNode[] {
   if (original === current) return [current];
   if (!original) {
     return [
-      <ins key={0} style={{ textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>
+      <ins key={0} style={INSERTED_STYLE}>
         {current}
       </ins>
     ];
@@ -26,10 +31,10 @@ export function diffWords(original: string, current: string): React.ReactNode[] 
       result.unshift(<span key={k++}>{oWords[i - 1]}</span>);
       i--; j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift(<ins key={k++} style={{ textDecoration: 'none', background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>{cWords[j - 1]}</ins>);
+      result.unshift(<ins key={k++} style={INSERTED_STYLE}>{cWords[j - 1]}</ins>);
       j--;
     } else {
-      result.unshift(<del key={k++} style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', textDecoration: 'line-through' }}>{oWords[i - 1]}</del>);
+      result.unshift(<del key={k++} style={DELETED_STYLE}>{oWords[i - 1]}</del>);
       i--;
     }
   }
@@ -41,25 +46,11 @@ export function boldKeywords(node: React.ReactNode, keywords: string[]): React.R
   if (!node || keywords.length === 0) return node;
 
   if (typeof node === 'string') {
-    const patterns = keywords.map(kw => {
-      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const startsWithWord = /^\w/.test(kw);
-      const endsWithWord = /\w$/.test(kw);
-      let pattern = escaped;
-      if (startsWithWord) pattern = '(?<!\\w)' + pattern;
-      if (endsWithWord) pattern = pattern + '(?!\\w)';
-      return pattern;
-    });
-
-    const regex = new RegExp(`(${patterns.join('|')})`, 'gi');
-    const parts = node.split(regex);
-
-    return parts.map((part, index) => {
-      const isMatch = keywords.some(
-        kw => part.toLowerCase() === kw.toLowerCase()
-      );
-      return isMatch ? <strong key={index} style={{ fontWeight: 700 }}>{part}</strong> : part;
-    });
+    // Same whole-word matching as the Word exports (lib/docx/shared.ts).
+    const matcher = createKeywordMatcher(keywords);
+    return matcher.split(node).map((part, index) =>
+      matcher.isKeyword(part) ? <strong key={index} style={{ fontWeight: 700 }}>{part}</strong> : part
+    );
   }
 
   if (React.isValidElement(node)) {
