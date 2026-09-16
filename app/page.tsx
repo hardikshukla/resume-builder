@@ -31,9 +31,12 @@ import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
-import { toDropboxErrorMessage, toDropboxUploadErrorMessage } from '@/lib/utils/dropboxError';
+import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
+import { dropboxExportPath, uploadToDropbox } from '@/lib/dropbox/upload';
+import { downloadBlob } from '@/lib/utils/download';
+import { buildBoldingKeywords } from '@/lib/utils/boldingKeywords';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY, INACTIVITY_TIMEOUT_MINUTES } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -116,15 +119,8 @@ export default function Home() {
 
   const handleStepChange = (step: number) => {
     setActiveStep(step);
-    if (step === 0 || step === 1) {
-      if (isMobile) {
-        setDrawerOpen(true);
-      }
-    } else {
-      if (isMobile) {
-        setDrawerOpen(false);
-      }
-    }
+    // On small screens the input steps open the parameters drawer; later steps close it.
+    if (isMobile) setDrawerOpen(step <= 1);
   };
 
   const missingAnthropicKey = !hasServerKey && !anthropicKey;
@@ -327,10 +323,10 @@ export default function Home() {
     void verifyDropboxToken(token);
   };
 
-  // Inactivity session lock (40 min). The expiry overlay promises that keys and
+  // Inactivity session lock. The expiry overlay promises that keys and
   // data are wiped, so this clears the saved resume as well as session storage
   // (keys, cached generations). The resume is otherwise kept across tab closes.
-  useInactivityTimeout(40, () => {
+  useInactivityTimeout(INACTIVITY_TIMEOUT_MINUTES, () => {
     sessionStorage.clear();
     localStorage.removeItem(RESUME_STORAGE_KEY);
     setIsSessionExpired(true);
@@ -342,63 +338,11 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', clearOnUnload);
   }, []);
 
-  // Get all unique keywords for bolding (strongMatches, clean version of keywordsAdded, JD keywords, and applied recommendations)
-  const boldingKeywords = useMemo(() => {
-    if (!output) return [];
-    const keywords = new Set<string>();
-    
-    // 1. Initial strong matches
-    output.gapAnalysis.strongMatches.forEach(kw => {
-      if (kw) keywords.add(kw.trim());
-    });
-    
-    // 2. Keywords added during initial tailoring
-    output.gapAnalysis.keywordsAdded.forEach(kw => {
-      if (kw) {
-        const clean = kw.replace(/ \([^)]+\)$/, '').trim();
-        if (clean) keywords.add(clean);
-      }
-    });
-
-    // 3. All JD keywords (must-have and nice-to-have skills)
-    if (jdKeywords) {
-      jdKeywords.mustHaveSkills.forEach(kw => {
-        if (kw) keywords.add(kw.trim());
-      });
-      jdKeywords.niceToHaveSkills.forEach(kw => {
-        if (kw) keywords.add(kw.trim());
-      });
-    }
-
-    // 4. Keywords from applied recommendations
-    if (output.gapAnalysis.recommendations) {
-      output.gapAnalysis.recommendations.forEach(rec => {
-        if (appliedRecs.has(rec.id)) {
-          // Extract capitalized words from the recommendation claim (excluding common verbs/prepositions/nouns)
-          const words = rec.claim.split(/[\s,.:;()'"?]+/);
-          words.forEach(w => {
-            const trimmed = w.trim();
-            if (trimmed && /^[A-Z]/.test(trimmed)) {
-              const lower = trimmed.toLowerCase();
-              const exclusions = new Set([
-                'add', 'consider', 'under', 'skills', 'experience', 'summary', 
-                'projects', 'mention', 'use', 'include', 'integrate', 'create', 
-                'update', 'modify', 'show', 'display', 'highlight', 'demonstrate', 
-                'provide', 'list', 'write', 'in', 'to', 'the', 'as', 'for', 'with',
-                'and', 'or', 'a', 'an', 'at', 'on', 'by'
-              ]);
-              if (!exclusions.has(lower)) {
-                keywords.add(trimmed);
-              }
-            }
-          });
-        }
-      });
-    }
-
-    // Sort descending by length so longer phrases match before shorter substrings
-    return Array.from(keywords).sort((a, b) => b.length - a.length);
-  }, [output, jdKeywords, appliedRecs]);
+  // Terms bolded in the preview and both Word exports.
+  const boldingKeywords = useMemo(
+    () => buildBoldingKeywords(output, jdKeywords, appliedRecs),
+    [output, jdKeywords, appliedRecs]
+  );
 
   const getCompanyStr = () =>
     (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
@@ -410,22 +354,18 @@ export default function Home() {
       type
     );
 
+  /** Builds the Word file for one export, bolding the same keywords as the preview. */
+  const buildDocx = async (type: 'resume' | 'coverLetter'): Promise<Blob> => {
+    if (!output) throw new Error('Nothing to export yet');
+    if (type === 'resume') return generateResumeDOCX(output.resume, boldingKeywords);
+    if (!output.coverLetter) throw new Error('No cover letter available');
+    return generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
+  };
+
   const handleDownload = async (type: 'resume' | 'coverLetter') => {
     if (!output) return;
     try {
-      let blob: Blob;
-      const filename = getFilename(type);
-      if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume, boldingKeywords);
-      } else {
-        if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(await buildDocx(type), getFilename(type));
       setActiveStep(3);
     } catch (err) {
       setFatalError(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -453,30 +393,8 @@ export default function Home() {
     if (!output || !dropboxToken) return;
     setDropboxSaveStatus(null);
     try {
-      const co = getCompanyStr();
-      const filename = getFilename(type);
-      let blob: Blob;
-      if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume, boldingKeywords);
-      } else {
-        if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
-      }
-      const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
-      const path = `/resumeBuilder/${folderName}/${filename}`;
-      const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
-        method: 'POST',
-        headers: {
-          // Must match what verifyDropboxToken checked, or a token that passed
-          // the check can still be rejected here.
-          Authorization: `Bearer ${dropboxToken.trim()}`,
-          'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', autorename: true, mute: false }),
-          'Content-Type': 'application/octet-stream',
-        },
-        body: blob,
-      });
-      // Dropbox answers with JSON jargon; translate it before it reaches the banner.
-      if (!res.ok) throw new Error(toDropboxUploadErrorMessage(await res.text()));
+      const path = dropboxExportPath(getCompanyStr(), getFilename(type));
+      await uploadToDropbox(dropboxToken, path, await buildDocx(type));
       setDropboxSaveStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
       setActiveStep(3);
     } catch (err) {
@@ -942,7 +860,7 @@ export default function Home() {
             <LockIcon color="error" sx={{ fontSize: 40, mx: 'auto' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Session Expired</Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              For your security, your session closed after 40 minutes of inactivity. API keys and data have been wiped.
+              {`For your security, your session closed after ${INACTIVITY_TIMEOUT_MINUTES} minutes of inactivity. API keys and data have been wiped.`}
             </Typography>
             <Button variant="contained" fullWidth onClick={() => window.location.reload()} sx={{ mt: 1 }}>
               Start New Session
@@ -951,50 +869,6 @@ export default function Home() {
         </Overlay>
       )}
 
-      {/* Print CSS */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page { size: letter; margin: 0.5in; }
-          body > * { visibility: hidden !important; }
-          #resume-print-area, #resume-print-area * { visibility: visible !important; }
-          #resume-print-area {
-            position: absolute !important; left: 0 !important; top: 0 !important;
-            width: 100% !important; max-width: 100% !important;
-            box-shadow: none !important; border: none !important;
-            padding: 0 !important; margin: 0 !important;
-            background: white !important; color: black !important;
-          }
-          ins { background: none !important; color: black !important; text-decoration: none !important; }
-          del { display: none !important; }
-          .editable-field-container--editing,
-          .editable-field,
-          .editable-field--edited {
-            border: none !important;
-            border-left: none !important;
-            border-bottom: none !important;
-            padding: 0 !important;
-            padding-left: 0 !important;
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            outline: none !important;
-            cursor: default !important;
-          }
-          .editable-field::after {
-            display: none !important;
-          }
-          .editable-field-container--editing input,
-          .editable-field-container--editing textarea {
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-            background: transparent !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .skills-row { page-break-inside: avoid; display: grid; grid-template-columns: 154px 1fr; }
-        }
-      ` }} />
     </Box>
   );
 }

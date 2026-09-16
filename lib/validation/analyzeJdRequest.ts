@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { MAX_JD_CHARS } from '@/lib/constants';
-
-const OptionalTextSchema = z.string().trim().max(500).optional();
+import { OptionalTextSchema, ValidationResult, firstIssueMessage } from '@/lib/validation/common';
 
 const AnalyzeJdSchema = z.object({
   jobDescription: z.string().min(1, 'Job description is required.').max(
@@ -13,22 +12,10 @@ const AnalyzeJdSchema = z.object({
   model: OptionalTextSchema,
 });
 
-export interface AnalyzeJdRequest {
-  jobDescription: string;
-  companyName?: string;
-  anthropicKey?: string;
-  model?: string;
-}
+/** A validated /api/analyze-jd request body. */
+export type AnalyzeJdRequest = z.infer<typeof AnalyzeJdSchema>;
 
-type ValidationResult =
-  | { success: true; data: AnalyzeJdRequest }
-  | { success: false; error: string };
-
-function firstIssueMessage(error: z.ZodError): string {
-  return error.issues[0]?.message ?? 'Invalid request payload.';
-}
-
-export function validateAnalyzeJdRequest(body: unknown): ValidationResult {
+export function validateAnalyzeJdRequest(body: unknown): ValidationResult<AnalyzeJdRequest> {
   const result = AnalyzeJdSchema.safeParse(body);
   if (!result.success) {
     return { success: false, error: firstIssueMessage(result.error) };

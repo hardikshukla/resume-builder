@@ -78,6 +78,9 @@ export const MODEL_FALLBACKS: Record<string, string> = {
  */
 export const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps';
 
+/** Minutes without mouse/keyboard activity before the session locks and wipes keys and data. */
+export const INACTIVITY_TIMEOUT_MINUTES = 40;
+
 /**
  * localStorage key for the pasted resume. It is kept across tab closes for
  * convenience, and wiped when the inactivity lock fires.

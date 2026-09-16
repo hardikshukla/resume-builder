@@ -59,3 +59,51 @@ body { min-height: 100vh; }
   border-radius: 2px;
 }
 
+
+/* ─── Print / PDF (the "Print / PDF" button on the Resume tab) ───────────── */
+/* Only the resume sheet is printed, as plain black text on white, with the
+   editing affordances above stripped out. Rules use !important because they
+   must beat the MUI (Emotion) styles on the same elements. */
+@media print {
+  @page { size: letter; margin: 0.5in; }
+  body > * { visibility: hidden !important; }
+  #resume-print-area, #resume-print-area * { visibility: visible !important; }
+  #resume-print-area {
+    position: absolute !important; left: 0 !important; top: 0 !important;
+    width: 100% !important; max-width: 100% !important;
+    box-shadow: none !important; border: none !important;
+    padding: 0 !important; margin: 0 !important;
+    background: white !important; color: black !important;
+  }
+  ins { background: none !important; color: black !important; text-decoration: none !important; }
+  del { display: none !important; }
+  .editable-field-container--editing,
+  .editable-field,
+  .editable-field--edited {
+    border: none !important;
+    border-left: none !important;
+    border-bottom: none !important;
+    padding: 0 !important;
+    padding-left: 0 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    cursor: default !important;
+  }
+  .editable-field::after {
+    display: none !important;
+  }
+  .editable-field-container--editing input,
+  .editable-field-container--editing textarea {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* Scoped under the print area so it outranks the row's Emotion class
+     whatever order the stylesheets load in. */
+  #resume-print-area .skills-row { page-break-inside: avoid; display: grid; grid-template-columns: 154px 1fr; }
+}

@@ -1,18 +1,13 @@
 import { z } from 'zod';
 import { MAX_JD_CHARS, MAX_RESUME_CHARS } from '@/lib/constants';
 import { GenerateRequest } from '@/types';
+import { JDExtractionResultSchema } from '@/lib/llm/schema';
+import { OptionalTextSchema, ValidationResult, firstIssueMessage } from '@/lib/validation/common';
 
 export const MAX_SELECTED_RECOMMENDATIONS = 10;
 export const MAX_RECOMMENDATION_TEXT_CHARS = 500;
+/** The refine payload's current output may be at most twice the resume limit, as JSON. */
 export const MAX_CURRENT_OUTPUT_JSON_CHARS = MAX_RESUME_CHARS * 2;
-
-type ValidationResult =
-  | { success: true; data: GenerateRequest }
-  | { success: false; error: string };
-
-import { JDExtractionResultSchema } from '@/lib/llm/schema';
-
-const OptionalTextSchema = z.string().trim().max(500).optional();
 
 const RecommendationSchema = z.object({
   id: z.string().trim().min(1).max(100),
@@ -60,11 +55,7 @@ const RefineSchema = z.object({
   jdKeywords: JDExtractionResultSchema.optional(),
 });
 
-function firstIssueMessage(error: z.ZodError): string {
-  return error.issues[0]?.message ?? 'Invalid request payload.';
-}
-
-export function validateGenerateRequest(body: unknown): ValidationResult {
+export function validateGenerateRequest(body: unknown): ValidationResult<GenerateRequest> {
   const mode = z.object({ mode: z.enum(['generate', 'refine']) }).safeParse(body);
   if (!mode.success) {
     return { success: false, error: 'Invalid mode specified.' };
@@ -83,15 +74,15 @@ export function validateGenerateRequest(body: unknown): ValidationResult {
     return { success: false, error: firstIssueMessage(result.error) };
   }
 
-  {
-    const currentOutputSize = JSON.stringify(result.data.currentOutput).length;
-    if (currentOutputSize > MAX_CURRENT_OUTPUT_JSON_CHARS) {
-      return {
-        success: false,
-        error: 'Current resume output is too large to refine. Try regenerating with a shorter resume.',
-      };
-    }
+  const currentOutputSize = JSON.stringify(result.data.currentOutput).length;
+  if (currentOutputSize > MAX_CURRENT_OUTPUT_JSON_CHARS) {
+    return {
+      success: false,
+      error: 'Current resume output is too large to refine. Try regenerating with a shorter resume.',
+    };
   }
 
+  // currentOutput is only shape-checked here (passthrough objects), so it is
+  // cast to the typed output; the refine prompt treats it as opaque JSON.
   return { success: true, data: result.data as unknown as GenerateRequest };
 }

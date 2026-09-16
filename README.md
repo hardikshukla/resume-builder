@@ -316,79 +316,86 @@ resume-builder/
 ├── app/
 │   ├── page.tsx                        # Single-page UI orchestrator (stepper, tabs, drawer)
 │   ├── layout.tsx                      # Root layout + SEO metadata
-│   ├── globals.css                     # Design tokens, EditableField styles, animations
+│   ├── globals.css                     # Reset, scrollbar, editable-field and print styles
 │   ├── global-error.tsx                # Sentry global error boundary
 │   └── api/
 │       ├── generate/route.ts           # Unified generate + refine LLM endpoint
 │       ├── analyze-jd/route.ts         # JD keyword extraction endpoint
 │       ├── parse-resume/route.ts       # DOCX/TXT text extraction (mammoth)
-│       ├── models/route.ts             # List available Claude models
+│       ├── models/route.ts             # List Claude models (also validates the key)
 │       ├── config/route.ts             # Server configuration endpoint
 │       └── dropbox/
-│           └── verify/route.ts         # Validate Dropbox PAT
+│           └── verify/route.ts         # Validate a Dropbox access token
 │
 ├── components/
 │   ├── WorkflowStepper.tsx             # 4-step guided stepper with lock and loading pulse
 │   ├── ContextPill.tsx                 # Chip bar: model · ATS score · edit count · applied recs
 │   ├── EditableField.tsx               # Click-to-edit wrapper with keyboard/a11y support
 │   ├── GapAnalysisPanel.tsx            # Gap analysis, recommendations, refine controls
-│   ├── ResumePreview.tsx               # A4 resume preview with inline editing + diff highlights
+│   ├── ResumePreview.tsx               # US Letter resume preview with inline editing + diff highlights
 │   ├── CoverLetterPreview.tsx          # Cover letter preview with inline editing
-│   ├── RecommendationCard.tsx          # Individual recommendation card component
+│   ├── RecommendationCard.tsx          # Individual recommendation card
 │   ├── ErrorBanner.tsx                 # Dismissable error banner with rate-limit countdown
-│   └── ThemeRegistry.tsx               # MUI theme + Emotion cache registry
+│   ├── SecretField.tsx                 # Masked key/token field with show/hide and check status
+│   ├── FieldStatusAdornment.tsx        # Inline ✓ / ✗ / spinner for background credential checks
+│   ├── CharCount.tsx                   # "n / limit chars" counter
+│   ├── DropboxSetupDialog.tsx          # "Connect Dropbox" token walkthrough
+│   ├── BackNavigationDialog.tsx        # Guard against losing work on browser Back
+│   ├── ThemeRegistry.tsx               # MUI theme + Emotion cache registry
+│   ├── preview/PreviewParts.tsx        # Shared preview toolbar, alerts and page styles
+│   └── ui/
+│       ├── Overlay.tsx                 # Full-screen backdrop used by the dialogs
+│       └── tokens.ts                   # Colours outside the MUI palette, brand gradient
 │
 ├── hooks/
-│   ├── useGenerate.ts                  # Core orchestration: generate, refine, refresh, revert,
-│   │                                   #   manualEdits, orphanedEdits, fuzzy merge, isGenerationError
+│   ├── useGenerate.ts                  # Generation state: generate, refine, refresh, revert, edits
 │   ├── useApiKey.ts                    # API key + Dropbox token state (sessionStorage)
-│   └── useInactivityTimeout.ts         # Auto-clears sessionStorage after 40 min
+│   ├── useInactivityTimeout.ts         # Locks the session after inactivity
+│   └── useBackButtonPrevention.ts      # Intercepts browser Back while a result is on screen
 │
 ├── lib/
-│   ├── prompt.ts                       # SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, buildJDExtractionPrompt
-│   ├── jdParser.ts                     # JD keyword extraction helpers
-│   ├── docxGenerator.ts                # Resume .docx generator (browser-side, keyword bolding)
+│   ├── prompt.ts                       # SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, JD_EXTRACTION_SYSTEM_PROMPT
+│   ├── jdParser.ts                     # Regex heuristics for seniority and company name
+│   ├── constants.ts                    # Limits, model ids, score rules, storage keys
+│   ├── docxGenerator.ts                # Resume .docx generator (browser-side)
 │   ├── coverLetterGenerator.ts         # Cover letter .docx generator (browser-side)
-│   ├── constants.ts                    # MAX_RESUME_CHARS, MAX_JD_CHARS, ANTHROPIC_DEFAULT_MODEL
+│   ├── docx/shared.ts                  # Shared .docx header, fonts, page setup, keyword bolding
+│   ├── api/routeErrors.ts              # Route error responses + Sentry reporting policy
+│   ├── cache/generationCache.ts        # sessionStorage LRU cache of generations and JD analyses
+│   ├── dropbox/upload.ts               # Browser-side Dropbox upload and export path
+│   ├── sentry/scrubEvent.ts            # Sentry beforeSend: redacts keys, tokens, resume, JD
 │   ├── llm/
-│   │   ├── index.ts                    # LLM router (Anthropic)
-│   │   ├── anthropic.ts                # Claude API handler with retry back-off + prompt caching
+│   │   ├── index.ts                    # runLLM: resolves the key and calls Anthropic
+│   │   ├── anthropic.ts                # Claude API call: retries, model fallback, prompt caching
 │   │   └── schema.ts                   # Zod schemas for LLM output validation
 │   ├── validation/
+│   │   ├── common.ts                   # Shared validator helpers
 │   │   ├── generateRequest.ts          # Zod validation for /api/generate request body
 │   │   ├── analyzeJdRequest.ts         # Zod validation for /api/analyze-jd request body
 │   │   └── hallucinationGuard.ts       # Post-generation hallucination detection
 │   └── utils/
-│       ├── path.ts                     # getAtPath, setAtPath, levenshtein (for fuzzy merge)
-│       ├── highlight.tsx               # renderDiffText, boldKeywords (word-level diffs)
+│       ├── path.ts                     # getAtPath, setAtPath, levenshtein
+│       ├── manualEdits.ts              # Apply inline edits and carry them across a refine
+│       ├── highlight.tsx               # Word-level diffs and keyword bolding in the preview
+│       ├── keywords.ts                 # Whole-word keyword matcher (preview + exports)
+│       ├── boldingKeywords.ts          # Which terms get bolded
+│       ├── contact.ts                  # Contact line (preview, exports, plain text)
+│       ├── download.ts                 # Save a Blob as a file in the browser
+│       ├── dropboxError.ts             # Plain-language Dropbox error messages
+│       ├── keyCheckError.ts            # Plain-language API key check messages
 │       └── string.ts                   # buildDownloadFilename, capitalizeName, resumeDataToText
 │
 ├── types/
-│   ├── index.ts                        # All shared TypeScript interfaces and types
-│   └── error.ts                        # ApiErrorResponse, toApiErrorResponse
+│   ├── index.ts                        # Shared TypeScript interfaces and types
+│   └── error.ts                        # ApiErrorResponse, error classification and status codes
 │
-├── middleware.ts                       # Sliding-window rate limiting per IP
-├── instrumentation.ts                  # Sentry server-side instrumentation
+├── middleware.ts                       # Sliding-window rate limiting per IP and route
+├── instrumentation.ts                  # Loads the server/edge Sentry configs
+├── instrumentation-client.ts           # Browser Sentry config
+├── sentry.server.config.ts             # Server Sentry config
+├── sentry.edge.config.ts               # Edge Sentry config
 │
-└── __tests__/
-    ├── EditableField.test.tsx          # Inline edit: click, Enter, Escape, blur
-    ├── prompt.test.ts                  # System prompt rules, JD extraction prompt
-    ├── schema.test.ts                  # Zod schema validation (valid/invalid payloads)
-    ├── useGenerate.test.ts             # Hook: initial state, setJD, generate, revert, errors
-    ├── useGenerate.manualEdit.test.ts  # Hook: inline edits, fuzzy merge, orphaned edits
-    ├── hallucinationGuard.test.ts      # Hallucination detection logic
-    ├── path.test.ts                    # getAtPath, setAtPath, levenshtein distance
-    ├── docx.test.ts                    # DOCX generators produce valid ZIP blobs > 5 KB
-    ├── filename.test.ts                # Download filename formatting and path safety
-    ├── timeout.test.ts                 # Inactivity timeout logic
-    ├── sentry.test.ts                  # Sentry scrubber redacts keys and resume data
-    ├── generateValidation.test.ts      # /api/generate request validation edge cases
-    ├── page.test.tsx                   # Smoke test: page renders without crash
-    └── integration/
-        ├── generate.test.ts            # /api/generate route handler (mocked LLM)
-        ├── analyzeJd.test.ts           # /api/analyze-jd route handler (mocked LLM)
-        ├── parseResume.test.ts         # /api/parse-resume route handler
-        └── middleware.test.ts          # Rate-limit middleware: 429, Retry-After header
+└── __tests__/                          # Jest suites — see Tests below
 ```
 
 ---
@@ -485,25 +492,41 @@ npm test               # Run all tests
 npm run test:coverage  # With coverage report
 ```
 
-**18 suites · 144 tests**
+**37 suites · 294 tests**
 
 | Suite | What It Covers |
 |-------|----------------|
 | `EditableField.test.tsx` | Click-to-edit, Enter save, blur save, Escape cancel without onBlur save |
-| `useGenerate.test.ts` | Initial state, setJD/setCompany, handleGenerate success/error, handleRevert, isGenerationError flag (reset on retry, set on all 3 error paths) |
-| `useGenerate.manualEdit.test.ts` | Inline edits, multi-edit on same path, fuzzy merge, orphaned edits, skills comma split, cover letter paragraph indexing |
-| `path.test.ts` | `getAtPath`, `setAtPath`, `levenshtein` distance calculations |
-| `schema.test.ts` | Zod schema accepts valid payloads, rejects missing required fields |
-| `hallucinationGuard.test.ts` | Claim verification against source resume, flagging unsupported claims |
-| `prompt.test.ts` | System prompt rules, JD extraction prompt includes JD text and `CANDIDATE IS APPLYING TO` hint |
-| `docx.test.ts` | DOCX generators return valid ZIP blobs with PK magic bytes, > 5 KB |
-| `generateValidation.test.ts` | Request validation edge cases (missing fields, oversized inputs) |
+| `useGenerate.test.ts` | Initial state, setters, handleGenerate success/error, handleRevert, isGenerationError |
+| `useGenerate.manualEdit.test.ts` | Inline edits, repeat edits on a path, fuzzy merge, orphaned edits |
+| `useGenerate.cache.test.ts` | Real-storage cache hits, JD analysis reuse, 10-entry LRU, refine merging, refresh dedupe |
+| `manualEdits.test.ts` | Edit read/write (paragraphs, skill lists), recordEdit, mergeManualEdits tolerance |
+| `generationCache.test.ts` | SHA-256 keys, LRU touch/evict, corrupted-entry recovery |
+| `path.test.ts` | `getAtPath`, `setAtPath`, `levenshtein` |
+| `schema.test.ts` | Zod schema accepts valid payloads, rejects invalid ones, strips retired fields |
+| `schemaTypes.test.ts` | Zod schemas and `types/index.ts` stay in sync (checked by `tsc`) |
+| `hallucinationGuard.test.ts` | Claim verification against the source resume |
+| `prompt.test.ts` | System prompt rules and requested fields, JD extraction prompt |
+| `anthropic.test.ts` | Claude call against a mocked SDK: thinking blocks, refusals, model fallback, retries |
+| `routeErrors.test.ts` | Error classification (incl. rejected keys) and which errors reach Sentry |
+| `docx.test.ts` | DOCX generators return valid ZIP blobs |
+| `docxOutput.test.ts` | Golden snapshots of the XML inside both Word exports |
+| `keywordsContact.test.ts` | Keyword matcher and contact line |
+| `boldingKeywords.test.ts` | Which terms are bolded, including blank-keyword handling |
+| `generateValidation.test.ts` | Request validation edge cases |
 | `filename.test.ts` | Download filename formatting; name/company can't inject path segments |
+| `dropboxError.test.ts` | Plain-language token-check and upload error messages |
+| `dropboxUpload.test.ts` | Upload request shape, export path, readable failures |
+| `dropboxLink.test.ts` | App Console link stays account-neutral |
+| `keyCheckError.test.ts` | Rejected vs unreachable API key messages |
+| `appVersion.test.ts` | Header version comes from package.json |
 | `timeout.test.ts` | Inactivity session lock logic |
-| `sentry.test.ts` | Shared Sentry `beforeSend` scrubber redacts keys, tokens, resume and JD text |
-| `page.test.tsx` | Page renders without crash |
+| `sentry.test.ts` | Scrubber redacts object and string bodies; Sentry wiring and errors-only config |
+| `page.test.tsx` | Page render, Dropbox token checks, inactivity wipe and overlay |
+| `ContextPill.test.tsx`, `ErrorBanner.test.tsx`, `SecretField.test.tsx`, `PreviewParts.test.tsx`, `DropboxSetupDialog.test.tsx` | Component behaviour |
 | `integration/generate.test.ts` | `/api/generate` route handler with mocked LLM |
 | `integration/analyzeJd.test.ts` | `/api/analyze-jd` route handler with mocked LLM |
+| `integration/models.test.ts` | `/api/models` listing and key-check statuses |
 | `integration/parseResume.test.ts` | `/api/parse-resume` route handler |
 | `integration/middleware.test.ts` | Rate-limit middleware: 429, Retry-After header |
 
