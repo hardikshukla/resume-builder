@@ -6,14 +6,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import AppliedIcon from '@mui/icons-material/CheckCircle';
 
 interface ContextPillProps {
-  model: string;
+  /** Human-readable model name, resolved by the caller from the model list. */
+  modelName: string;
   matchScore: number;
   editCount: number;
   appliedRecsCount: number;
 }
 
 export const ContextPill: React.FC<ContextPillProps> = ({
-  model,
+  modelName,
   matchScore,
   editCount,
   appliedRecsCount,
@@ -44,14 +45,6 @@ export const ContextPill: React.FC<ContextPillProps> = ({
 
   const scoreColors = getScoreColor(matchScore);
 
-  const friendlyModelName = (modelId: string) => {
-    if (modelId.includes('claude-3-7-sonnet')) return 'Claude 3.7 Sonnet';
-    if (modelId.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet';
-    if (modelId.includes('claude-haiku-4-5')) return 'Claude Haiku 4.5';
-    if (modelId.includes('claude-3-5-haiku')) return 'Claude 3.5 Haiku';
-    return modelId;
-  };
-
   return (
     <Paper
       elevation={0}
@@ -73,7 +66,7 @@ export const ContextPill: React.FC<ContextPillProps> = ({
     >
       <Chip
         icon={<ModelIcon style={{ fontSize: 16 }} />}
-        label={`Model: ${friendlyModelName(model)}`}
+        label={`Model: ${modelName}`}
         size="small"
         sx={{
           background: 'rgba(103, 58, 183, 0.08)',

@@ -43,11 +43,9 @@ const minimalOutput = {
   gapAnalysis: {
     matchScore: 78,
     strongMatches: ['Python'],
-    gaps: [],
     dealbreakers: [],
     recommendations: [],
     keywordsAdded: [],
-    missingKeywords: [],
     summaryChanges: 'None.',
     extractedCompanyName: null,
   },

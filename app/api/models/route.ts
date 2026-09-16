@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toApiErrorResponse } from '@/types/error';
-import { getModelCapabilities, MODEL_FALLBACKS } from '@/lib/constants';
+import { ModelOption } from '@/types';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -54,19 +54,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       data: { id: string; display_name?: string }[];
     };
 
-    // Filter to models starting with 'claude-' and map them
-    const models = data.data
+    // The model picker only needs an id and a display name per Claude model.
+    const models: ModelOption[] = data.data
       .filter((m) => m.id.startsWith('claude-'))
-      .map((m) => {
-        const caps = getModelCapabilities(m.id);
-        const fallback = MODEL_FALLBACKS[m.id] || (m.id.includes('haiku') ? 'claude-haiku-4-5-20251001' : 'claude-3-5-sonnet-20241022');
-        return {
-          id: m.id,
-          name: m.display_name || m.id,
-          capabilities: caps,
-          fallbackModelId: fallback !== m.id ? fallback : undefined,
-        };
-      });
+      .map((m) => ({ id: m.id, name: m.display_name || m.id }));
 
     return NextResponse.json({ success: true, models });
   } catch (err) {

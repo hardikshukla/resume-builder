@@ -9,8 +9,8 @@ import {
   REFINE_SYSTEM_PROMPT,
   JD_EXTRACTION_SYSTEM_PROMPT,
 } from '../lib/prompt';
+import * as promptModule from '../lib/prompt';
 import { ResumeBuilderOutputSchema } from '../lib/llm/schema';
-import { Recommendation } from '../types';
 
 // ── SYSTEM_PROMPT ────────────────────────────────────────────────────────────
 
@@ -46,8 +46,19 @@ describe('SYSTEM_PROMPT', () => {
     expect(prompt).toMatch(/must come strictly from the original resume/i);
   });
 
-  it('references missingKeywords in the JSON schema instruction', () => {
-    expect(prompt).toContain('missingKeywords');
+  it('does not ask for gap fields the UI never shows', () => {
+    // `gaps` and `missingKeywords` were requested (and paid for) on every
+    // generation but never rendered. `gapsDetected` in <jd_keywords> is unrelated.
+    expect(prompt).not.toContain('missingKeywords');
+    expect(prompt).not.toContain('suggestedBullet');
+    expect(prompt).not.toMatch(/"gaps"\s*:/);
+    expect(prompt).not.toMatch(/\bgaps\b(?!Detected)/);
+  });
+
+  it('still asks for every gap-analysis field the UI renders', () => {
+    for (const field of ['matchScore', 'scoreBreakdown', 'strongMatches', 'dealbreakers', 'recommendations', 'keywordsAdded', 'summaryChanges', 'extractedCompanyName']) {
+      expect(prompt).toContain(field);
+    }
   });
 
   it('contains the recommendations guidelines including Career Coach style and generic filter', () => {
@@ -95,7 +106,6 @@ describe('GapAnalysis schema shape', () => {
   const validGapAnalysis = {
     matchScore:    72,
     strongMatches: ['Python', 'AWS'],
-    gaps:          ['Kubernetes'],
     dealbreakers:  [],
     recommendations: [
       {
@@ -108,14 +118,6 @@ describe('GapAnalysis schema shape', () => {
         resolvesDealbreakers: [],
       },
     ],
-    missingKeywords: [
-      {
-        id:               'kw-terraform',
-        keyword:          'Terraform',
-        suggestedSection: 'Core Competencies',
-        suggestedBullet:  'Managed infrastructure as code using Terraform',
-      },
-    ],
     keywordsAdded:  ['Kubernetes'],
     summaryChanges: 'Added Kubernetes to the experience section.',
     extractedCompanyName: 'Acme Corp',
@@ -125,19 +127,8 @@ describe('GapAnalysis schema shape', () => {
     expect(validGapAnalysis.matchScore).toBeGreaterThanOrEqual(0);
     expect(validGapAnalysis.matchScore).toBeLessThanOrEqual(100);
     expect(Array.isArray(validGapAnalysis.strongMatches)).toBe(true);
-    expect(Array.isArray(validGapAnalysis.gaps)).toBe(true);
     expect(Array.isArray(validGapAnalysis.dealbreakers)).toBe(true);
     expect(Array.isArray(validGapAnalysis.recommendations)).toBe(true);
-    expect(Array.isArray(validGapAnalysis.missingKeywords)).toBe(true);
-  });
-
-  it('has correctly shaped missingKeywords entries', () => {
-    for (const kw of validGapAnalysis.missingKeywords) {
-      expect(typeof kw.keyword).toBe('string');
-      expect(typeof kw.suggestedSection).toBe('string');
-      expect(typeof kw.suggestedBullet).toBe('string');
-      expect(kw.keyword.length).toBeGreaterThan(0);
-    }
   });
 
   it('matchScore is a number between 0 and 100', () => {
@@ -181,9 +172,8 @@ describe('JD_EXTRACTION_SYSTEM_PROMPT', () => {
   });
 
   it('does not expose the buildJDExtractionPrompt function', () => {
-    const mod = require('../lib/prompt');
-    expect(typeof mod.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
-    expect(mod.buildJDExtractionPrompt).toBeUndefined();
+    expect(typeof promptModule.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
+    expect('buildJDExtractionPrompt' in promptModule).toBe(false);
   });
 
   it('instructs the model to use the CANDIDATE IS APPLYING TO hint', () => {

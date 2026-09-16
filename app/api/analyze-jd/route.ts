@@ -4,6 +4,7 @@ import { parseJdStructure } from '@/lib/jdParser';
 import { validateAnalyzeJdRequest } from '@/lib/validation/analyzeJdRequest';
 import { toApiErrorResponse } from '@/types/error';
 import { JDExtractionResult } from '@/types';
+import { JD_EXTRACTION_MODEL } from '@/lib/constants';
 
 export const maxDuration = 60; // Claude Haiku is fast
 
@@ -53,8 +54,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // 1. Perform structural regex extraction
     const regexResult = parseJdStructure(jobDescription);
 
-    // 2. Call Claude Haiku (prefer claude-haiku-4-5-20251001 or custom model override)
-    const modelId = model || 'claude-haiku-4-5-20251001';
+    // 2. Extract keywords with the fast extraction model unless the caller picked one.
+    const modelId = model || JD_EXTRACTION_MODEL;
     const llmRaw = await callAnthropic(apiKey, 'analyze-jd', {
       jobDescription,
       companyName,

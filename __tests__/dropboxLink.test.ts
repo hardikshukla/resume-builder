@@ -17,20 +17,20 @@ describe('DROPBOX_APP_CONSOLE_URL', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('points at the Dropbox app list', () => {
-    const { DROPBOX_APP_CONSOLE_URL } = require('@/lib/constants');
+  it('points at the Dropbox app list', async () => {
+    const { DROPBOX_APP_CONSOLE_URL } = await import('@/lib/constants');
     expect(DROPBOX_APP_CONSOLE_URL).toBe('https://www.dropbox.com/developers/apps');
   });
 
-  it('is not personalised by any build-time app key', () => {
+  it('is not personalised by any build-time app key', async () => {
     process.env.NEXT_PUBLIC_DROPBOX_APP_KEY = 'abc123key';
-    const { DROPBOX_APP_CONSOLE_URL } = require('@/lib/constants');
+    const { DROPBOX_APP_CONSOLE_URL } = await import('@/lib/constants');
     expect(DROPBOX_APP_CONSOLE_URL).not.toContain('abc123key');
     expect(DROPBOX_APP_CONSOLE_URL).toBe('https://www.dropbox.com/developers/apps');
   });
 
-  it('is an https dropbox.com developers URL', () => {
-    const { DROPBOX_APP_CONSOLE_URL } = require('@/lib/constants');
+  it('is an https dropbox.com developers URL', async () => {
+    const { DROPBOX_APP_CONSOLE_URL } = await import('@/lib/constants');
     const url = new URL(DROPBOX_APP_CONSOLE_URL);
     expect(url.protocol).toBe('https:');
     expect(url.hostname).toBe('www.dropbox.com');

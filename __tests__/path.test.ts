@@ -84,7 +84,7 @@ describe('Path Utilities', () => {
     });
 
     it('creates nested structures if path does not exist', () => {
-      const empty: any = {};
+      const empty: Record<string, unknown> = {};
       const updated = setAtPath(empty, 'a.b[0].c', 'hello');
       expect(updated).toEqual({
         a: {

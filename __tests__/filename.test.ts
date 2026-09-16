@@ -1,27 +1,10 @@
 import {
-  sanitizeFilename,
-  toCamelCase,
   toPascalCase,
   buildDownloadFilename,
   capitalizeName,
 } from '../lib/utils/string';
 
 describe('Filename and Path Helpers', () => {
-  it('sanitizeFilename should remove directory traversals', () => {
-    expect(sanitizeFilename('../../../etc/passwd')).toBe('etcpasswd');
-    expect(sanitizeFilename('folder\\file.txt')).toBe('folderfile.txt');
-  });
-
-  it('sanitizeFilename should collapse spaces to underscores', () => {
-    expect(sanitizeFilename('My File Name.docx')).toBe('My_File_Name.docx');
-  });
-
-  it('toCamelCase should camelCase strings', () => {
-    expect(toCamelCase('OpenAI Inc.')).toBe('openaiInc');
-    expect(toCamelCase('google')).toBe('google');
-    expect(toCamelCase('General Motors')).toBe('generalMotors');
-  });
-
   it('toPascalCase should pascalCase strings', () => {
     expect(toPascalCase('OpenAI Inc.')).toBe('OpenaiInc');
     expect(toPascalCase('google')).toBe('Google');
@@ -51,5 +34,10 @@ describe('Filename and Path Helpers', () => {
     // Spaces, special characters, multi-word
     expect(buildDownloadFilename('John A. Smith', 'Google LLC', 'resume')).toBe('JohnASmith_GoogleLlc_Resume.docx');
     expect(buildDownloadFilename('Jane-Doe', 'Yahoo! Inc.', 'resume')).toBe('JaneDoe_YahooInc_Resume.docx');
+  });
+
+  it('buildDownloadFilename strips path separators and traversal from AI-supplied names', () => {
+    // Name and company come from model output, so they must never shape a path.
+    expect(buildDownloadFilename('../../etc/passwd', 'a\\b/c', 'resume')).toBe('EtcPasswd_ABC_Resume.docx');
   });
 });

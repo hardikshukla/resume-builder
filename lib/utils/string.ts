@@ -4,12 +4,11 @@ import { ResumeData } from '@/types';
  * string.ts — Shared string manipulation utilities.
  */
 
-export function toCamelCase(str: string): string {
-  return str.split(/[^a-zA-Z0-9]+/).filter(Boolean)
-    .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join('');
-}
-
+/**
+ * "google llc" -> "GoogleLlc". Anything that is not a letter or digit is
+ * dropped, which is also what keeps download filenames free of path
+ * separators and traversal sequences.
+ */
 export function toPascalCase(str: string): string {
   return str.split(/[^a-zA-Z0-9]+/).filter(Boolean)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
@@ -29,13 +28,6 @@ export function capitalizeName(name: string): string {
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(' ');
-}
-
-export function sanitizeFilename(raw: string): string {
-  return raw.replace(/\.\./g, '').replace(/[/\\]/g, '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1f\x7f]/g, '').replace(/[^\w\s\-().+]/g, '')
-    .replace(/\s+/g, '_').slice(0, 80) || 'document';
 }
 
 /**

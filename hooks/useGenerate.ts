@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { ResumeBuilderOutput, Recommendation, JDExtractionResult } from '@/types';
 import { ApiErrorResponse, toApiErrorResponse } from '@/types/error';
 import { resumeDataToText } from '@/lib/utils/string';
-import { ANTHROPIC_DEFAULT_MODEL } from '@/lib/constants';
+import { ANTHROPIC_DEFAULT_MODEL, RESUME_STORAGE_KEY } from '@/lib/constants';
 import { getAtPath, setAtPath, levenshtein } from '@/lib/utils/path';
 
 export type ManualEdit = {
@@ -11,7 +11,6 @@ export type ManualEdit = {
   editedValue: string;
 };
 
-const LOCAL_RESUME = 'rb_resume';
 const CACHE_KEYS_KEY = 'rb_cache_keys';
 const MAX_CACHE_SIZE = 10;
 
@@ -126,9 +125,12 @@ export function useGenerate() {
     setOutput((prev) => {
       if (!prev) return null;
       
-      let originalValue: any;
-      let resolvedOriginal: any;
-      let resolvedNewValue: any = newValue;
+      // What the field held before this edit, as stored in the output object.
+      let originalValue: unknown;
+      // The same value flattened to text, so it can be recorded on the edit.
+      let resolvedOriginal: unknown;
+      // What actually gets written back: a string, or a string[] for skill lists.
+      let resolvedNewValue: string | string[] = newValue;
       let updatedOutput = prev;
 
       const bodyMatch = path.match(/^coverLetter\.body\[(\d+)\]$/);
@@ -172,11 +174,12 @@ export function useGenerate() {
 
       return updatedOutput;
     });
-  }, [originalOutput]);
+    // Only state setters are used, and React guarantees those are stable.
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LOCAL_RESUME);
+      const saved = localStorage.getItem(RESUME_STORAGE_KEY);
       if (saved) setResume(saved);
     }
   }, []);
@@ -184,7 +187,7 @@ export function useGenerate() {
   const handleResumeChange = useCallback((v: string) => {
     setResume(v);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(LOCAL_RESUME, v);
+      localStorage.setItem(RESUME_STORAGE_KEY, v);
     }
   }, []);
 
@@ -362,14 +365,14 @@ export function useGenerate() {
             }
             if (typeof targetValue === 'string') {
               if (targetValue === edit.originalValue) {
-                let resolvedNewValue: any = edit.editedValue;
+                let resolvedNewValue: string | string[] = edit.editedValue;
                 if (edit.path.match(/^resume\.skills\[\d+\]\.items$/)) {
                   resolvedNewValue = edit.editedValue.split(',').map((s) => s.trim()).filter(Boolean);
                 }
                 mergedOutputTemp = setAtPath(mergedOutputTemp, edit.path, resolvedNewValue);
                 nextManualEdits.push(edit);
               } else if (levenshtein(targetValue, edit.originalValue) <= 3) {
-                let resolvedNewValue: any = edit.editedValue;
+                let resolvedNewValue: string | string[] = edit.editedValue;
                 if (edit.path.match(/^resume\.skills\[\d+\]\.items$/)) {
                   resolvedNewValue = edit.editedValue.split(',').map((s) => s.trim()).filter(Boolean);
                 }
@@ -502,7 +505,6 @@ export function useGenerate() {
     companyName,
     selectedModel,
     setSelectedModel,
-    setResume,
     setJD,
     setCompany,
     handleResumeChange,

@@ -19,13 +19,6 @@ export interface Recommendation {
   resolvesDealbreakers: string[]; // references IDs of Dealbreakers resolved
 }
 
-export interface MissingKeyword {
-  id: string;               // e.g. "kw-kubernetes"
-  keyword: string;          // e.g. "Kubernetes"
-  suggestedSection: string; // e.g. "Core Competencies"
-  suggestedBullet: string;  // e.g. "Orchestrated containerised workloads using Kubernetes"
-}
-
 export interface ScoreBreakdown {
   summary: number;
   skills: number;
@@ -37,11 +30,9 @@ export interface GapAnalysis {
   matchScore: number;
   scoreBreakdown?: ScoreBreakdown;
   strongMatches: string[];    // PRESENT — keyword already in resume
-  gaps: string[];             // IMPLIED — experience existed, term was added
   dealbreakers: Dealbreaker[]; // MISSING — no evidence in candidate background
   recommendations: Recommendation[]; // Actionable suggestions the candidate can selectively apply
   keywordsAdded: string[];          // Implied keywords that were woven into the resume rewrite
-  missingKeywords: MissingKeyword[]; // Keywords the user may optionally add via UI
   summaryChanges: string;            // One sentence: what changed in the Summary and why
   extractedCompanyName?: string | null; // Extracted company name from the JD
 }
@@ -145,9 +136,19 @@ export interface GenerateRequest {
 
 /**
  * Result of a background credential check (Anthropic key, Dropbox token).
- * `checking` drives the inline spinner; a null status means "not checked yet".
+ * Callers hold `FieldStatus | null`, where null means "not checked yet"; the
+ * in-progress spinner is driven by a separate boolean.
  */
 export interface FieldStatus {
   ok: boolean;
   message: string;
+}
+
+/** A Claude model the user can pick in the model selector. */
+export interface ModelOption {
+  id: string;
+  /** Display name, e.g. "Claude Sonnet 4.6". Also shown in the context pill. */
+  name: string;
+  /** Short qualifier shown after the name in the picker, e.g. "Recommended". */
+  hint?: string;
 }

@@ -2,26 +2,58 @@ import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT, JD_EXTRACTION_SYSTEM_PROMPT } from '@/lib/prompt';
 import { ResumeBuilderOutputSchema, RefineOutputSchema, JDExtractionResultSchema } from '@/lib/llm/schema';
 import { Recommendation } from '@/types';
-import { ANTHROPIC_DEFAULT_MODEL, MODEL_FALLBACKS } from '@/lib/constants';
+import { ANTHROPIC_DEFAULT_MODEL, MODEL_FALLBACKS, MODEL_IDS } from '@/lib/constants';
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? ANTHROPIC_DEFAULT_MODEL;
 
 const PLACEHOLDER_RE = /\[PLACEHOLDER[:\s]/i;
 
-/** Check if error represents an unsupported model name. */
+/**
+ * Output budget per request. Models with adaptive thinking on by default
+ * (Sonnet 5, Opus 5) spend part of this on thinking before writing the JSON,
+ * so it is sized well above the ~3-6K tokens a tailored resume needs.
+ */
+const MAX_OUTPUT_TOKENS = 16_000;
+
+/**
+ * Pulls the human-readable message out of an SDK API error.
+ *
+ * The SDK keeps the raw response body on `err.error`
+ * ({ type: 'error', error: { type, message } }) and sets `err.message` to
+ * "<status> <body as JSON>". Matching against `err.message` is unreliable:
+ * every 400 body contains "invalid_request_error", for example.
+ */
+function apiErrorDetail(err: InstanceType<typeof Anthropic.APIError>): string {
+  const body = err.error as { error?: { message?: unknown } } | undefined;
+  const detail = body?.error?.message;
+  return typeof detail === 'string' ? detail : err.message;
+}
+
+/**
+ * True only when the API rejected the request because of the model itself
+ * (unknown, retired, or not available to this key). Other 400s — a malformed
+ * request, an oversized input — are real errors and must not be masked by
+ * silently retrying on a different model.
+ */
 function isUnsupportedModelError(err: unknown): boolean {
-  if (err instanceof Anthropic.APIError) {
-    const isModelError = err.status === 400 || err.status === 404;
-    const msg = err.message.toLowerCase();
-    return isModelError && (
-      msg.includes('model') ||
-      msg.includes('not found') ||
-      msg.includes('unsupported') ||
-      msg.includes('permission') ||
-      msg.includes('invalid_request_error')
-    );
+  if (err instanceof Anthropic.NotFoundError) {
+    // A 404 from the Messages endpoint names the missing model ("model: <id>").
+    return /\bmodel\b/i.test(apiErrorDetail(err));
+  }
+  if (err instanceof Anthropic.BadRequestError) {
+    const detail = apiErrorDetail(err);
+    return /\bmodel\b/i.test(detail)
+      && /not found|not supported|unsupported|does not exist|not available|invalid model/i.test(detail);
   }
   return false;
+}
+
+/**
+ * The model to retry with after an unsupported-model error: Haiku for the
+ * extraction task (or when Haiku was requested), Sonnet for everything else.
+ */
+function fallbackModelFor(mode: 'generate' | 'refine' | 'analyze-jd', model: string): string {
+  return mode === 'analyze-jd' || model.includes('haiku') ? MODEL_IDS.haiku : MODEL_IDS.sonnet;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +189,7 @@ export async function callAnthropic(
   }
 
   let systemPrompt = '';
-  let messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = [];
+  let messagesContent: Anthropic.TextBlockParam[] = [];
 
   if (mode === 'analyze-jd') {
     if (!payload.jobDescription) {
@@ -213,42 +245,41 @@ export async function callAnthropic(
     ];
   }
 
-  const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
+  const systemBlocks: Anthropic.TextBlockParam[] = [
     { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
   ];
+
+  /**
+   * One Messages API call with transient-error retries. Prompt caching is GA,
+   * so the cache_control markers above work on the standard endpoint without
+   * a beta header.
+   */
+  const createMessage = (modelId: string) =>
+    withRetry(() =>
+      client.messages.create({
+        model: modelId,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        system: systemBlocks,
+        messages: [{ role: 'user', content: messagesContent }],
+      })
+    );
 
   const MAX_PARSE_ATTEMPTS = 3;
   let lastParseError: Error | undefined;
 
   for (let attempt = 0; attempt < MAX_PARSE_ATTEMPTS; attempt++) {
-    let response: Anthropic.Beta.BetaMessage;
+    let response: Anthropic.Message;
     try {
-      response = await withRetry(() =>
-        client.beta.messages.create({
-          model,
-          max_tokens: 8192,
-          system: systemBlocks,
-          messages: [{ role: 'user', content: messagesContent }],
-          betas: ['prompt-caching-2024-07-31'],
-        })
-      );
+      response = await createMessage(model);
     } catch (err) {
-      if (isUnsupportedModelError(err)) {
-        // 'claude-sonnet-4-6' is an alias — intentionally kept without date suffix
-        // per project spec (mirrors user-selectable model IDs in constants.ts).
-        const fallbackModel = (mode === 'analyze-jd' || model.includes('haiku'))
-          ? 'claude-haiku-4-5-20251001'
-          : 'claude-sonnet-4-6';
+      const fallbackModel = fallbackModelFor(mode, model);
+      // Retry once on a known-good model, but never on the model that just failed.
+      if (isUnsupportedModelError(err) && fallbackModel !== model) {
         console.warn(`[callAnthropic] Model "${model}" is unsupported. Falling back to "${fallbackModel}"...`);
-        response = await withRetry(() =>
-          client.beta.messages.create({
-            model: fallbackModel,
-            max_tokens: 8192,
-            system: systemBlocks,
-            messages: [{ role: 'user', content: messagesContent }],
-            betas: ['prompt-caching-2024-07-31'],
-          })
-        );
+        // Stay on the fallback for any later parse attempts too, instead of
+        // paying for the same unsupported-model error on every retry.
+        model = fallbackModel;
+        response = await createMessage(model);
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('looping content') || msg.includes('loop detection')) {
@@ -260,11 +291,10 @@ export async function callAnthropic(
       }
     }
 
-    // Log cache stats to server console
+    // Log cache stats to the server console, to confirm prompt caching is hitting.
     if (response.usage) {
-      const usage = response.usage as unknown as { cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
       console.log(
-        `[Cache] write: ${usage.cache_creation_input_tokens ?? 0} | read: ${usage.cache_read_input_tokens ?? 0}`
+        `[Cache] write: ${response.usage.cache_creation_input_tokens ?? 0} | read: ${response.usage.cache_read_input_tokens ?? 0}`
       );
     }
 
@@ -272,13 +302,23 @@ export async function callAnthropic(
       throw new Error('Response was cut off due to token limits. Try shortening input.');
     }
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Anthropic returned non-text content');
+    // A refusal is a deliberate decision, not a formatting glitch — retrying
+    // the same request would only be declined again.
+    if (response.stop_reason === 'refusal') {
+      throw new Error('Claude declined to process this request. Review the resume and job description text, then try again.');
+    }
+
+    // Thinking models put a `thinking` block before the answer, so the JSON is
+    // in the first *text* block rather than necessarily the first block.
+    const textBlock = response.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text'
+    );
+    if (!textBlock) {
+      throw new Error('Anthropic returned no text content');
     }
 
     // ── JSON extraction ────────────────────────────────────────────────────────
-    const raw = content.text.trim();
+    const raw = textBlock.text.trim();
     const jsonStr = extractJSON(raw);
 
     if (!jsonStr) {

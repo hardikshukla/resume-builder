@@ -28,7 +28,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 import { useApiKey } from '@/hooks/useApiKey';
-import { Recommendation, FieldStatus } from '@/types';
+import { Recommendation, FieldStatus, ModelOption } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
@@ -36,7 +36,7 @@ import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
 import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -101,7 +101,7 @@ export default function Home() {
   const [anthropicKeyTouched, setAnthropicKeyTouched] = useState(false);
   const [isCheckingAnthropicKey, setIsCheckingAnthropicKey] = useState(false);
   const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
-  /** Token of the last completed Dropbox check — blur re-checks only on change. */
+  /** Token of the most recent Dropbox check (recorded when it starts) — blur re-checks only on change. */
   const lastCheckedDropboxToken = useRef<string | null>(null);
   /** Read inside the models effect, which must not re-run when the model changes. */
   const selectedModelRef = useRef(selectedModel);
@@ -178,7 +178,9 @@ export default function Home() {
       .catch((err) => console.error('Failed to load server config:', err));
   }, []);
 
-  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>(DEFAULT_MODELS);
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>(DEFAULT_MODELS);
+  // Display name for the context pill; falls back to the raw id for models not in the list.
+  const selectedModelName = availableModels.find((m) => m.id === selectedModel)?.name ?? selectedModel;
 
   useEffect(() => {
     const key = anthropicKey || (hasServerKey ? 'server' : '');
@@ -312,7 +314,7 @@ export default function Home() {
   /**
    * Checks the token once the field is done being edited. Tokens are ~130
    * characters, so checking mid-typing would flash a false failure — and the
-   * IP rate limit in middleware.ts is shared with generation.
+   * verify route has its own per-IP rate limit in middleware.ts.
    */
   const handleDropboxBlur = () => {
     const token = dropboxToken?.trim();
@@ -325,9 +327,12 @@ export default function Home() {
     void verifyDropboxToken(token);
   };
 
-  // Inactivity session lock (40 min) using custom hook
+  // Inactivity session lock (40 min). The expiry overlay promises that keys and
+  // data are wiped, so this clears the saved resume as well as session storage
+  // (keys, cached generations). The resume is otherwise kept across tab closes.
   useInactivityTimeout(40, () => {
     sessionStorage.clear();
+    localStorage.removeItem(RESUME_STORAGE_KEY);
     setIsSessionExpired(true);
   });
 
@@ -414,7 +419,7 @@ export default function Home() {
         blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, getCompanyStr(), boldingKeywords);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
       }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -455,7 +460,7 @@ export default function Home() {
         blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co, boldingKeywords);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
       }
       const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
       const path = `/resumeBuilder/${folderName}/${filename}`;
@@ -615,7 +620,7 @@ export default function Home() {
         >
           {availableModels.map((m) => (
             <MenuItem key={m.id} value={m.id}>
-              {m.name}
+              {m.hint ? `${m.name} (${m.hint})` : m.name}
             </MenuItem>
           ))}
         </Select>
@@ -866,7 +871,7 @@ export default function Home() {
             {output && !isLoading && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <ContextPill
-                  model={selectedModel}
+                  modelName={selectedModelName}
                   matchScore={output.gapAnalysis.matchScore}
                   editCount={manualEdits.length}
                   appliedRecsCount={appliedRecs.size}
@@ -991,10 +996,6 @@ export default function Home() {
 
       {/* Print CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.15); opacity: 0.7; }
-        }
         @media print {
           @page { size: letter; margin: 0.5in; }
           body > * { visibility: hidden !important; }

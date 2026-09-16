@@ -109,11 +109,13 @@ The app works without any `.env.local` configuration — users paste their own A
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | *(unset)* | Server-side Anthropic key. If set, users don't need to provide their own. |
-| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20241022` | Default Claude model ID (user can override in UI) |
-| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser error tracking (optional) |
-| `SENTRY_DSN` | *(unset)* | Sentry DSN for server-side tracking (optional) |
-| `SENTRY_ORG` | *(unset)* | Sentry org slug — only needed for CI source-map upload |
-| `SENTRY_PROJECT` | *(unset)* | Sentry project name — only needed for CI source-map upload |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Model used when an `/api/generate` request omits `model`. The UI always sends the model picked in the selector, so this only affects direct API callers. |
+| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser and server error tracking (optional) |
+| `SENTRY_DSN` | *(unset)* | Server-only DSN; overrides `NEXT_PUBLIC_SENTRY_DSN` on the server (optional) |
+| `SENTRY_AUTH_TOKEN` | *(unset)* | Uploads source maps at build time; skipped when unset (optional) |
+| `SENTRY_ORG` / `SENTRY_PROJECT` | *(unset)* | Sentry org and project for the source-map upload (optional) |
+
+> **Sentry** is off until a DSN is set. It reports **errors only** (`tracesSampleRate: 0`), and a shared scrubber (`lib/sentry/scrubEvent.ts`) redacts API keys, tokens, resume and JD text before anything is sent. Browser events are tunnelled through `/monitoring` on this app, so the CSP stays `connect-src 'self'`; that tunnel only works for sentry.io DSNs — a self-hosted DSN's host must be added to `connect-src` in `next.config.mjs`.
 
 > **API keys never go in `.env` permanently.** If `ANTHROPIC_API_KEY` is not set, users bring their own key via the UI. Keys travel only in HTTPS request bodies and are never logged, stored, or returned by the server.
 
@@ -377,9 +379,9 @@ resume-builder/
     ├── hallucinationGuard.test.ts      # Hallucination detection logic
     ├── path.test.ts                    # getAtPath, setAtPath, levenshtein distance
     ├── docx.test.ts                    # DOCX generators produce valid ZIP blobs > 5 KB
-    ├── filename.test.ts                # Download filename sanitisation
+    ├── filename.test.ts                # Download filename formatting and path safety
     ├── timeout.test.ts                 # Inactivity timeout logic
-    ├── sentry.test.ts                  # Sentry config validation
+    ├── sentry.test.ts                  # Sentry scrubber redacts keys and resume data
     ├── generateValidation.test.ts      # /api/generate request validation edge cases
     ├── page.test.tsx                   # Smoke test: page renders without crash
     └── integration/
@@ -496,9 +498,9 @@ npm run test:coverage  # With coverage report
 | `prompt.test.ts` | System prompt rules, JD extraction prompt includes JD text and `CANDIDATE IS APPLYING TO` hint |
 | `docx.test.ts` | DOCX generators return valid ZIP blobs with PK magic bytes, > 5 KB |
 | `generateValidation.test.ts` | Request validation edge cases (missing fields, oversized inputs) |
-| `filename.test.ts` | Download filename sanitisation and formatting |
+| `filename.test.ts` | Download filename formatting; name/company can't inject path segments |
 | `timeout.test.ts` | Inactivity session lock logic |
-| `sentry.test.ts` | Sentry configuration validation |
+| `sentry.test.ts` | Shared Sentry `beforeSend` scrubber redacts keys, tokens, resume and JD text |
 | `page.test.tsx` | Page renders without crash |
 | `integration/generate.test.ts` | `/api/generate` route handler with mocked LLM |
 | `integration/analyzeJd.test.ts` | `/api/analyze-jd` route handler with mocked LLM |
@@ -517,11 +519,9 @@ Set these in **Vercel Dashboard → Project → Settings → Environment Variabl
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...        # Optional: users can bring their own key in the UI
-NEXT_PUBLIC_SENTRY_DSN=https://...  # Optional: browser error tracking
-SENTRY_DSN=https://...              # Optional: server-side error tracking
-SENTRY_ORG=your-org                 # Optional: CI source map upload only
-SENTRY_PROJECT=resume-builder       # Optional: CI source map upload only
 ```
+
+To turn on error tracking, also set `NEXT_PUBLIC_SENTRY_DSN` (and optionally `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for readable stack traces) — see [Environment Variables](#environment-variables).
 
 No API keys are required in Vercel — users bring their own via the UI.
 

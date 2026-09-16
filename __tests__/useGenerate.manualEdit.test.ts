@@ -248,7 +248,8 @@ describe('useGenerate — Manual Edits & Fuzzy Merge', () => {
     // Let's manually inject skills to test path: resume.skills[0].items
     act(() => {
       // Direct update of output state to setup skills structure
-      result.current.handleManualEdit('resume.skills[0]', { category: 'Languages', items: ['Python', 'Go'] } as any);
+      // handleManualEdit is typed for strings; passing an object is a deliberate shortcut to seed structure.
+      result.current.handleManualEdit('resume.skills[0]', { category: 'Languages', items: ['Python', 'Go'] } as unknown as string);
     });
 
     act(() => {
@@ -268,7 +269,8 @@ describe('useGenerate — Manual Edits & Fuzzy Merge', () => {
 
     // Mock cover letter structure
     act(() => {
-      result.current.handleManualEdit('coverLetter', { subject: 'Application for SWE', body: 'First paragraph.\nSecond paragraph.' } as any);
+      // Same deliberate shortcut as above: seed a whole cover letter object through a string-typed setter.
+      result.current.handleManualEdit('coverLetter', { subject: 'Application for SWE', body: 'First paragraph.\nSecond paragraph.' } as unknown as string);
     });
 
     // Edit paragraph 1 (zero-indexed: Second paragraph)

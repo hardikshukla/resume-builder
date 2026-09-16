@@ -1,6 +1,20 @@
 import React from 'react';
 import { Stepper, Step, StepLabel, StepButton, Tooltip, Box } from '@mui/material';
+import { keyframes } from '@mui/material/styles';
 import LockIcon from '@mui/icons-material/Lock';
+
+/**
+ * Pulse on the "Analyze & Generate" step while a generation runs.
+ *
+ * `keyframes` gives the animation a unique generated name. It was previously a
+ * global `@keyframes pulse` defined twice (here and in app/page.tsx) with
+ * different frames; the page's copy won because it loaded later, so these are
+ * its frames — the animation users actually saw.
+ */
+const stepPulse = keyframes`
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+`;
 
 interface WorkflowStepperProps {
   activeStep: number;
@@ -30,16 +44,7 @@ export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({
 
           const labelContent = (
             <StepLabel
-              sx={isStepLoading
-                ? {
-                    animation: 'pulse 1.5s infinite ease-in-out',
-                    '@keyframes pulse': {
-                      '0%': { opacity: 0.6 },
-                      '50%': { opacity: 1 },
-                      '100%': { opacity: 0.6 },
-                    },
-                  }
-                : {}}
+              sx={isStepLoading ? { animation: `${stepPulse} 1.5s infinite ease-in-out` } : {}}
             >
               <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
                 <span>{step.label}</span>

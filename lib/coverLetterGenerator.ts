@@ -82,11 +82,8 @@ function buildCandidateHeader(name?: string, contact?: ResumeData['contact']): P
 }
 
 /**
- * Generates a cover letter DOCX blob.
- *
- * @param coverLetter  The cover letter data (subject + body).
- * @param resume       The candidate's resume data (name, contact info).
- * @param companyName  Optional company name (currently reserved for future use).
+ * Splits `text` into TextRuns, bolding any whole-word match of `keywords`.
+ * `baseOptions` (font, size, italics) apply to every run.
  */
 function buildTextRunsWithBolding(
   text: string,
@@ -126,14 +123,18 @@ function buildTextRunsWithBolding(
     });
 }
 
+/**
+ * Generates a cover letter DOCX blob.
+ *
+ * @param coverLetter  The cover letter data (subject + body).
+ * @param resume       The candidate's resume data (name, contact info).
+ * @param keywords     Terms to bold in the body paragraphs.
+ */
 export async function generateCoverLetterDOCX(
   coverLetter: CoverLetterData,
   resume: ResumeData,
-  companyName?: string,
   keywords: string[] = []
 ): Promise<Blob> {
-  void companyName; // reserved for future personalisation
-
   const children: Paragraph[] = [];
 
   // Header
