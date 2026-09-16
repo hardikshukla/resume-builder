@@ -78,6 +78,9 @@ export const MODEL_FALLBACKS: Record<string, string> = {
  */
 export const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps';
 
+/** Minutes without mouse/keyboard activity before the session locks and wipes keys and data. */
+export const INACTIVITY_TIMEOUT_MINUTES = 40;
+
 /**
  * localStorage key for the pasted resume. It is kept across tab closes for
  * convenience, and wiped when the inactivity lock fires.
@@ -86,6 +89,19 @@ export const RESUME_STORAGE_KEY = 'rb_resume';
 
 /** App version from package.json, injected at build time by next.config.mjs. */
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+
+/**
+ * Match score rules, shared by the prompt (what Claude is asked to do), the
+ * schema (what is accepted) and the gap analysis panel (what is shown).
+ */
+export const SCORE_SECTION_MAX = { summary: 25, skills: 30, experience: 30 } as const;
+/** Sum of the section maximums: the full width of the breakdown bar. */
+export const SCORE_BREAKDOWN_TOTAL =
+  SCORE_SECTION_MAX.summary + SCORE_SECTION_MAX.skills + SCORE_SECTION_MAX.experience;
+/** Points deducted per unresolved dealbreaker. */
+export const DEALBREAKER_PENALTY = 5;
+/** The highest match score Claude may report, even with every keyword present. */
+export const MATCH_SCORE_CAP = 95;
 
 /** Maximum file upload size in bytes (5 MB). */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;

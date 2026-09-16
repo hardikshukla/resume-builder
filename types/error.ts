@@ -1,11 +1,53 @@
+/**
+ * Every API error type the client can receive.
+ * - AUTH_FAILED: Anthropic rejected the API key (401) or its access (403).
+ * - RATE_LIMIT: our middleware or Anthropic throttled the request.
+ * - TIMEOUT: Anthropic was slow, overloaded, or unreachable.
+ * - TOKEN_LIMIT: the input or output did not fit.
+ * - VALIDATION_FAILED: a bad request, or Claude returned unusable output.
+ * - FATAL: anything unexpected.
+ */
+export type ApiErrorType =
+  | 'AUTH_FAILED'
+  | 'RATE_LIMIT'
+  | 'TIMEOUT'
+  | 'TOKEN_LIMIT'
+  | 'VALIDATION_FAILED'
+  | 'FATAL';
+
 export interface ApiErrorResponse {
   success: false;
   error: {
-    type: 'RATE_LIMIT' | 'TIMEOUT' | 'TOKEN_LIMIT' | 'VALIDATION_FAILED' | 'FATAL';
+    type: ApiErrorType;
     message: string;
     retryAfterSeconds?: number;
   };
 }
+
+/** HTTP status each error type is returned with. */
+const STATUS_BY_TYPE: Record<ApiErrorType, number> = {
+  AUTH_FAILED: 401,
+  RATE_LIMIT: 429,
+  TIMEOUT: 504,
+  TOKEN_LIMIT: 400,
+  VALIDATION_FAILED: 400,
+  FATAL: 500,
+};
+
+export function statusForErrorType(type: ApiErrorType): number {
+  return STATUS_BY_TYPE[type];
+}
+
+/** Builds the JSON body for an error the route detected itself. */
+export function apiError(type: ApiErrorType, message: string): ApiErrorResponse {
+  return { success: false, error: { type, message } };
+}
+
+/** Plain-language messages for Anthropic auth failures (the raw body is JSON jargon). */
+const AUTH_MESSAGES: Record<401 | 403, string> = {
+  401: 'Anthropic rejected this API key. Check the key in the panel and try again.',
+  403: "This API key isn't allowed to make this request. Check that it has access to the selected model.",
+};
 
 /**
  * The fields toApiErrorResponse reads off an unknown thrown value. SDK errors
@@ -25,8 +67,13 @@ export function toApiErrorResponse(err: unknown): ApiErrorResponse {
   const errorLike: ErrorLike = typeof err === 'object' && err !== null ? (err as ErrorLike) : {};
   const status = errorLike.status || errorLike.statusCode;
   
-  let type: ApiErrorResponse['error']['type'] = 'FATAL';
+  let type: ApiErrorType = 'FATAL';
   let retryAfterSeconds: number | undefined;
+
+  // Auth failures are decided by status alone and get a readable message.
+  if (status === 401 || status === 403) {
+    return apiError('AUTH_FAILED', AUTH_MESSAGES[status]);
+  }
 
   if (status === 429 || message.toLowerCase().includes('rate limit') || message.includes('429')) {
     type = 'RATE_LIMIT';

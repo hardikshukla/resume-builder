@@ -16,27 +16,27 @@ import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Skeleton from '@mui/material/Skeleton';
 import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Link from '@mui/material/Link';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 import { useApiKey } from '@/hooks/useApiKey';
-import { Recommendation, FieldStatus, ModelOption } from '@/types';
+import { Recommendation, FieldStatus, ModelOption, DropboxSaveStatus } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
 import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
 import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
+import { dropboxExportPath, uploadToDropbox } from '@/lib/dropbox/upload';
+import { downloadBlob } from '@/lib/utils/download';
+import { buildBoldingKeywords } from '@/lib/utils/boldingKeywords';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY, INACTIVITY_TIMEOUT_MINUTES } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -51,7 +51,10 @@ import { ContextPill } from '@/components/ContextPill';
 import { useBackButtonPrevention } from '@/hooks/useBackButtonPrevention';
 import BackNavigationDialog from '@/components/BackNavigationDialog';
 import DropboxSetupDialog from '@/components/DropboxSetupDialog';
-import FieldStatusAdornment from '@/components/FieldStatusAdornment';
+import SecretField from '@/components/SecretField';
+import CharCount from '@/components/CharCount';
+import Overlay from '@/components/ui/Overlay';
+import { BRAND_GRADIENT, BRAND_GRADIENT_HOVER } from '@/components/ui/tokens';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -90,14 +93,14 @@ export default function Home() {
   const [appliedRecs, setAppliedRecs] = useState<Set<string>>(new Set());
   const [customRecommendations, setCustomRecommendations] = useState<Recommendation[]>([]);
   const [customRecText, setCustomRecText] = useState('');
-  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
-  const [showDropboxToken, setShowDropboxToken] = useState(false);
   const [dropboxSetupOpen, setDropboxSetupOpen] = useState(false);
-  const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  /** Result of the last "Save to Dropbox" (shown above the preview). */
+  const [dropboxSaveStatus, setDropboxSaveStatus] = useState<DropboxSaveStatus | null>(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [isVerifyingDropbox, setIsVerifyingDropbox] = useState(false);
-  const [dropboxStatusMsg, setDropboxStatusMsg] = useState<FieldStatus | null>(null);
+  /** Result of the background token check (shown on the token field). */
+  const [dropboxTokenStatus, setDropboxTokenStatus] = useState<FieldStatus | null>(null);
   const [anthropicKeyTouched, setAnthropicKeyTouched] = useState(false);
   const [isCheckingAnthropicKey, setIsCheckingAnthropicKey] = useState(false);
   const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
@@ -116,15 +119,8 @@ export default function Home() {
 
   const handleStepChange = (step: number) => {
     setActiveStep(step);
-    if (step === 0 || step === 1) {
-      if (isMobile) {
-        setDrawerOpen(true);
-      }
-    } else {
-      if (isMobile) {
-        setDrawerOpen(false);
-      }
-    }
+    // On small screens the input steps open the parameters drawer; later steps close it.
+    if (isMobile) setDrawerOpen(step <= 1);
   };
 
   const missingAnthropicKey = !hasServerKey && !anthropicKey;
@@ -274,7 +270,7 @@ export default function Home() {
 
   const verifyDropboxToken = async (token: string) => {
     setIsVerifyingDropbox(true);
-    setDropboxStatusMsg(null);
+    setDropboxTokenStatus(null);
     // Record the attempt up front. Every outcome, including failure, counts as
     // "this token has been checked" — otherwise each focus/blur re-fires the
     // request for a token we already know about. "Try again" clears the ref.
@@ -287,17 +283,17 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setDropboxStatusMsg({ ok: true, message: `Connected as ${data.account}` });
+        setDropboxTokenStatus({ ok: true, message: `Connected as ${data.account}` });
       } else if (res.status === 429) {
         // Our own rate limiter, not Dropbox's verdict on the token.
-        setDropboxStatusMsg({ ok: false, message: 'Too many checks in a row. Wait a moment, then try again.' });
+        setDropboxTokenStatus({ ok: false, message: 'Too many checks in a row. Wait a moment, then try again.' });
       } else {
         const rawError = typeof data.error === 'object' && data.error ? data.error.message : data.error;
-        setDropboxStatusMsg({ ok: false, message: toDropboxErrorMessage(rawError) });
+        setDropboxTokenStatus({ ok: false, message: toDropboxErrorMessage(rawError) });
       }
     } catch (err) {
       console.error('Dropbox token verification error:', err);
-      setDropboxStatusMsg({ ok: false, message: "Couldn't reach Dropbox to check this token" });
+      setDropboxTokenStatus({ ok: false, message: "Couldn't reach Dropbox to check this token" });
     } finally {
       setIsVerifyingDropbox(false);
     }
@@ -319,7 +315,7 @@ export default function Home() {
   const handleDropboxBlur = () => {
     const token = dropboxToken?.trim();
     if (!token) {
-      setDropboxStatusMsg(null);
+      setDropboxTokenStatus(null);
       lastCheckedDropboxToken.current = null;
       return;
     }
@@ -327,10 +323,10 @@ export default function Home() {
     void verifyDropboxToken(token);
   };
 
-  // Inactivity session lock (40 min). The expiry overlay promises that keys and
+  // Inactivity session lock. The expiry overlay promises that keys and
   // data are wiped, so this clears the saved resume as well as session storage
   // (keys, cached generations). The resume is otherwise kept across tab closes.
-  useInactivityTimeout(40, () => {
+  useInactivityTimeout(INACTIVITY_TIMEOUT_MINUTES, () => {
     sessionStorage.clear();
     localStorage.removeItem(RESUME_STORAGE_KEY);
     setIsSessionExpired(true);
@@ -342,63 +338,11 @@ export default function Home() {
     return () => window.removeEventListener('beforeunload', clearOnUnload);
   }, []);
 
-  // Get all unique keywords for bolding (strongMatches, clean version of keywordsAdded, JD keywords, and applied recommendations)
-  const boldingKeywords = useMemo(() => {
-    if (!output) return [];
-    const keywords = new Set<string>();
-    
-    // 1. Initial strong matches
-    output.gapAnalysis.strongMatches.forEach(kw => {
-      if (kw) keywords.add(kw.trim());
-    });
-    
-    // 2. Keywords added during initial tailoring
-    output.gapAnalysis.keywordsAdded.forEach(kw => {
-      if (kw) {
-        const clean = kw.replace(/ \([^)]+\)$/, '').trim();
-        if (clean) keywords.add(clean);
-      }
-    });
-
-    // 3. All JD keywords (must-have and nice-to-have skills)
-    if (jdKeywords) {
-      jdKeywords.mustHaveSkills.forEach(kw => {
-        if (kw) keywords.add(kw.trim());
-      });
-      jdKeywords.niceToHaveSkills.forEach(kw => {
-        if (kw) keywords.add(kw.trim());
-      });
-    }
-
-    // 4. Keywords from applied recommendations
-    if (output.gapAnalysis.recommendations) {
-      output.gapAnalysis.recommendations.forEach(rec => {
-        if (appliedRecs.has(rec.id)) {
-          // Extract capitalized words from the recommendation claim (excluding common verbs/prepositions/nouns)
-          const words = rec.claim.split(/[\s,.:;()'"?]+/);
-          words.forEach(w => {
-            const trimmed = w.trim();
-            if (trimmed && /^[A-Z]/.test(trimmed)) {
-              const lower = trimmed.toLowerCase();
-              const exclusions = new Set([
-                'add', 'consider', 'under', 'skills', 'experience', 'summary', 
-                'projects', 'mention', 'use', 'include', 'integrate', 'create', 
-                'update', 'modify', 'show', 'display', 'highlight', 'demonstrate', 
-                'provide', 'list', 'write', 'in', 'to', 'the', 'as', 'for', 'with',
-                'and', 'or', 'a', 'an', 'at', 'on', 'by'
-              ]);
-              if (!exclusions.has(lower)) {
-                keywords.add(trimmed);
-              }
-            }
-          });
-        }
-      });
-    }
-
-    // Sort descending by length so longer phrases match before shorter substrings
-    return Array.from(keywords).sort((a, b) => b.length - a.length);
-  }, [output, jdKeywords, appliedRecs]);
+  // Terms bolded in the preview and both Word exports.
+  const boldingKeywords = useMemo(
+    () => buildBoldingKeywords(output, jdKeywords, appliedRecs),
+    [output, jdKeywords, appliedRecs]
+  );
 
   const getCompanyStr = () =>
     (companyName || output?.gapAnalysis.extractedCompanyName || '').trim();
@@ -410,22 +354,18 @@ export default function Home() {
       type
     );
 
+  /** Builds the Word file for one export, bolding the same keywords as the preview. */
+  const buildDocx = async (type: 'resume' | 'coverLetter'): Promise<Blob> => {
+    if (!output) throw new Error('Nothing to export yet');
+    if (type === 'resume') return generateResumeDOCX(output.resume, boldingKeywords);
+    if (!output.coverLetter) throw new Error('No cover letter available');
+    return generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
+  };
+
   const handleDownload = async (type: 'resume' | 'coverLetter') => {
     if (!output) return;
     try {
-      let blob: Blob;
-      const filename = getFilename(type);
-      if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume, boldingKeywords);
-      } else {
-        if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(await buildDocx(type), getFilename(type));
       setActiveStep(3);
     } catch (err) {
       setFatalError(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -451,42 +391,15 @@ export default function Home() {
 
   const handleSaveToDropbox = async (type: 'resume' | 'coverLetter') => {
     if (!output || !dropboxToken) return;
-    setDropboxStatus(null);
+    setDropboxSaveStatus(null);
     try {
-      const co = getCompanyStr();
-      const filename = getFilename(type);
-      let blob: Blob;
-      if (type === 'resume') {
-        blob = await generateResumeDOCX(output.resume, boldingKeywords);
-      } else {
-        if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
-      }
-      const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
-      const path = `/resumeBuilder/${folderName}/${filename}`;
-      const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
-        method: 'POST',
-        headers: {
-          // Must match what verifyDropboxToken checked, or a token that passed
-          // the check can still be rejected here.
-          Authorization: `Bearer ${dropboxToken.trim()}`,
-          'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', autorename: true, mute: false }),
-          'Content-Type': 'application/octet-stream',
-        },
-        body: blob,
-      });
-      if (!res.ok) throw new Error(await res.text() || 'Upload failed');
-      setDropboxStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
+      const path = dropboxExportPath(getCompanyStr(), getFilename(type));
+      await uploadToDropbox(dropboxToken, path, await buildDocx(type));
+      setDropboxSaveStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
       setActiveStep(3);
     } catch (err) {
-      setDropboxStatus({ type: 'error', message: err instanceof Error ? err.message : 'Dropbox failed.' });
+      setDropboxSaveStatus({ type: 'error', message: err instanceof Error ? err.message : 'Dropbox failed.' });
     }
-  };
-
-  const getCharColor = (count: number, limit: number, warn: number) => {
-    if (count > limit) return 'error.main';
-    if (count > warn) return 'warning.main';
-    return 'text.secondary';
   };
 
   const renderInputs = () => (
@@ -500,7 +413,7 @@ export default function Home() {
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
-        backgroundColor: '#0f1117',
+        backgroundColor: 'background.default',
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -539,40 +452,33 @@ export default function Home() {
         </Box>
         <TextField multiline rows={8} fullWidth value={resume}
           onChange={(e) => handleResumeChange(e.target.value)}
-          placeholder="Paste your current resume or upload above..." variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+          placeholder="Paste your current resume or upload above..." variant="outlined" />
         {parseError && (
           <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
             ⚠️ {parseError}
           </Typography>
         )}
-        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(resume.length, MAX_RESUME_CHARS, RESUME_WARN_CHARS) }}>
-          {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
-        </Typography>
+        <CharCount count={resume.length} limit={MAX_RESUME_CHARS} warnAt={RESUME_WARN_CHARS} />
       </Box>
 
       {/* Job Description */}
       <Box>
         <TextField label="Job Description" multiline rows={8} fullWidth value={jobDescription}
           onChange={(e) => setJD(e.target.value)}
-          placeholder="Paste the target Job Description..." variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
-        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(jobDescription.length, MAX_JD_CHARS, JD_WARN_CHARS) }}>
-          {jobDescription.length.toLocaleString()} / {MAX_JD_CHARS.toLocaleString()} chars
-        </Typography>
+          placeholder="Paste the target Job Description..." variant="outlined" />
+        <CharCount count={jobDescription.length} limit={MAX_JD_CHARS} warnAt={JD_WARN_CHARS} />
       </Box>
 
       {/* Company Name */}
       <TextField label="Company name" fullWidth value={companyName}
-        onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google"
-        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+        onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google" />
 
       <Divider sx={{ borderColor: 'divider' }} />
 
       {/* Anthropic Key */}
-      <TextField
+      <SecretField
         label="Anthropic API key"
-        type={showAnthropicKey ? 'text' : 'password'} fullWidth
+        fullWidth
         value={hasServerKey ? '' : anthropicKey}
         onChange={(e) => setAnthropicKey(e.target.value)}
         onBlur={() => setAnthropicKeyTouched(true)}
@@ -588,29 +494,13 @@ export default function Home() {
                 ? anthropicKeyStatus.message
                 : 'Kept in this tab only, never logged server-side.'
         }
-        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-        slotProps={{ input: {
-          endAdornment: (
-            <InputAdornment position="end">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {!hasServerKey && (
-                  <FieldStatusAdornment
-                    checking={isCheckingAnthropicKey}
-                    status={anthropicKeyStatus}
-                    label="Anthropic API key"
-                  />
-                )}
-                <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
-                  {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                </IconButton>
-              </Box>
-            </InputAdornment>
-          ),
-        }}}
+        checking={isCheckingAnthropicKey}
+        status={anthropicKeyStatus}
+        hideStatus={hasServerKey}
       />
 
       {/* Claude Model Selection */}
-      <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
+      <FormControl fullWidth>
         <InputLabel id="model-select-label">Claude model</InputLabel>
         <Select
           labelId="model-select-label"
@@ -634,40 +524,25 @@ export default function Home() {
 
       {/* Dropbox — checked on blur, never blocks generation */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <TextField
+        <SecretField
           label="Dropbox access token"
-          type={showDropboxToken ? 'text' : 'password'} fullWidth
+          fullWidth
           value={dropboxToken || ''}
           onChange={(e) => {
             setDropboxToken(e.target.value);
             // The old verdict described the old token. Go quiet until blur re-checks.
-            setDropboxStatusMsg(null);
+            setDropboxTokenStatus(null);
           }}
           onBlur={handleDropboxBlur}
           placeholder="Paste to save exports to Dropbox"
-          helperText={dropboxStatusMsg?.message ?? ' '}
+          helperText={dropboxTokenStatus?.message ?? ' '}
           sx={{
-            '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' },
             '& .MuiFormHelperText-root': {
-              color: dropboxStatusMsg ? (dropboxStatusMsg.ok ? 'success.main' : 'error.main') : 'text.secondary',
+              color: dropboxTokenStatus ? (dropboxTokenStatus.ok ? 'success.main' : 'error.main') : 'text.secondary',
             },
           }}
-          slotProps={{ input: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <FieldStatusAdornment
-                    checking={isVerifyingDropbox}
-                    status={dropboxStatusMsg}
-                    label="Dropbox token"
-                  />
-                  <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
-                    {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                </Box>
-              </InputAdornment>
-            ),
-          }}}
+          checking={isVerifyingDropbox}
+          status={dropboxTokenStatus}
         />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Link
@@ -680,7 +555,7 @@ export default function Home() {
           >
             How do I get a token?
           </Link>
-          {dropboxStatusMsg && !dropboxStatusMsg.ok && !isVerifyingDropbox && (
+          {dropboxTokenStatus && !dropboxTokenStatus.ok && !isVerifyingDropbox && (
             <Link
               component="button"
               type="button"
@@ -711,9 +586,9 @@ export default function Home() {
                 },
               }
             : {
-                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+                background: BRAND_GRADIENT,
                 boxShadow: '0 4px 20px rgba(108,99,255,0.4)',
-                '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' },
+                '&:hover': { background: BRAND_GRADIENT_HOVER },
               }),
         }}>
         {isLoading
@@ -726,12 +601,12 @@ export default function Home() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f1117' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
 
       {/* Header */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', py: 2, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6c63ff, #a855f7)', borderRadius: 2, display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
+          <Box sx={{ width: 40, height: 40, background: BRAND_GRADIENT, borderRadius: 2, display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
             <AutoAwesomeIcon />
           </Box>
           <Box>
@@ -781,7 +656,7 @@ export default function Home() {
                 paper: {
                   sx: {
                     width: '320px',
-                    backgroundColor: '#0f1117',
+                    backgroundColor: 'background.default',
                     borderRight: '1px solid rgba(255,255,255,0.1)',
                   },
                 },
@@ -801,7 +676,7 @@ export default function Home() {
                 bottom: 24,
                 right: 24,
                 zIndex: 1000,
-                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+                background: BRAND_GRADIENT,
               }}
             >
               <SettingsIcon />
@@ -930,8 +805,8 @@ export default function Home() {
                     setShowHighlights={setShowHighlights}
                     boldingKeywords={boldingKeywords}
                     dropboxToken={dropboxToken}
-                    dropboxStatus={dropboxStatus}
-                    setDropboxStatus={setDropboxStatus}
+                    dropboxSaveStatus={dropboxSaveStatus}
+                    setDropboxSaveStatus={setDropboxSaveStatus}
                     handleDownload={handleDownload}
                     handleSaveToDropbox={handleSaveToDropbox}
                     handleManualEdit={handleManualEdit}
@@ -951,8 +826,8 @@ export default function Home() {
                     setShowHighlights={setShowHighlights}
                     boldingKeywords={boldingKeywords}
                     dropboxToken={dropboxToken}
-                    dropboxStatus={dropboxStatus}
-                    setDropboxStatus={setDropboxStatus}
+                    dropboxSaveStatus={dropboxSaveStatus}
+                    setDropboxSaveStatus={setDropboxSaveStatus}
                     handleDownload={handleDownload}
                     handleSaveToDropbox={handleSaveToDropbox}
                     handleManualEdit={handleManualEdit}
@@ -980,64 +855,20 @@ export default function Home() {
 
       {/* Session Expired Overlay */}
       {isSessionExpired && (
-        <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,17,23,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+        <Overlay opacity={0.96} blur={false}>
           <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 3, maxWidth: 400, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <LockIcon color="error" sx={{ fontSize: 40, mx: 'auto' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Session Expired</Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              For your security, your session closed after 40 minutes of inactivity. API keys and data have been wiped.
+              {`For your security, your session closed after ${INACTIVITY_TIMEOUT_MINUTES} minutes of inactivity. API keys and data have been wiped.`}
             </Typography>
             <Button variant="contained" fullWidth onClick={() => window.location.reload()} sx={{ mt: 1 }}>
               Start New Session
             </Button>
           </Paper>
-        </Box>
+        </Overlay>
       )}
 
-      {/* Print CSS */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page { size: letter; margin: 0.5in; }
-          body > * { visibility: hidden !important; }
-          #resume-print-area, #resume-print-area * { visibility: visible !important; }
-          #resume-print-area {
-            position: absolute !important; left: 0 !important; top: 0 !important;
-            width: 100% !important; max-width: 100% !important;
-            box-shadow: none !important; border: none !important;
-            padding: 0 !important; margin: 0 !important;
-            background: white !important; color: black !important;
-          }
-          ins { background: none !important; color: black !important; text-decoration: none !important; }
-          del { display: none !important; }
-          .editable-field-container--editing,
-          .editable-field,
-          .editable-field--edited {
-            border: none !important;
-            border-left: none !important;
-            border-bottom: none !important;
-            padding: 0 !important;
-            padding-left: 0 !important;
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            outline: none !important;
-            cursor: default !important;
-          }
-          .editable-field::after {
-            display: none !important;
-          }
-          .editable-field-container--editing input,
-          .editable-field-container--editing textarea {
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-            background: transparent !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .skills-row { page-break-inside: avoid; display: grid; grid-template-columns: 154px 1fr; }
-        }
-      ` }} />
     </Box>
   );
 }

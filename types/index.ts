@@ -152,3 +152,21 @@ export interface ModelOption {
   /** Short qualifier shown after the name in the picker, e.g. "Recommended". */
   hint?: string;
 }
+
+/**
+ * A user's inline edit to the generated output. `path` uses bracket notation
+ * (e.g. `resume.experience[0].bullets[2]`, or `coverLetter.body[1]` for a
+ * cover letter paragraph). `originalValue` is the generated text the edit
+ * replaced; it is how the edit is re-located after a refine.
+ */
+export interface ManualEdit {
+  path: string;
+  originalValue: string;
+  editedValue: string;
+}
+
+/** Outcome of saving an export to Dropbox, shown above the preview. */
+export interface DropboxSaveStatus {
+  type: 'success' | 'error';
+  message: string;
+}

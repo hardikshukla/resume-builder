@@ -1,4 +1,5 @@
 import { ResumeData } from '@/types';
+import { contactParts } from '@/lib/utils/contact';
 
 /**
  * string.ts — Shared string manipulation utilities.
@@ -63,11 +64,9 @@ export function buildDownloadFilename(
 export function resumeDataToText(r: ResumeData): string {
   const parts: string[] = [];
   if (r.name) parts.push(r.name);
-  if (r.contact) {
-    const c = r.contact;
-    const contactLine = [c.email, c.phone, c.linkedin, c.github, c.location].filter(Boolean).join(' | ');
-    if (contactLine) parts.push(contactLine);
-  }
+  // Full URLs here: this text goes back to Claude, not to the reader.
+  const contactLine = contactParts(r.contact).join(' | ');
+  if (contactLine) parts.push(contactLine);
   if (r.summary) {
     parts.push('\nSUMMARY');
     parts.push(r.summary);

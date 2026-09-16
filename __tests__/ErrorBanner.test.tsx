@@ -32,6 +32,15 @@ describe('ErrorBanner', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('labels a rejected API key clearly', () => {
+    const authError: ApiErrorResponse = {
+      success: false,
+      error: { type: 'AUTH_FAILED', message: 'Anthropic rejected this API key.' },
+    };
+    render(<ErrorBanner error={authError} onDismiss={jest.fn()} />);
+    expect(screen.getByText('🔑 API Key Rejected')).toBeInTheDocument();
+  });
+
   it('renders error message', () => {
     render(<ErrorBanner error={fatalError} onDismiss={jest.fn()} />);
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();

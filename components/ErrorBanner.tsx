@@ -12,6 +12,7 @@ interface ErrorBannerProps {
 }
 
 const TYPE_LABELS: Record<ApiErrorResponse['error']['type'], string> = {
+  AUTH_FAILED: '🔑 API Key Rejected',
   RATE_LIMIT: '⏳ Rate Limited',
   TIMEOUT: '⏱ Timeout / Overloaded',
   TOKEN_LIMIT: '📏 Input Too Long',
