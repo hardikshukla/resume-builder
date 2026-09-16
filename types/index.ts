@@ -164,3 +164,9 @@ export interface ManualEdit {
   originalValue: string;
   editedValue: string;
 }
+
+/** Outcome of saving an export to Dropbox, shown above the preview. */
+export interface DropboxSaveStatus {
+  type: 'success' | 'error';
+  message: string;
+}

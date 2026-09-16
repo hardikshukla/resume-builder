@@ -9,6 +9,7 @@ import IconButton from '@mui/material/IconButton';
 import Alert from '@mui/material/Alert';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import Overlay from '@/components/ui/Overlay';
 
 import { DROPBOX_APP_CONSOLE_URL } from '@/lib/constants';
 
@@ -27,9 +28,8 @@ const REQUIRED_SCOPES: ReadonlyArray<{ scope: string; usedFor: string }> = [
  * Setup steps for minting a personal Dropbox access token.
  *
  * Dropbox has no shared key — every user creates their own app — so these
- * steps are the app's only on-ramp to the Dropbox feature. Uses the fixed
- * Box + Paper overlay pattern of BackNavigationDialog rather than MUI Dialog,
- * and adds the Esc / backdrop dismissal that pattern otherwise lacks.
+ * steps are the app's only on-ramp to the Dropbox feature. Uses the shared
+ * Overlay rather than MUI Dialog, adding Esc / backdrop dismissal and a focus trap.
  */
 export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -90,24 +90,7 @@ export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialog
   if (!open) return null;
 
   return (
-    <Box
-      data-testid="dropbox-setup-backdrop"
-      onClick={onClose}
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(15,17,23,0.92)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        backdropFilter: 'blur(4px)',
-        p: 2,
-      }}
-    >
+    <Overlay data-testid="dropbox-setup-backdrop" onBackdropClick={onClose} padding={2}>
       <Paper
         ref={panelRef}
         role="dialog"
@@ -216,7 +199,7 @@ export default function DropboxSetupDialog({ open, onClose }: DropboxSetupDialog
           Got it
         </Button>
       </Paper>
-    </Box>
+    </Overlay>
   );
 }
 

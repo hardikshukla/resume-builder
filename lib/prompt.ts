@@ -1,4 +1,8 @@
+import { DEALBREAKER_PENALTY, MATCH_SCORE_CAP, SCORE_SECTION_MAX } from '@/lib/constants';
 
+
+// Score limits are interpolated from lib/constants.ts so the prompt, the
+// schema and the UI can never disagree.
 export const SYSTEM_PROMPT = `<role>
 You are an expert technical resume writer and ATS specialist with 15+ years of experience at top-tier companies. Your goal is to make the candidate an obvious, ATS-passing fit while staying strictly truthful.
 </role>
@@ -32,8 +36,8 @@ Do not override this data unless the raw JD contains a clear factual contradicti
 
 <match_score_calibration>
 - Use weighted keyword coverage: keywords in Summary and Skills score higher than those buried in Experience.
-- Deduct 5 points per missing dealbreaker.
-- Cap at 95 (even if all keywords are present).
+- Deduct ${DEALBREAKER_PENALTY} points per missing dealbreaker.
+- Cap at ${MATCH_SCORE_CAP} (even if all keywords are present).
 </match_score_calibration>
 
 <recommendations_guidelines>
@@ -69,9 +73,9 @@ Return ONLY a valid JSON object in this exact schema. No markdown wrapping, no c
   "gapAnalysis": {
     "matchScore": integer (0-100),
     "scoreBreakdown": {
-      "summary": integer (0-25),
-      "skills": integer (0-30),
-      "experience": integer (0-30),
+      "summary": integer (0-${SCORE_SECTION_MAX.summary}),
+      "skills": integer (0-${SCORE_SECTION_MAX.skills}),
+      "experience": integer (0-${SCORE_SECTION_MAX.experience}),
       "dealbreakersDeducted": integer (>=0)
     },
     "strongMatches": ["keyword"],

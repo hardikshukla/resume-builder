@@ -114,7 +114,7 @@ describe('Home Page Component', () => {
 
   it('checks the Dropbox token when the field loses focus', async () => {
     render(<Home />);
-    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    fireEvent.blur(screen.getByLabelText('Dropbox access token'));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -132,7 +132,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    const field = screen.getByLabelText(/Dropbox access token/i);
+    const field = screen.getByLabelText('Dropbox access token');
 
     fireEvent.blur(field);
     await waitFor(() => expect(dropboxVerifyCalls()).toHaveLength(1));
@@ -150,7 +150,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    fireEvent.blur(screen.getByLabelText('Dropbox access token'));
 
     await waitFor(() => expect(screen.getByTestId('field-status-error')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /generate tailored resume/i })).toBeEnabled();
@@ -166,7 +166,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    const field = screen.getByLabelText(/Dropbox access token/i);
+    const field = screen.getByLabelText('Dropbox access token');
 
     fireEvent.blur(field);
     await waitFor(() => expect(screen.getByTestId('field-status-error')).toBeInTheDocument());
@@ -186,7 +186,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    fireEvent.blur(screen.getByLabelText('Dropbox access token'));
     await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument());
     expect(dropboxVerifyCalls()).toHaveLength(1);
 
@@ -202,7 +202,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    const field = screen.getByLabelText(/Dropbox access token/i);
+    const field = screen.getByLabelText('Dropbox access token');
 
     fireEvent.blur(field);
     await waitFor(() => expect(screen.getByTestId('field-status-ok')).toBeInTheDocument());
@@ -226,7 +226,7 @@ describe('Home Page Component', () => {
     );
 
     render(<Home />);
-    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    fireEvent.blur(screen.getByLabelText('Dropbox access token'));
 
     await waitFor(() => expect(screen.getByTestId('field-status-error')).toBeInTheDocument());
     expect(screen.getByText(/too many checks/i)).toBeInTheDocument();
@@ -315,7 +315,7 @@ describe('Home Page Component', () => {
     render(<Home />);
     expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
 
-    fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
+    fireEvent.blur(screen.getByLabelText('Dropbox access token'));
     await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument());
   });
   it('wipes the saved resume and session data when the inactivity lock fires', () => {
@@ -328,5 +328,15 @@ describe('Home Page Component', () => {
     expect(localStorage.getItem(RESUME_STORAGE_KEY)).toBeNull();
     expect(sessionStorage.getItem('anthropic_key')).toBeNull();
     expect(screen.getByText(/Session Expired/i)).toBeInTheDocument();
+
+    // Pin the overlay's look (jsdom resolves these, not backdrop-filter): it
+    // covers the page, above everything, on a near-opaque dark backdrop.
+    let overlay: HTMLElement | null = screen.getByText(/Session Expired/i);
+    while (overlay && getComputedStyle(overlay).position !== 'fixed') overlay = overlay.parentElement;
+    expect(overlay).not.toBeNull();
+    const style = getComputedStyle(overlay!);
+    expect(style.zIndex).toBe('9999');
+    expect(style.backgroundColor).toBe('rgba(15, 17, 23, 0.96)');
+    expect([style.top, style.right, style.bottom, style.left]).toEqual(['0px', '0px', '0px', '0px']);
   });
 });

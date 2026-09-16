@@ -4,6 +4,7 @@ import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Outfit } from 'next/font/google';
+import { APP_BACKGROUND, APP_PAPER } from '@/components/ui/tokens';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -14,8 +15,8 @@ const theme = createTheme({
   palette: {
     mode: 'dark',
     background: {
-      default: '#0f1117',
-      paper: '#1a1d27',
+      default: APP_BACKGROUND,
+      paper: APP_PAPER,
     },
     primary: {
       main: '#6C63FF',
@@ -28,6 +29,15 @@ const theme = createTheme({
     },
     error: {
       main: '#ef4444',
+    },
+  },
+  components: {
+    // Every text field and select sits on the page background rather than
+    // the lighter paper colour of the panel around it.
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: { backgroundColor: APP_BACKGROUND },
+      },
     },
   },
   typography: {

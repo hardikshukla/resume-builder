@@ -4,6 +4,7 @@ import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
 import { Recommendation } from '@/types';
+import { RAISED_PANEL } from '@/components/ui/tokens';
 
 interface RecommendationCardProps {
   rec: Recommendation;
@@ -27,7 +28,7 @@ export default function RecommendationCard({
       borderRadius: 2,
       border: '1px solid',
       borderColor: checked ? 'warning.main' : 'divider',
-      backgroundColor: checked ? 'rgba(237,108,2,0.02)' : '#161920',
+      backgroundColor: checked ? 'rgba(237,108,2,0.02)' : RAISED_PANEL,
       display: 'flex',
       alignItems: 'flex-start',
       gap: 1.5,
@@ -84,7 +85,7 @@ export default function RecommendationCard({
         </Typography>
         
         {!isCustom && (
-          <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, backgroundColor: '#0f1117', border: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, backgroundColor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: '0.7rem' }}>
               <strong>Evidence Required:</strong> {rec.evidenceRequired}
             </Typography>

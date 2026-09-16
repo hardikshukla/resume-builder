@@ -22,6 +22,52 @@ import AutorenewIcon from '@mui/icons-material/Autorenew';
 
 import { ResumeBuilderOutput, Recommendation, JDExtractionResult } from '@/types';
 import RecommendationCard from './RecommendationCard';
+import { RAISED_PANEL } from '@/components/ui/tokens';
+import { DEALBREAKER_PENALTY, MATCH_SCORE_CAP, SCORE_BREAKDOWN_TOTAL, SCORE_SECTION_MAX } from '@/lib/constants';
+import { SxProps, Theme } from '@mui/material/styles';
+
+interface SectionAccordionProps {
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  /** Space below the section, in theme units. */
+  spacing: number;
+  /** Optional control shown at the right end of the header. */
+  action?: React.ReactNode;
+  detailsSx?: SxProps<Theme>;
+  children: React.ReactNode;
+}
+
+/** An expanded-by-default section of the gap analysis. */
+function SectionAccordion({ icon, title, spacing, action, detailsSx, children }: SectionAccordionProps) {
+  const heading = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {icon}
+      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        {title}
+      </Typography>
+    </Box>
+  );
+  return (
+    <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: 'background.default', mb: spacing }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        {action ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
+            {heading}
+            {action}
+          </Box>
+        ) : heading}
+      </AccordionSummary>
+      <AccordionDetails sx={detailsSx}>{children}</AccordionDetails>
+    </Accordion>
+  );
+}
+
+/** The three scored sections, in bar order, with their colour. */
+const SCORE_SEGMENTS = [
+  { key: 'summary', label: 'Summary', color: 'primary.main' },
+  { key: 'skills', label: 'Skills', color: 'success.main' },
+  { key: 'experience', label: 'Experience', color: 'warning.main' },
+] as const;
 
 interface GapAnalysisPanelProps {
   output: ResumeBuilderOutput;
@@ -70,6 +116,7 @@ export default function GapAnalysisPanel({
     new Map(output.gapAnalysis.recommendations.map((r) => [r.claim, r])).values()
   );
   const allRecommendations = [...uniqueRecommendations, ...customRecommendations];
+  const { scoreBreakdown } = output.gapAnalysis;
 
   const isDealbreakerResolved = (dbId: string) =>
     selectedRecs.some((recId) => {
@@ -97,60 +144,42 @@ export default function GapAnalysisPanel({
           </Typography>
         </Box>
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
-          Placement-weighted coverage (Summary &amp; Skills score higher). Deducts 5 pts per unresolved dealbreaker. Capped at 95.
+          {/* One string, as before: splitting it into text nodes changes kerning. */}
+          {`Placement-weighted coverage (Summary & Skills score higher). Deducts ${DEALBREAKER_PENALTY} pts per unresolved dealbreaker. Capped at ${MATCH_SCORE_CAP}.`}
         </Typography>
 
         {/* Score Breakdown Stacked Bar Chart */}
-        {output.gapAnalysis.scoreBreakdown && (
+        {scoreBreakdown && (
           <Box sx={{ mt: 1.5, mb: 3 }}>
             <Box sx={{ display: 'flex', height: 14, borderRadius: 7, overflow: 'hidden', backgroundColor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
-              {output.gapAnalysis.scoreBreakdown.summary > 0 && (
-                <Box sx={{
-                  width: `${(output.gapAnalysis.scoreBreakdown.summary / 85) * 100}%`,
-                  backgroundColor: 'primary.main',
-                  height: '100%',
-                }} title={`Summary: ${output.gapAnalysis.scoreBreakdown.summary}/25`} />
-              )}
-              {output.gapAnalysis.scoreBreakdown.skills > 0 && (
-                <Box sx={{
-                  width: `${(output.gapAnalysis.scoreBreakdown.skills / 85) * 100}%`,
-                  backgroundColor: 'success.main',
-                  height: '100%',
-                }} title={`Skills: ${output.gapAnalysis.scoreBreakdown.skills}/30`} />
-              )}
-              {output.gapAnalysis.scoreBreakdown.experience > 0 && (
-                <Box sx={{
-                  width: `${(output.gapAnalysis.scoreBreakdown.experience / 85) * 100}%`,
-                  backgroundColor: 'warning.main',
-                  height: '100%',
-                }} title={`Experience: ${output.gapAnalysis.scoreBreakdown.experience}/30`} />
-              )}
+              {/* One segment per section, sized against the full breakdown total. */}
+              {SCORE_SEGMENTS.map(({ key, label, color }) => {
+                const points = scoreBreakdown[key];
+                return points > 0 && (
+                  <Box key={key} sx={{
+                    width: `${(points / SCORE_BREAKDOWN_TOTAL) * 100}%`,
+                    backgroundColor: color,
+                    height: '100%',
+                  }} title={`${label}: ${points}/${SCORE_SECTION_MAX[key]}`} />
+                );
+              })}
             </Box>
             
             {/* Legend / Labels */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, flexWrap: 'wrap', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'primary.main' }} />
-                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
-                  Summary ({output.gapAnalysis.scoreBreakdown.summary}/25)
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'success.main' }} />
-                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
-                  Skills ({output.gapAnalysis.scoreBreakdown.skills}/30)
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'warning.main' }} />
-                <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
-                  Experience ({output.gapAnalysis.scoreBreakdown.experience}/30)
-                </Typography>
-              </Box>
-              {output.gapAnalysis.scoreBreakdown.dealbreakersDeducted > 0 && (
+              {SCORE_SEGMENTS.map(({ key, label, color }) => (
+                <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
+                  <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+                    {/* Text nodes split as "Summary (" | "20" | "/25)", matching the original layout. */}
+                    {`${label} (`}{scoreBreakdown[key]}{`/${SCORE_SECTION_MAX[key]})`}
+                  </Typography>
+                </Box>
+              ))}
+              {scoreBreakdown.dealbreakersDeducted > 0 && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'error.main', fontWeight: 600 }}>
-                    -{output.gapAnalysis.scoreBreakdown.dealbreakersDeducted} pts (dealbreakers)
+                    -{scoreBreakdown.dealbreakersDeducted} pts (dealbreakers)
                   </Typography>
                 </Box>
               )}
@@ -161,237 +190,190 @@ export default function GapAnalysisPanel({
 
         {/* Job Description Analysis (Pre-extracted keywords) */}
         {jdKeywords && (
-          <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 2 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AutoAwesomeIcon color="secondary" fontSize="small" />
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  🔍 Job Description Analysis (Haiku Extracted)
+          <SectionAccordion icon={<AutoAwesomeIcon color="secondary" fontSize="small" />} title="🔍 Job Description Analysis (Haiku Extracted)" spacing={2} detailsSx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <Typography variant="body2">
+                <strong>Seniority:</strong> {jdKeywords.seniority || 'N/A'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Company:</strong> {jdKeywords.companyName || 'N/A'}
+              </Typography>
+            </Box>
+            
+            {jdKeywords.mustHaveSkills && jdKeywords.mustHaveSkills.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
+                  MUST-HAVE SKILLS
                 </Typography>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                <Typography variant="body2">
-                  <strong>Seniority:</strong> {jdKeywords.seniority || 'N/A'}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Company:</strong> {jdKeywords.companyName || 'N/A'}
-                </Typography>
-              </Box>
-              
-              {jdKeywords.mustHaveSkills && jdKeywords.mustHaveSkills.length > 0 && (
-                <Box>
-                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
-                    MUST-HAVE SKILLS
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {jdKeywords.mustHaveSkills.map((sk) => (
-                      <Chip key={sk} label={sk} size="small" variant="outlined" color="primary" />
-                    ))}
-                  </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {jdKeywords.mustHaveSkills.map((sk) => (
+                    <Chip key={sk} label={sk} size="small" variant="outlined" color="primary" />
+                  ))}
                 </Box>
-              )}
-              
-              {jdKeywords.niceToHaveSkills && jdKeywords.niceToHaveSkills.length > 0 && (
-                <Box>
-                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
-                    NICE-TO-HAVE SKILLS
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {jdKeywords.niceToHaveSkills.map((sk) => (
-                      <Chip key={sk} label={sk} size="small" variant="outlined" />
-                    ))}
-                  </Box>
+              </Box>
+            )}
+            
+            {jdKeywords.niceToHaveSkills && jdKeywords.niceToHaveSkills.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
+                  NICE-TO-HAVE SKILLS
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {jdKeywords.niceToHaveSkills.map((sk) => (
+                    <Chip key={sk} label={sk} size="small" variant="outlined" />
+                  ))}
                 </Box>
-              )}
+              </Box>
+            )}
 
-              {jdKeywords.gapsDetected && jdKeywords.gapsDetected.length > 0 && (
-                <Box>
-                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
-                    GAPS DETECTED
-                  </Typography>
-                  <Box component="ul" sx={{ m: 0, pl: 2, fontSize: '0.85rem', color: 'text.secondary' }}>
-                    {jdKeywords.gapsDetected.map((g, i) => (
-                      <li key={i}>{g}</li>
-                    ))}
-                  </Box>
+            {jdKeywords.gapsDetected && jdKeywords.gapsDetected.length > 0 && (
+              <Box>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 600 }}>
+                  GAPS DETECTED
+                </Typography>
+                <Box component="ul" sx={{ m: 0, pl: 2, fontSize: '0.85rem', color: 'text.secondary' }}>
+                  {jdKeywords.gapsDetected.map((g, i) => (
+                    <li key={i}>{g}</li>
+                  ))}
                 </Box>
-              )}
-            </AccordionDetails>
-          </Accordion>
+              </Box>
+            )}
+          </SectionAccordion>
         )}
 
         {/* Strong Matches */}
-        <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CheckCircleIcon color="success" fontSize="small" />
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                ✅ Strong Matches ({uniqueStrongMatches.length})
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {uniqueStrongMatches.map((kw) => (
-                <Chip key={kw} label={kw} color="success" variant="outlined" size="small" />
-              ))}
-            </Box>
-          </AccordionDetails>
-        </Accordion>
+        <SectionAccordion icon={<CheckCircleIcon color="success" fontSize="small" />} title={<>✅ Strong Matches ({uniqueStrongMatches.length})</>} spacing={1}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {uniqueStrongMatches.map((kw) => (
+              <Chip key={kw} label={kw} color="success" variant="outlined" size="small" />
+            ))}
+          </Box>
+        </SectionAccordion>
 
         {/* Keywords Added by Claude */}
-        <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AutoAwesomeIcon color="primary" fontSize="small" />
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                💡 Keywords Added by Claude ({uniqueKeywordsAdded.length})
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {uniqueKeywordsAdded.map((kw) => (
-                <Chip key={kw} label={kw} color="primary" variant="outlined" size="small" />
-              ))}
-            </Box>
-          </AccordionDetails>
-        </Accordion>
+        <SectionAccordion icon={<AutoAwesomeIcon color="primary" fontSize="small" />} title={<>💡 Keywords Added by Claude ({uniqueKeywordsAdded.length})</>} spacing={1}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {uniqueKeywordsAdded.map((kw) => (
+              <Chip key={kw} label={kw} color="primary" variant="outlined" size="small" />
+            ))}
+          </Box>
+        </SectionAccordion>
 
         {/* Dealbreakers */}
-        <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ErrorIcon color="error" fontSize="small" />
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                ❌ Dealbreakers / Missing ({uniqueDealbreakers.length})
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              {uniqueDealbreakers.map((db) => {
-                const resolved = isDealbreakerResolved(db.id);
-                return (
-                  <FormControlLabel key={db.id}
-                    control={<Checkbox checked={resolved} disabled color="error" />}
-                    label={
-                      <Typography variant="body2" sx={{
-                        textDecoration: resolved ? 'line-through' : 'none',
-                        color: resolved ? 'text.secondary' : 'error.main',
-                        opacity: resolved ? 0.6 : 1,
-                        fontWeight: resolved ? 400 : 600,
-                      }}>
-                        {db.text}{resolved && ' (Covered by recommendation)'}
-                      </Typography>
-                    }
-                  />
-                );
-              })}
-              {uniqueDealbreakers.length === 0 && (
-                <Typography variant="body2" sx={{ color: 'success.main' }}>No dealbreakers — excellent match!</Typography>
-              )}
-            </Box>
-          </AccordionDetails>
-        </Accordion>
+        <SectionAccordion icon={<ErrorIcon color="error" fontSize="small" />} title={<>❌ Dealbreakers / Missing ({uniqueDealbreakers.length})</>} spacing={1}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {uniqueDealbreakers.map((db) => {
+              const resolved = isDealbreakerResolved(db.id);
+              return (
+                <FormControlLabel key={db.id}
+                  control={<Checkbox checked={resolved} disabled color="error" />}
+                  label={
+                    <Typography variant="body2" sx={{
+                      textDecoration: resolved ? 'line-through' : 'none',
+                      color: resolved ? 'text.secondary' : 'error.main',
+                      opacity: resolved ? 0.6 : 1,
+                      fontWeight: resolved ? 400 : 600,
+                    }}>
+                      {db.text}{resolved && ' (Covered by recommendation)'}
+                    </Typography>
+                  }
+                />
+              );
+            })}
+            {uniqueDealbreakers.length === 0 && (
+              <Typography variant="body2" sx={{ color: 'success.main' }}>No dealbreakers — excellent match!</Typography>
+            )}
+          </Box>
+        </SectionAccordion>
 
         {/* Recommendations */}
-        <Accordion defaultExpanded variant="outlined" sx={{ borderColor: 'divider', backgroundColor: '#0f1117', mb: 2 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <WarningIcon color="warning" fontSize="small" />
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  📋 Actionable Recommendations ({allRecommendations.length})
-                </Typography>
-              </Box>
-              <IconButton
-                id="refresh-recommendations-btn"
-                size="small"
-                disabled={isRefreshing || isLoading}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  setIsRefreshing(true);
-                  await handleRefreshRecommendations(anthropicKey || undefined);
-                  setIsRefreshing(false);
-                }}
-                title="Re-analyse resume against JD and surface any new gaps"
-                sx={{
-                  color: 'warning.main',
-                  opacity: isRefreshing ? 0.6 : 1,
-                  transition: 'opacity 0.2s',
-                  '&:hover': { backgroundColor: 'rgba(237,108,2,0.1)' },
-                }}
-              >
-                {/* The progress spinner replaces the icon while a refresh runs. */}
-                {isRefreshing
-                  ? <CircularProgress size={16} color="warning" />
-                  : <AutorenewIcon fontSize="small" />}
-              </IconButton>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              {allRecommendations.map((rec) => {
-                const applied = appliedRecs.has(rec.id);
-                const checked = selectedRecs.includes(rec.id);
-                const isCustom = rec.id.startsWith('custom-');
-                return (
-                  <RecommendationCard
-                    key={rec.id}
-                    rec={rec}
-                    checked={checked}
-                    applied={applied}
-                    isCustom={isCustom}
-                    onToggle={() => handleRecToggle(rec.id)}
-                  />
-                );
-              })}
+        <SectionAccordion
+          icon={<WarningIcon color="warning" fontSize="small" />}
+          title={<>📋 Actionable Recommendations ({allRecommendations.length})</>}
+          spacing={2}
+          action={
+            <IconButton
+              id="refresh-recommendations-btn"
+              size="small"
+              disabled={isRefreshing || isLoading}
+              onClick={async (e) => {
+                e.stopPropagation();
+                setIsRefreshing(true);
+                await handleRefreshRecommendations(anthropicKey || undefined);
+                setIsRefreshing(false);
+              }}
+              title="Re-analyse resume against JD and surface any new gaps"
+              sx={{
+                color: 'warning.main',
+                opacity: isRefreshing ? 0.6 : 1,
+                transition: 'opacity 0.2s',
+                '&:hover': { backgroundColor: 'rgba(237,108,2,0.1)' },
+              }}
+            >
+              {/* The progress spinner replaces the icon while a refresh runs. */}
+              {isRefreshing
+                ? <CircularProgress size={16} color="warning" />
+                : <AutorenewIcon fontSize="small" />}
+            </IconButton>
+          }
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {allRecommendations.map((rec) => {
+              const applied = appliedRecs.has(rec.id);
+              const checked = selectedRecs.includes(rec.id);
+              const isCustom = rec.id.startsWith('custom-');
+              return (
+                <RecommendationCard
+                  key={rec.id}
+                  rec={rec}
+                  checked={checked}
+                  applied={applied}
+                  isCustom={isCustom}
+                  onToggle={() => handleRecToggle(rec.id)}
+                />
+              );
+            })}
 
-              {/* Add Custom Recommendation UI */}
-              <Box sx={{ mt: 1, p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider', backgroundColor: '#161920' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '0.8rem', color: 'text.primary' }}>
-                  ➕ Add Custom Refinement Instruction
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="e.g., Add Python to Core Competencies, highlight my AWS cert..."
-                    value={customRecText}
-                    onChange={(e) => setCustomRecText(e.target.value)}
-                    sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-                  />
-                  <Button
-                    variant="outlined"
-                    color="warning"
-                    size="small"
-                    onClick={() => {
-                      if (!customRecText.trim()) return;
-                      const newRec: Recommendation = {
-                        id: `custom-${Date.now()}`,
-                        claim: customRecText.trim(),
-                        targetSection: 'User Custom Instruction',
-                        evidenceRequired: 'User supplied',
-                        evidenceFound: 'User supplied',
-                        riskLevel: 'medium',
-                        resolvesDealbreakers: [],
-                      };
-                      setCustomRecommendations((prev) => [...prev, newRec]);
-                      setSelectedRecs((prev) => [...prev, newRec.id]);
-                      setCustomRecText('');
-                    }}
-                    sx={{ fontWeight: 600, px: 2 }}
-                  >
-                    Add
-                  </Button>
-                </Box>
+            {/* Add Custom Recommendation UI */}
+            <Box sx={{ mt: 1, p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider', backgroundColor: RAISED_PANEL }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, fontSize: '0.8rem', color: 'text.primary' }}>
+                ➕ Add Custom Refinement Instruction
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="e.g., Add Python to Core Competencies, highlight my AWS cert..."
+                  value={customRecText}
+                  onChange={(e) => setCustomRecText(e.target.value)}
+                />
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  size="small"
+                  onClick={() => {
+                    if (!customRecText.trim()) return;
+                    const newRec: Recommendation = {
+                      id: `custom-${Date.now()}`,
+                      claim: customRecText.trim(),
+                      targetSection: 'User Custom Instruction',
+                      evidenceRequired: 'User supplied',
+                      evidenceFound: 'User supplied',
+                      riskLevel: 'medium',
+                      resolvesDealbreakers: [],
+                    };
+                    setCustomRecommendations((prev) => [...prev, newRec]);
+                    setSelectedRecs((prev) => [...prev, newRec.id]);
+                    setCustomRecText('');
+                  }}
+                  sx={{ fontWeight: 600, px: 2 }}
+                >
+                  Add
+                </Button>
               </Box>
             </Box>
-          </AccordionDetails>
-        </Accordion>
+          </Box>
+        </SectionAccordion>
 
         <Button variant="contained" color="warning" fullWidth
           onClick={async () => {

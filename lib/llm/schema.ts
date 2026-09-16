@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { SCORE_SECTION_MAX } from '@/lib/constants';
 
 // ── Primitives ──────────────────────────────────────────────────────────────
 
@@ -91,19 +92,17 @@ const CoverLetterSchema = z.object({
   body:    z.string(),
 });
 
+/** An integer section score, clamped into 0..max rather than rejected. */
+const sectionScore = (max: number) =>
+  z.preprocess(
+    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), max) : val,
+    z.number().int()
+  );
+
 const ScoreBreakdownSchema = z.object({
-  summary: z.preprocess(
-    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 25) : val,
-    z.number().int()
-  ),
-  skills: z.preprocess(
-    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 30) : val,
-    z.number().int()
-  ),
-  experience: z.preprocess(
-    (val) => typeof val === 'number' ? Math.min(Math.max(val, 0), 30) : val,
-    z.number().int()
-  ),
+  summary: sectionScore(SCORE_SECTION_MAX.summary),
+  skills: sectionScore(SCORE_SECTION_MAX.skills),
+  experience: sectionScore(SCORE_SECTION_MAX.experience),
   dealbreakersDeducted: z.number().int().min(0),
 });
 

@@ -16,19 +16,16 @@ import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Skeleton from '@mui/material/Skeleton';
 import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
 import Divider from '@mui/material/Divider';
 import Link from '@mui/material/Link';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LockIcon from '@mui/icons-material/Lock';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 import { useApiKey } from '@/hooks/useApiKey';
-import { Recommendation, FieldStatus, ModelOption } from '@/types';
+import { Recommendation, FieldStatus, ModelOption, DropboxSaveStatus } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
@@ -51,7 +48,10 @@ import { ContextPill } from '@/components/ContextPill';
 import { useBackButtonPrevention } from '@/hooks/useBackButtonPrevention';
 import BackNavigationDialog from '@/components/BackNavigationDialog';
 import DropboxSetupDialog from '@/components/DropboxSetupDialog';
-import FieldStatusAdornment from '@/components/FieldStatusAdornment';
+import SecretField from '@/components/SecretField';
+import CharCount from '@/components/CharCount';
+import Overlay from '@/components/ui/Overlay';
+import { BRAND_GRADIENT, BRAND_GRADIENT_HOVER } from '@/components/ui/tokens';
 
 export default function Home() {
   const { anthropicKey, dropboxToken, setAnthropicKey, setDropboxToken } = useApiKey();
@@ -90,14 +90,14 @@ export default function Home() {
   const [appliedRecs, setAppliedRecs] = useState<Set<string>>(new Set());
   const [customRecommendations, setCustomRecommendations] = useState<Recommendation[]>([]);
   const [customRecText, setCustomRecText] = useState('');
-  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
-  const [showDropboxToken, setShowDropboxToken] = useState(false);
   const [dropboxSetupOpen, setDropboxSetupOpen] = useState(false);
-  const [dropboxStatus, setDropboxStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  /** Result of the last "Save to Dropbox" (shown above the preview). */
+  const [dropboxSaveStatus, setDropboxSaveStatus] = useState<DropboxSaveStatus | null>(null);
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [isVerifyingDropbox, setIsVerifyingDropbox] = useState(false);
-  const [dropboxStatusMsg, setDropboxStatusMsg] = useState<FieldStatus | null>(null);
+  /** Result of the background token check (shown on the token field). */
+  const [dropboxTokenStatus, setDropboxTokenStatus] = useState<FieldStatus | null>(null);
   const [anthropicKeyTouched, setAnthropicKeyTouched] = useState(false);
   const [isCheckingAnthropicKey, setIsCheckingAnthropicKey] = useState(false);
   const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
@@ -274,7 +274,7 @@ export default function Home() {
 
   const verifyDropboxToken = async (token: string) => {
     setIsVerifyingDropbox(true);
-    setDropboxStatusMsg(null);
+    setDropboxTokenStatus(null);
     // Record the attempt up front. Every outcome, including failure, counts as
     // "this token has been checked" — otherwise each focus/blur re-fires the
     // request for a token we already know about. "Try again" clears the ref.
@@ -287,17 +287,17 @@ export default function Home() {
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        setDropboxStatusMsg({ ok: true, message: `Connected as ${data.account}` });
+        setDropboxTokenStatus({ ok: true, message: `Connected as ${data.account}` });
       } else if (res.status === 429) {
         // Our own rate limiter, not Dropbox's verdict on the token.
-        setDropboxStatusMsg({ ok: false, message: 'Too many checks in a row. Wait a moment, then try again.' });
+        setDropboxTokenStatus({ ok: false, message: 'Too many checks in a row. Wait a moment, then try again.' });
       } else {
         const rawError = typeof data.error === 'object' && data.error ? data.error.message : data.error;
-        setDropboxStatusMsg({ ok: false, message: toDropboxErrorMessage(rawError) });
+        setDropboxTokenStatus({ ok: false, message: toDropboxErrorMessage(rawError) });
       }
     } catch (err) {
       console.error('Dropbox token verification error:', err);
-      setDropboxStatusMsg({ ok: false, message: "Couldn't reach Dropbox to check this token" });
+      setDropboxTokenStatus({ ok: false, message: "Couldn't reach Dropbox to check this token" });
     } finally {
       setIsVerifyingDropbox(false);
     }
@@ -319,7 +319,7 @@ export default function Home() {
   const handleDropboxBlur = () => {
     const token = dropboxToken?.trim();
     if (!token) {
-      setDropboxStatusMsg(null);
+      setDropboxTokenStatus(null);
       lastCheckedDropboxToken.current = null;
       return;
     }
@@ -451,7 +451,7 @@ export default function Home() {
 
   const handleSaveToDropbox = async (type: 'resume' | 'coverLetter') => {
     if (!output || !dropboxToken) return;
-    setDropboxStatus(null);
+    setDropboxSaveStatus(null);
     try {
       const co = getCompanyStr();
       const filename = getFilename(type);
@@ -477,17 +477,11 @@ export default function Home() {
       });
       // Dropbox answers with JSON jargon; translate it before it reaches the banner.
       if (!res.ok) throw new Error(toDropboxUploadErrorMessage(await res.text()));
-      setDropboxStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
+      setDropboxSaveStatus({ type: 'success', message: `Saved to Dropbox: ${path}` });
       setActiveStep(3);
     } catch (err) {
-      setDropboxStatus({ type: 'error', message: err instanceof Error ? err.message : 'Dropbox failed.' });
+      setDropboxSaveStatus({ type: 'error', message: err instanceof Error ? err.message : 'Dropbox failed.' });
     }
-  };
-
-  const getCharColor = (count: number, limit: number, warn: number) => {
-    if (count > limit) return 'error.main';
-    if (count > warn) return 'warning.main';
-    return 'text.secondary';
   };
 
   const renderInputs = () => (
@@ -501,7 +495,7 @@ export default function Home() {
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
-        backgroundColor: '#0f1117',
+        backgroundColor: 'background.default',
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -540,40 +534,33 @@ export default function Home() {
         </Box>
         <TextField multiline rows={8} fullWidth value={resume}
           onChange={(e) => handleResumeChange(e.target.value)}
-          placeholder="Paste your current resume or upload above..." variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+          placeholder="Paste your current resume or upload above..." variant="outlined" />
         {parseError && (
           <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
             ⚠️ {parseError}
           </Typography>
         )}
-        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(resume.length, MAX_RESUME_CHARS, RESUME_WARN_CHARS) }}>
-          {resume.length.toLocaleString()} / {MAX_RESUME_CHARS.toLocaleString()} chars
-        </Typography>
+        <CharCount count={resume.length} limit={MAX_RESUME_CHARS} warnAt={RESUME_WARN_CHARS} />
       </Box>
 
       {/* Job Description */}
       <Box>
         <TextField label="Job Description" multiline rows={8} fullWidth value={jobDescription}
           onChange={(e) => setJD(e.target.value)}
-          placeholder="Paste the target Job Description..." variant="outlined"
-          sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
-        <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5, color: getCharColor(jobDescription.length, MAX_JD_CHARS, JD_WARN_CHARS) }}>
-          {jobDescription.length.toLocaleString()} / {MAX_JD_CHARS.toLocaleString()} chars
-        </Typography>
+          placeholder="Paste the target Job Description..." variant="outlined" />
+        <CharCount count={jobDescription.length} limit={MAX_JD_CHARS} warnAt={JD_WARN_CHARS} />
       </Box>
 
       {/* Company Name */}
       <TextField label="Company name" fullWidth value={companyName}
-        onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google"
-        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }} />
+        onChange={(e) => setCompany(e.target.value)} placeholder="e.g. Google" />
 
       <Divider sx={{ borderColor: 'divider' }} />
 
       {/* Anthropic Key */}
-      <TextField
+      <SecretField
         label="Anthropic API key"
-        type={showAnthropicKey ? 'text' : 'password'} fullWidth
+        fullWidth
         value={hasServerKey ? '' : anthropicKey}
         onChange={(e) => setAnthropicKey(e.target.value)}
         onBlur={() => setAnthropicKeyTouched(true)}
@@ -589,29 +576,13 @@ export default function Home() {
                 ? anthropicKeyStatus.message
                 : 'Kept in this tab only, never logged server-side.'
         }
-        sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}
-        slotProps={{ input: {
-          endAdornment: (
-            <InputAdornment position="end">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {!hasServerKey && (
-                  <FieldStatusAdornment
-                    checking={isCheckingAnthropicKey}
-                    status={anthropicKeyStatus}
-                    label="Anthropic API key"
-                  />
-                )}
-                <IconButton onClick={() => setShowAnthropicKey(!showAnthropicKey)} edge="end" disabled={hasServerKey}>
-                  {showAnthropicKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                </IconButton>
-              </Box>
-            </InputAdornment>
-          ),
-        }}}
+        checking={isCheckingAnthropicKey}
+        status={anthropicKeyStatus}
+        hideStatus={hasServerKey}
       />
 
       {/* Claude Model Selection */}
-      <FormControl fullWidth sx={{ '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' } }}>
+      <FormControl fullWidth>
         <InputLabel id="model-select-label">Claude model</InputLabel>
         <Select
           labelId="model-select-label"
@@ -635,40 +606,25 @@ export default function Home() {
 
       {/* Dropbox — checked on blur, never blocks generation */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <TextField
+        <SecretField
           label="Dropbox access token"
-          type={showDropboxToken ? 'text' : 'password'} fullWidth
+          fullWidth
           value={dropboxToken || ''}
           onChange={(e) => {
             setDropboxToken(e.target.value);
             // The old verdict described the old token. Go quiet until blur re-checks.
-            setDropboxStatusMsg(null);
+            setDropboxTokenStatus(null);
           }}
           onBlur={handleDropboxBlur}
           placeholder="Paste to save exports to Dropbox"
-          helperText={dropboxStatusMsg?.message ?? ' '}
+          helperText={dropboxTokenStatus?.message ?? ' '}
           sx={{
-            '& .MuiOutlinedInput-root': { backgroundColor: '#0f1117' },
             '& .MuiFormHelperText-root': {
-              color: dropboxStatusMsg ? (dropboxStatusMsg.ok ? 'success.main' : 'error.main') : 'text.secondary',
+              color: dropboxTokenStatus ? (dropboxTokenStatus.ok ? 'success.main' : 'error.main') : 'text.secondary',
             },
           }}
-          slotProps={{ input: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <FieldStatusAdornment
-                    checking={isVerifyingDropbox}
-                    status={dropboxStatusMsg}
-                    label="Dropbox token"
-                  />
-                  <IconButton onClick={() => setShowDropboxToken(!showDropboxToken)} edge="end">
-                    {showDropboxToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                </Box>
-              </InputAdornment>
-            ),
-          }}}
+          checking={isVerifyingDropbox}
+          status={dropboxTokenStatus}
         />
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Link
@@ -681,7 +637,7 @@ export default function Home() {
           >
             How do I get a token?
           </Link>
-          {dropboxStatusMsg && !dropboxStatusMsg.ok && !isVerifyingDropbox && (
+          {dropboxTokenStatus && !dropboxTokenStatus.ok && !isVerifyingDropbox && (
             <Link
               component="button"
               type="button"
@@ -712,9 +668,9 @@ export default function Home() {
                 },
               }
             : {
-                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+                background: BRAND_GRADIENT,
                 boxShadow: '0 4px 20px rgba(108,99,255,0.4)',
-                '&:hover': { background: 'linear-gradient(135deg, #5b54e5, #9546e5)' },
+                '&:hover': { background: BRAND_GRADIENT_HOVER },
               }),
         }}>
         {isLoading
@@ -727,12 +683,12 @@ export default function Home() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0f1117' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
 
       {/* Header */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', py: 2, px: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6c63ff, #a855f7)', borderRadius: 2, display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
+          <Box sx={{ width: 40, height: 40, background: BRAND_GRADIENT, borderRadius: 2, display: 'grid', placeItems: 'center', color: '#fff', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
             <AutoAwesomeIcon />
           </Box>
           <Box>
@@ -782,7 +738,7 @@ export default function Home() {
                 paper: {
                   sx: {
                     width: '320px',
-                    backgroundColor: '#0f1117',
+                    backgroundColor: 'background.default',
                     borderRight: '1px solid rgba(255,255,255,0.1)',
                   },
                 },
@@ -802,7 +758,7 @@ export default function Home() {
                 bottom: 24,
                 right: 24,
                 zIndex: 1000,
-                background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
+                background: BRAND_GRADIENT,
               }}
             >
               <SettingsIcon />
@@ -931,8 +887,8 @@ export default function Home() {
                     setShowHighlights={setShowHighlights}
                     boldingKeywords={boldingKeywords}
                     dropboxToken={dropboxToken}
-                    dropboxStatus={dropboxStatus}
-                    setDropboxStatus={setDropboxStatus}
+                    dropboxSaveStatus={dropboxSaveStatus}
+                    setDropboxSaveStatus={setDropboxSaveStatus}
                     handleDownload={handleDownload}
                     handleSaveToDropbox={handleSaveToDropbox}
                     handleManualEdit={handleManualEdit}
@@ -952,8 +908,8 @@ export default function Home() {
                     setShowHighlights={setShowHighlights}
                     boldingKeywords={boldingKeywords}
                     dropboxToken={dropboxToken}
-                    dropboxStatus={dropboxStatus}
-                    setDropboxStatus={setDropboxStatus}
+                    dropboxSaveStatus={dropboxSaveStatus}
+                    setDropboxSaveStatus={setDropboxSaveStatus}
                     handleDownload={handleDownload}
                     handleSaveToDropbox={handleSaveToDropbox}
                     handleManualEdit={handleManualEdit}
@@ -981,7 +937,7 @@ export default function Home() {
 
       {/* Session Expired Overlay */}
       {isSessionExpired && (
-        <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,17,23,0.96)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+        <Overlay opacity={0.96} blur={false}>
           <Paper elevation={0} sx={{ p: 4, border: '1px solid', borderColor: 'divider', borderRadius: 3, maxWidth: 400, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <LockIcon color="error" sx={{ fontSize: 40, mx: 'auto' }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Session Expired</Typography>
@@ -992,7 +948,7 @@ export default function Home() {
               Start New Session
             </Button>
           </Paper>
-        </Box>
+        </Overlay>
       )}
 
       {/* Print CSS */}

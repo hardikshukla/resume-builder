@@ -4,6 +4,7 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import Overlay from '@/components/ui/Overlay';
 
 interface BackNavigationDialogProps {
   open: boolean;
@@ -14,27 +15,13 @@ interface BackNavigationDialogProps {
 /**
  * Confirmation overlay shown when the user presses the browser back button
  * while a generated resume is active. Mirrors the session-expired overlay
- * pattern already used in page.tsx (fixed Box + Paper, no MUI Dialog import).
+ * pattern used by the app's other dialogs (shared Overlay + Paper, no MUI Dialog).
  */
 export default function BackNavigationDialog({ open, onStay, onLeave }: BackNavigationDialogProps) {
   if (!open) return null;
 
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(15,17,23,0.92)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        backdropFilter: 'blur(4px)',
-      }}
-    >
+    <Overlay>
       <Paper
         elevation={0}
         sx={{
@@ -84,6 +71,6 @@ export default function BackNavigationDialog({ open, onStay, onLeave }: BackNavi
           </Button>
         </Box>
       </Paper>
-    </Box>
+    </Overlay>
   );
 }

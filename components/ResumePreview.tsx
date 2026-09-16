@@ -2,32 +2,22 @@ import React, { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PrintIcon from '@mui/icons-material/Print';
-import { ResumeBuilderOutput } from '@/types';
+import { DropboxSaveStatus, ManualEdit, ResumeBuilderOutput } from '@/types';
 import { renderDiffText } from '@/lib/utils/highlight';
 import { contactParts } from '@/lib/utils/contact';
 import { EditableField } from './EditableField';
-
-const A4_STYLES = {
-  backgroundColor: '#ffffff',
-  color: '#000000',
-  p: 6,
-  fontFamily: '"Times New Roman", Times, serif',
-  fontSize: '11pt',
-  lineHeight: 1.5,
-  boxShadow: '0 4px 40px rgba(0,0,0,0.5)',
-  border: '1px solid #d3d3d3',
-  minHeight: '11in',
-  width: '100%',
-  maxWidth: '8.5in',
-  mx: 'auto',
-} as const;
+import {
+  BODY_TEXT_SX,
+  DropboxSaveAlert,
+  LETTER_PAGE_SX,
+  PreviewToolbar,
+  UnappliedEditsAlert,
+} from './preview/PreviewParts';
 
 const SECTION_HEADER_SX = {
   fontFamily: '"Times New Roman"',
@@ -39,11 +29,6 @@ const SECTION_HEADER_SX = {
   fontWeight: 700,
 };
 
-const BODY_TEXT_SX = {
-  fontFamily: '"Times New Roman"',
-  fontSize: '11pt',
-};
-
 interface ResumePreviewProps {
   output: ResumeBuilderOutput;
   originalOutput: ResumeBuilderOutput | null;
@@ -51,14 +36,14 @@ interface ResumePreviewProps {
   setShowHighlights: (checked: boolean) => void;
   boldingKeywords: string[];
   dropboxToken: string | null;
-  dropboxStatus: { type: 'success' | 'error'; message: string } | null;
-  setDropboxStatus: (status: { type: 'success' | 'error'; message: string } | null) => void;
+  dropboxSaveStatus: DropboxSaveStatus | null;
+  setDropboxSaveStatus: (status: DropboxSaveStatus | null) => void;
   handleDownload: (type: 'resume' | 'coverLetter') => void;
   handleSaveToDropbox: (type: 'resume' | 'coverLetter') => void;
   handleManualEdit: (path: string, value: string) => void;
   handlePrint: () => void;
-  manualEdits: { path: string; originalValue: string; editedValue: string }[];
-  orphanedEdits: { path: string; originalValue: string; editedValue: string }[];
+  manualEdits: ManualEdit[];
+  orphanedEdits: ManualEdit[];
   clearOrphanedEdits: (prefix?: 'resume' | 'coverLetter') => void;
 }
 
@@ -69,8 +54,8 @@ export default function ResumePreview({
   setShowHighlights,
   boldingKeywords,
   dropboxToken,
-  dropboxStatus,
-  setDropboxStatus,
+  dropboxSaveStatus,
+  setDropboxSaveStatus,
   handleDownload,
   handleSaveToDropbox,
   handleManualEdit,
@@ -89,40 +74,26 @@ export default function ResumePreview({
 
   return (
     <Box id="tabpanel-resume" role="tabpanel" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <FormControlLabel
-          control={<Switch checked={showHighlights} onChange={(e) => setShowHighlights(e.target.checked)} color="success" />}
-          label="Show Highlights"
-        />
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('resume')}>Download DOCX</Button>
-          {dropboxToken && (
-            <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('resume')}>Save to Dropbox</Button>
-          )}
-          <Button startIcon={<PrintIcon />} variant="contained" color="secondary" size="small" onClick={handlePrint}>Print / PDF</Button>
-        </Box>
-      </Box>
+      <PreviewToolbar showHighlights={showHighlights} onShowHighlightsChange={setShowHighlights}>
+        <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('resume')}>Download DOCX</Button>
+        {dropboxToken && (
+          <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('resume')}>Save to Dropbox</Button>
+        )}
+        <Button startIcon={<PrintIcon />} variant="contained" color="secondary" size="small" onClick={handlePrint}>Print / PDF</Button>
+      </PreviewToolbar>
 
       <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: -1 }}>
         In the print dialog, open &ldquo;More settings&rdquo; and turn off <strong>Headers and footers</strong> to avoid the browser stamping a date/URL onto the PDF.
       </Typography>
 
-      {dropboxStatus && (
-        <Alert severity={dropboxStatus.type} onClose={() => setDropboxStatus(null)}>{dropboxStatus.message}</Alert>
-      )}
+      <DropboxSaveAlert status={dropboxSaveStatus} onClose={() => setDropboxSaveStatus(null)} />
 
-      {resumeOrphans && resumeOrphans.length > 0 && (
-        <Alert severity="warning" onClose={() => clearOrphanedEdits('resume')} sx={{ mb: 2 }}>
-          <strong>⚠️ Unapplied Edits:</strong> The following manual edit(s) could not be automatically merged because the content was significantly rewritten during refinement:
-          <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
-            {resumeOrphans.map((edit, idx) => (
-              <Box component="li" key={idx} sx={{ fontSize: '0.85rem', mt: 0.5 }}>
-                At <code>{edit.path}</code>: <em>&ldquo;{edit.editedValue}&rdquo;</em>
-              </Box>
-            ))}
-          </Box>
-        </Alert>
-      )}
+      <UnappliedEditsAlert
+        title="⚠️ Unapplied Edits:"
+        edits={resumeOrphans}
+        describeLocation={(edit) => <code>{edit.path}</code>}
+        onClose={() => clearOrphanedEdits('resume')}
+      />
 
       {output.hallucinationReport && !output.hallucinationReport.passed && (
         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -138,7 +109,7 @@ export default function ResumePreview({
       )}
 
       {/* A4 Preview */}
-      <Box id="resume-print-area" sx={A4_STYLES}>
+      <Box id="resume-print-area" sx={LETTER_PAGE_SX}>
         {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 2 }}>
           <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>

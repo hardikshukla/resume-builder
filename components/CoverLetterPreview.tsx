@@ -2,38 +2,30 @@ import React, { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { ResumeBuilderOutput } from '@/types';
+import { DropboxSaveStatus, ManualEdit, ResumeBuilderOutput } from '@/types';
 import { renderDiffText } from '@/lib/utils/highlight';
 import { contactParts } from '@/lib/utils/contact';
 import { capitalizeName } from '@/lib/utils/string';
 import { EditableField } from './EditableField';
+import {
+  BODY_TEXT_SX,
+  DropboxSaveAlert,
+  LETTER_PAGE_SX,
+  PreviewToolbar,
+  UnappliedEditsAlert,
+} from './preview/PreviewParts';
 
-const A4_STYLES = {
-  backgroundColor: '#ffffff',
-  color: '#000000',
-  p: 6,
-  fontFamily: '"Times New Roman", Times, serif',
-  fontSize: '11pt',
-  lineHeight: 1.5,
-  boxShadow: '0 4px 40px rgba(0,0,0,0.5)',
-  border: '1px solid #d3d3d3',
-  minHeight: '11in',
-  width: '100%',
-  maxWidth: '8.5in',
-  mx: 'auto',
-} as const;
+/** "coverLetter.body[1]" -> "Paragraph 2"; other paths are shown as-is. */
+function describeCoverLetterLocation(edit: ManualEdit): string {
+  const match = edit.path.match(/\[(\d+)\]$/);
+  return match ? `Paragraph ${parseInt(match[1], 10) + 1}` : edit.path;
+}
 
-const BODY_TEXT_SX = {
-  fontFamily: '"Times New Roman"',
-  fontSize: '11pt',
-};
 
 interface CoverLetterPreviewProps {
   output: ResumeBuilderOutput;
@@ -42,13 +34,13 @@ interface CoverLetterPreviewProps {
   setShowHighlights: (checked: boolean) => void;
   boldingKeywords: string[];
   dropboxToken: string | null;
-  dropboxStatus: { type: 'success' | 'error'; message: string } | null;
-  setDropboxStatus: (status: { type: 'success' | 'error'; message: string } | null) => void;
+  dropboxSaveStatus: DropboxSaveStatus | null;
+  setDropboxSaveStatus: (status: DropboxSaveStatus | null) => void;
   handleDownload: (type: 'resume' | 'coverLetter') => void;
   handleSaveToDropbox: (type: 'resume' | 'coverLetter') => void;
   handleManualEdit: (path: string, value: string) => void;
-  manualEdits: { path: string; originalValue: string; editedValue: string }[];
-  orphanedEdits: { path: string; originalValue: string; editedValue: string }[];
+  manualEdits: ManualEdit[];
+  orphanedEdits: ManualEdit[];
   clearOrphanedEdits: (prefix?: 'resume' | 'coverLetter') => void;
 }
 
@@ -59,8 +51,8 @@ export default function CoverLetterPreview({
   setShowHighlights,
   boldingKeywords,
   dropboxToken,
-  dropboxStatus,
-  setDropboxStatus,
+  dropboxSaveStatus,
+  setDropboxSaveStatus,
   handleDownload,
   handleSaveToDropbox,
   handleManualEdit,
@@ -78,46 +70,28 @@ export default function CoverLetterPreview({
 
   return (
     <Box id="tabpanel-cover" role="tabpanel" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <FormControlLabel
-          control={<Switch checked={showHighlights} onChange={(e) => setShowHighlights(e.target.checked)} color="success" />}
-          label="Show Highlights"
-        />
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button startIcon={<ContentCopyIcon />} variant="outlined" size="small"
-            onClick={() => { if (output.coverLetter) { navigator.clipboard.writeText(output.coverLetter.body); } }}>
-            Copy Body
-          </Button>
-          <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('coverLetter')}>Download DOCX</Button>
-          {dropboxToken && (
-            <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('coverLetter')}>Save to Dropbox</Button>
-          )}
-        </Box>
-      </Box>
+      <PreviewToolbar showHighlights={showHighlights} onShowHighlightsChange={setShowHighlights}>
+        <Button startIcon={<ContentCopyIcon />} variant="outlined" size="small"
+          onClick={() => { if (output.coverLetter) { navigator.clipboard.writeText(output.coverLetter.body); } }}>
+          Copy Body
+        </Button>
+        <Button startIcon={<DownloadIcon />} variant="outlined" size="small" onClick={() => handleDownload('coverLetter')}>Download DOCX</Button>
+        {dropboxToken && (
+          <Button startIcon={<CloudUploadIcon />} variant="outlined" color="primary" size="small" onClick={() => handleSaveToDropbox('coverLetter')}>Save to Dropbox</Button>
+        )}
+      </PreviewToolbar>
 
-      {dropboxStatus && (
-        <Alert severity={dropboxStatus.type} onClose={() => setDropboxStatus(null)}>{dropboxStatus.message}</Alert>
-      )}
+      <DropboxSaveAlert status={dropboxSaveStatus} onClose={() => setDropboxSaveStatus(null)} />
 
-      {coverLetterOrphans && coverLetterOrphans.length > 0 && (
-        <Alert severity="warning" onClose={() => clearOrphanedEdits('coverLetter')} sx={{ mb: 2 }}>
-          <strong>⚠️ Unapplied Cover Letter Edits:</strong> The following manual edit(s) could not be automatically merged because the content was significantly rewritten during refinement:
-          <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
-            {coverLetterOrphans.map((edit, idx) => {
-              const bodyMatch = edit.path.match(/\[(\d+)\]$/);
-              const name = bodyMatch ? `Paragraph ${parseInt(bodyMatch[1], 10) + 1}` : edit.path;
-              return (
-                <Box component="li" key={idx} sx={{ fontSize: '0.85rem', mt: 0.5 }}>
-                  At {name}: <em>&ldquo;{edit.editedValue}&rdquo;</em>
-                </Box>
-              );
-            })}
-          </Box>
-        </Alert>
-      )}
+      <UnappliedEditsAlert
+        title="⚠️ Unapplied Cover Letter Edits:"
+        edits={coverLetterOrphans}
+        describeLocation={describeCoverLetterLocation}
+        onClose={() => clearOrphanedEdits('coverLetter')}
+      />
 
       {output.coverLetter ? (
-        <Box sx={A4_STYLES}>
+        <Box sx={LETTER_PAGE_SX}>
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Typography sx={{ ...BODY_TEXT_SX, fontWeight: 700, fontSize: '14pt', textTransform: 'uppercase' }}>
