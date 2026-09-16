@@ -101,7 +101,7 @@ export default function Home() {
   const [anthropicKeyTouched, setAnthropicKeyTouched] = useState(false);
   const [isCheckingAnthropicKey, setIsCheckingAnthropicKey] = useState(false);
   const [anthropicKeyStatus, setAnthropicKeyStatus] = useState<FieldStatus | null>(null);
-  /** Token of the last completed Dropbox check — blur re-checks only on change. */
+  /** Token of the most recent Dropbox check (recorded when it starts) — blur re-checks only on change. */
   const lastCheckedDropboxToken = useRef<string | null>(null);
   /** Read inside the models effect, which must not re-run when the model changes. */
   const selectedModelRef = useRef(selectedModel);
@@ -314,7 +314,7 @@ export default function Home() {
   /**
    * Checks the token once the field is done being edited. Tokens are ~130
    * characters, so checking mid-typing would flash a false failure — and the
-   * IP rate limit in middleware.ts is shared with generation.
+   * verify route has its own per-IP rate limit in middleware.ts.
    */
   const handleDropboxBlur = () => {
     const token = dropboxToken?.trim();
@@ -419,7 +419,7 @@ export default function Home() {
         blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, getCompanyStr(), boldingKeywords);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
       }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -460,7 +460,7 @@ export default function Home() {
         blob = await generateResumeDOCX(output.resume, boldingKeywords);
       } else {
         if (!output.coverLetter) throw new Error('No cover letter available');
-        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, co, boldingKeywords);
+        blob = await generateCoverLetterDOCX(output.coverLetter, output.resume, boldingKeywords);
       }
       const folderName = (co || 'Tailored').replace(/[^a-z0-9]/gi, '_');
       const path = `/resumeBuilder/${folderName}/${filename}`;
@@ -996,10 +996,6 @@ export default function Home() {
 
       {/* Print CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.15); opacity: 0.7; }
-        }
         @media print {
           @page { size: letter; margin: 0.5in; }
           body > * { visibility: hidden !important; }

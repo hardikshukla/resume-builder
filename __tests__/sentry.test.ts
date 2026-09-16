@@ -15,7 +15,6 @@ describe('scrubEvent', () => {
       request: {
         data: {
           anthropicKey: 'sk-ant-1234',
-          openaiKey: 'sk-1234',
           dropboxToken: 'sl.B1234',
           resume: 'Jane Doe, engineer',
           jobDescription: 'Senior engineer role',

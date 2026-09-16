@@ -11,7 +11,6 @@
 /** Request-body fields that must never reach Sentry. */
 export const REDACTED_FIELDS = [
   'anthropicKey',
-  'openaiKey',
   'dropboxToken',
   'resume',
   'jobDescription',

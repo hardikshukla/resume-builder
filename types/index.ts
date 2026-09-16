@@ -145,7 +145,8 @@ export interface GenerateRequest {
 
 /**
  * Result of a background credential check (Anthropic key, Dropbox token).
- * `checking` drives the inline spinner; a null status means "not checked yet".
+ * Callers hold `FieldStatus | null`, where null means "not checked yet"; the
+ * in-progress spinner is driven by a separate boolean.
  */
 export interface FieldStatus {
   ok: boolean;

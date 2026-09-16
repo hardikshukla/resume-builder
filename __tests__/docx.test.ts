@@ -122,7 +122,7 @@ describe('generateCoverLetterDOCX()', () => {
   let buf:  Buffer;
 
   beforeAll(async () => {
-    blob = await generateCoverLetterDOCX(mockCoverLetter, mockResume, 'Acme Corp');
+    blob = await generateCoverLetterDOCX(mockCoverLetter, mockResume);
     buf  = await blobToBuffer(blob);
   });
 
@@ -138,22 +138,15 @@ describe('generateCoverLetterDOCX()', () => {
     expect(isPKZip(buf)).toBe(true);
   });
 
-  it('works without a company name (optional param)', async () => {
-    const b    = await generateCoverLetterDOCX(mockCoverLetter, mockResume);
-    const buf2 = await blobToBuffer(b);
-    expect(buf2.byteLength).toBeGreaterThan(5 * 1024);
-    expect(isPKZip(buf2)).toBe(true);
-  });
-
   it('different cover letter bodies produce different output', async () => {
     const altLetter: CoverLetterData = { ...mockCoverLetter, body: 'A completely different letter body.' };
-    const blobB    = await generateCoverLetterDOCX(altLetter, mockResume, 'Acme Corp');
+    const blobB    = await generateCoverLetterDOCX(altLetter, mockResume);
     const bufB     = await blobToBuffer(blobB);
     expect(buf.equals(bufB)).toBe(false);
   });
 
   it('runs successfully with keywords and produces different output', async () => {
-    const blobKeywords = await generateCoverLetterDOCX(mockCoverLetter, mockResume, 'Acme Corp', ['Acme Corp', 'cloud infrastructure']);
+    const blobKeywords = await generateCoverLetterDOCX(mockCoverLetter, mockResume, ['Acme Corp', 'cloud infrastructure']);
     const bufKeywords = await blobToBuffer(blobKeywords);
     expect(blobKeywords).toBeInstanceOf(Blob);
     expect(isPKZip(bufKeywords)).toBe(true);

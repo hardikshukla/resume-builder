@@ -189,7 +189,7 @@ export async function callAnthropic(
   }
 
   let systemPrompt = '';
-  let messagesContent: Anthropic.Beta.Messages.BetaContentBlockParam[] = [];
+  let messagesContent: Anthropic.TextBlockParam[] = [];
 
   if (mode === 'analyze-jd') {
     if (!payload.jobDescription) {
@@ -245,39 +245,41 @@ export async function callAnthropic(
     ];
   }
 
-  const systemBlocks: Anthropic.Beta.Messages.BetaTextBlockParam[] = [
+  const systemBlocks: Anthropic.TextBlockParam[] = [
     { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
   ];
+
+  /**
+   * One Messages API call with transient-error retries. Prompt caching is GA,
+   * so the cache_control markers above work on the standard endpoint without
+   * a beta header.
+   */
+  const createMessage = (modelId: string) =>
+    withRetry(() =>
+      client.messages.create({
+        model: modelId,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        system: systemBlocks,
+        messages: [{ role: 'user', content: messagesContent }],
+      })
+    );
 
   const MAX_PARSE_ATTEMPTS = 3;
   let lastParseError: Error | undefined;
 
   for (let attempt = 0; attempt < MAX_PARSE_ATTEMPTS; attempt++) {
-    let response: Anthropic.Beta.BetaMessage;
+    let response: Anthropic.Message;
     try {
-      response = await withRetry(() =>
-        client.beta.messages.create({
-          model,
-          max_tokens: MAX_OUTPUT_TOKENS,
-          system: systemBlocks,
-          messages: [{ role: 'user', content: messagesContent }],
-          betas: ['prompt-caching-2024-07-31'],
-        })
-      );
+      response = await createMessage(model);
     } catch (err) {
       const fallbackModel = fallbackModelFor(mode, model);
       // Retry once on a known-good model, but never on the model that just failed.
       if (isUnsupportedModelError(err) && fallbackModel !== model) {
         console.warn(`[callAnthropic] Model "${model}" is unsupported. Falling back to "${fallbackModel}"...`);
-        response = await withRetry(() =>
-          client.beta.messages.create({
-            model: fallbackModel,
-            max_tokens: MAX_OUTPUT_TOKENS,
-            system: systemBlocks,
-            messages: [{ role: 'user', content: messagesContent }],
-            betas: ['prompt-caching-2024-07-31'],
-          })
-        );
+        // Stay on the fallback for any later parse attempts too, instead of
+        // paying for the same unsupported-model error on every retry.
+        model = fallbackModel;
+        response = await createMessage(model);
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('looping content') || msg.includes('loop detection')) {
@@ -289,11 +291,10 @@ export async function callAnthropic(
       }
     }
 
-    // Log cache stats to server console
+    // Log cache stats to the server console, to confirm prompt caching is hitting.
     if (response.usage) {
-      const usage = response.usage as unknown as { cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
       console.log(
-        `[Cache] write: ${usage.cache_creation_input_tokens ?? 0} | read: ${usage.cache_read_input_tokens ?? 0}`
+        `[Cache] write: ${response.usage.cache_creation_input_tokens ?? 0} | read: ${response.usage.cache_read_input_tokens ?? 0}`
       );
     }
 
@@ -310,7 +311,7 @@ export async function callAnthropic(
     // Thinking models put a `thinking` block before the answer, so the JSON is
     // in the first *text* block rather than necessarily the first block.
     const textBlock = response.content.find(
-      (block): block is Anthropic.Beta.BetaTextBlock => block.type === 'text'
+      (block): block is Anthropic.TextBlock => block.type === 'text'
     );
     if (!textBlock) {
       throw new Error('Anthropic returned no text content');

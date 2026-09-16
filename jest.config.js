@@ -9,8 +9,9 @@ const config = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   transform: {
+    // isolatedModules (transpile-only, no type-check during tests) is read
+    // from tsconfig.json; type errors are caught by `tsc --noEmit` instead.
     '^.+\\.tsx?$': ['ts-jest', {
-      isolatedModules: true,
       tsconfig: {
         // Relax for tests — no need for strict JSX transform
         jsx: 'react',
@@ -18,10 +19,6 @@ const config = {
       },
     }],
   },
-  // Don't try to transform node_modules except these ESM-only packages
-  transformIgnorePatterns: [
-    'node_modules/(?!(node-fetch)/)',
-  ],
   collectCoverageFrom: [
     'lib/**/*.ts',
     '!lib/**/*.d.ts',

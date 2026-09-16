@@ -505,7 +505,6 @@ export function useGenerate() {
     companyName,
     selectedModel,
     setSelectedModel,
-    setResume,
     setJD,
     setCompany,
     handleResumeChange,

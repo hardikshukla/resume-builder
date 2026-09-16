@@ -13,15 +13,15 @@ import { MODEL_IDS } from '@/lib/constants';
 // inside callAnthropic, so the SDK class itself is replaced — while keeping its
 // static error classes, which callAnthropic checks with instanceof.
 const mockCreate = jest.fn();
+// Separate mock for the beta namespace, so a test can assert it is never used.
+const mockBetaCreate = jest.fn();
 
 jest.mock('@anthropic-ai/sdk', () => {
   const actual = jest.requireActual('@anthropic-ai/sdk');
   class MockAnthropic extends actual.default {
     constructor(options: unknown) {
       super(options);
-      // Both namespaces point at the same mock so these tests do not care
-      // whether the implementation uses the GA or the beta endpoint.
-      Object.assign(this, { messages: { create: mockCreate }, beta: { messages: { create: mockCreate } } });
+      Object.assign(this, { messages: { create: mockCreate }, beta: { messages: { create: mockBetaCreate } } });
     }
   }
   return { __esModule: true, ...actual, default: MockAnthropic };
@@ -65,6 +65,7 @@ const requestedModel = (call: number) => mockCreate.mock.calls[call][0].model;
 
 beforeEach(() => {
   mockCreate.mockReset();
+  mockBetaCreate.mockReset();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -150,5 +151,31 @@ describe('callAnthropic — model selection', () => {
 
     await expect(analyzeJd()).rejects.toBe(authError);
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+  it('stays on the fallback model when a later attempt has to be retried', async () => {
+    mockCreate
+      .mockRejectedValueOnce(apiError(404, 'not_found_error', 'model: claude-made-up'))
+      .mockResolvedValueOnce({ content: [{ type: 'text', text: 'not json' }], stop_reason: 'end_turn', usage: {} })
+      .mockResolvedValueOnce(textResponse(JD_RESULT));
+
+    await expect(analyzeJd('claude-made-up')).resolves.toEqual(JD_RESULT);
+    // 404 on the requested model, then two attempts that both use the fallback.
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+    expect(requestedModel(2)).toBe(MODEL_IDS.haiku);
+  });
+});
+
+// ── Request shape ────────────────────────────────────────────────────────────
+
+describe('callAnthropic — request shape', () => {
+  it('uses the GA Messages endpoint with prompt caching and no beta header', async () => {
+    mockCreate.mockResolvedValueOnce(textResponse(JD_RESULT));
+    await analyzeJd();
+
+    expect(mockBetaCreate).not.toHaveBeenCalled();
+    const params = mockCreate.mock.calls[0][0];
+    expect(params).not.toHaveProperty('betas');
+    expect(params.system[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
+    expect(params.max_tokens).toBe(16_000);
   });
 });

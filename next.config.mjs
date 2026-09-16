@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // ── Security Headers (T5.4) ────────────────────────────────────────────────
-// Applied to every route. Sentry integration is deferred to S6.
+// Applied to every route.
 const securityHeaders = [
   // Prevent clickjacking
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -31,7 +31,11 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self' https://api.anthropic.com https://api.openai.com https://content.dropboxapi.com https://api.dropboxapi.com",
+      // Hosts the *browser* may call. Anthropic and the Dropbox token check are
+      // reached through our own API routes ('self'); only the Dropbox file
+      // upload goes straight from the browser. Add the Sentry ingest host here
+      // when browser Sentry is wired up.
+      "connect-src 'self' https://content.dropboxapi.com",
       "worker-src blob:",
       "object-src 'none'",
       "base-uri 'self'",

@@ -71,40 +71,6 @@ export const MODEL_FALLBACKS: Record<string, string> = {
   'claude-haiku-4-5-latest': MODEL_IDS.haiku,
 };
 
-export interface ModelCapability {
-  recommendedFor: 'generation' | 'extraction' | 'advanced' | 'legacy';
-  supportsPromptCaching: boolean;
-}
-
-export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
-  'claude-3-7-sonnet-20250219': { recommendedFor: 'generation', supportsPromptCaching: true },
-  'claude-3-7-sonnet-latest': { recommendedFor: 'generation', supportsPromptCaching: true },
-  'claude-3-5-sonnet-20241022': { recommendedFor: 'generation', supportsPromptCaching: true },
-  'claude-3-5-sonnet-latest': { recommendedFor: 'generation', supportsPromptCaching: true },
-  'claude-haiku-4-5-20251001': { recommendedFor: 'extraction', supportsPromptCaching: true },
-  'claude-haiku-4-5-latest': { recommendedFor: 'extraction', supportsPromptCaching: true },
-  'claude-3-5-haiku-20241022': { recommendedFor: 'extraction', supportsPromptCaching: true },
-  'claude-3-5-haiku-latest': { recommendedFor: 'extraction', supportsPromptCaching: true },
-  'claude-3-opus-20240229': { recommendedFor: 'advanced', supportsPromptCaching: false },
-};
-
-export const getModelCapabilities = (modelId: string): ModelCapability => {
-  const normalized = modelId.toLowerCase();
-  if (MODEL_CAPABILITIES[normalized]) {
-    return MODEL_CAPABILITIES[normalized];
-  }
-  if (normalized.includes('opus')) {
-    return { recommendedFor: 'advanced', supportsPromptCaching: false };
-  }
-  if (normalized.includes('haiku')) {
-    return { recommendedFor: 'extraction', supportsPromptCaching: true };
-  }
-  if (normalized.includes('sonnet') || normalized.includes('claude-3-7')) {
-    return { recommendedFor: 'generation', supportsPromptCaching: true };
-  }
-  return { recommendedFor: 'legacy', supportsPromptCaching: false };
-};
-
 /**
  * Dropbox App Console. Every user needs their own Dropbox app to mint a
  * personal access token, so this is deliberately not deep-linked to any

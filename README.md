@@ -110,10 +110,10 @@ The app works without any `.env.local` configuration — users paste their own A
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | *(unset)* | Server-side Anthropic key. If set, users don't need to provide their own. |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Model used when an `/api/generate` request omits `model`. The UI always sends the model picked in the selector, so this only affects direct API callers. |
-| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser error tracking (optional) |
-| `SENTRY_DSN` | *(unset)* | Sentry DSN for server-side tracking (optional) |
-| `SENTRY_ORG` | *(unset)* | Sentry org slug — only needed for CI source-map upload |
-| `SENTRY_PROJECT` | *(unset)* | Sentry project name — only needed for CI source-map upload |
+| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser error tracking. **Not active yet** — see note below. |
+| `SENTRY_DSN` | *(unset)* | Sentry DSN for server-side tracking. **Not active yet** — see note below. |
+
+> **Sentry is not wired up yet.** `sentry.*.config.ts` exist, but nothing loads them: on Next 14 the server config needs `experimental.instrumentationHook`, and the browser config needs `withSentryConfig` in `next.config.mjs`. Until that is added, setting the DSNs has no effect.
 
 > **API keys never go in `.env` permanently.** If `ANTHROPIC_API_KEY` is not set, users bring their own key via the UI. Keys travel only in HTTPS request bodies and are never logged, stored, or returned by the server.
 
@@ -377,9 +377,9 @@ resume-builder/
     ├── hallucinationGuard.test.ts      # Hallucination detection logic
     ├── path.test.ts                    # getAtPath, setAtPath, levenshtein distance
     ├── docx.test.ts                    # DOCX generators produce valid ZIP blobs > 5 KB
-    ├── filename.test.ts                # Download filename sanitisation
+    ├── filename.test.ts                # Download filename formatting and path safety
     ├── timeout.test.ts                 # Inactivity timeout logic
-    ├── sentry.test.ts                  # Sentry config validation
+    ├── sentry.test.ts                  # Sentry scrubber redacts keys and resume data
     ├── generateValidation.test.ts      # /api/generate request validation edge cases
     ├── page.test.tsx                   # Smoke test: page renders without crash
     └── integration/
@@ -496,9 +496,9 @@ npm run test:coverage  # With coverage report
 | `prompt.test.ts` | System prompt rules, JD extraction prompt includes JD text and `CANDIDATE IS APPLYING TO` hint |
 | `docx.test.ts` | DOCX generators return valid ZIP blobs with PK magic bytes, > 5 KB |
 | `generateValidation.test.ts` | Request validation edge cases (missing fields, oversized inputs) |
-| `filename.test.ts` | Download filename sanitisation and formatting |
+| `filename.test.ts` | Download filename formatting; name/company can't inject path segments |
 | `timeout.test.ts` | Inactivity session lock logic |
-| `sentry.test.ts` | Sentry configuration validation |
+| `sentry.test.ts` | Shared Sentry `beforeSend` scrubber redacts keys, tokens, resume and JD text |
 | `page.test.tsx` | Page renders without crash |
 | `integration/generate.test.ts` | `/api/generate` route handler with mocked LLM |
 | `integration/analyzeJd.test.ts` | `/api/analyze-jd` route handler with mocked LLM |
@@ -517,11 +517,9 @@ Set these in **Vercel Dashboard → Project → Settings → Environment Variabl
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...        # Optional: users can bring their own key in the UI
-NEXT_PUBLIC_SENTRY_DSN=https://...  # Optional: browser error tracking
-SENTRY_DSN=https://...              # Optional: server-side error tracking
-SENTRY_ORG=your-org                 # Optional: CI source map upload only
-SENTRY_PROJECT=resume-builder       # Optional: CI source map upload only
 ```
+
+Sentry DSNs can be set too, but have no effect until Sentry is wired up (see [Environment Variables](#environment-variables)).
 
 No API keys are required in Vercel — users bring their own via the UI.
 
