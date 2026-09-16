@@ -7,6 +7,7 @@
 
 import { NextRequest } from 'next/server';
 import { POST } from '../../app/api/analyze-jd/route';
+import { JD_EXTRACTION_MODEL } from '@/lib/constants';
 
 // ── Mock Anthropic Client Calls ────────────────────────────────────────────────
 jest.mock('../../lib/llm/anthropic', () => ({
@@ -61,6 +62,8 @@ describe('POST /api/analyze-jd', () => {
       expect.objectContaining({
         jobDescription: validAnalyzeBody.jobDescription,
         companyName: 'Google',
+        // No model in the request, so the dedicated extraction model is used.
+        modelOverride: JD_EXTRACTION_MODEL,
       })
     );
   });

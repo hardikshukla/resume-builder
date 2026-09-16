@@ -16,15 +16,15 @@ describe('APP_VERSION', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('reads the build-time injected version', () => {
+  it('reads the build-time injected version', async () => {
     process.env.NEXT_PUBLIC_APP_VERSION = '9.8.7';
-    const { APP_VERSION } = require('@/lib/constants');
+    const { APP_VERSION } = await import('@/lib/constants');
     expect(APP_VERSION).toBe('9.8.7');
   });
 
-  it('is empty when nothing was injected, so the badge is hidden rather than showing "v"', () => {
+  it('is empty when nothing was injected, so the badge is hidden rather than showing "v"', async () => {
     delete process.env.NEXT_PUBLIC_APP_VERSION;
-    const { APP_VERSION } = require('@/lib/constants');
+    const { APP_VERSION } = await import('@/lib/constants');
     expect(APP_VERSION).toBe('');
   });
 

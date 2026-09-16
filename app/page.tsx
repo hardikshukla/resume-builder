@@ -28,7 +28,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 import { useApiKey } from '@/hooks/useApiKey';
-import { Recommendation, FieldStatus } from '@/types';
+import { Recommendation, FieldStatus, ModelOption } from '@/types';
 import { useGenerate } from '@/hooks/useGenerate';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 import { generateResumeDOCX } from '@/lib/docxGenerator';
@@ -36,7 +36,7 @@ import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
 import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION, RESUME_STORAGE_KEY } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -178,7 +178,9 @@ export default function Home() {
       .catch((err) => console.error('Failed to load server config:', err));
   }, []);
 
-  const [availableModels, setAvailableModels] = useState<{ id: string; name: string }[]>(DEFAULT_MODELS);
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>(DEFAULT_MODELS);
+  // Display name for the context pill; falls back to the raw id for models not in the list.
+  const selectedModelName = availableModels.find((m) => m.id === selectedModel)?.name ?? selectedModel;
 
   useEffect(() => {
     const key = anthropicKey || (hasServerKey ? 'server' : '');
@@ -325,9 +327,12 @@ export default function Home() {
     void verifyDropboxToken(token);
   };
 
-  // Inactivity session lock (40 min) using custom hook
+  // Inactivity session lock (40 min). The expiry overlay promises that keys and
+  // data are wiped, so this clears the saved resume as well as session storage
+  // (keys, cached generations). The resume is otherwise kept across tab closes.
   useInactivityTimeout(40, () => {
     sessionStorage.clear();
+    localStorage.removeItem(RESUME_STORAGE_KEY);
     setIsSessionExpired(true);
   });
 
@@ -615,7 +620,7 @@ export default function Home() {
         >
           {availableModels.map((m) => (
             <MenuItem key={m.id} value={m.id}>
-              {m.name}
+              {m.hint ? `${m.name} (${m.hint})` : m.name}
             </MenuItem>
           ))}
         </Select>
@@ -866,7 +871,7 @@ export default function Home() {
             {output && !isLoading && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <ContextPill
-                  model={selectedModel}
+                  modelName={selectedModelName}
                   matchScore={output.gapAnalysis.matchScore}
                   editCount={manualEdits.length}
                   appliedRecsCount={appliedRecs.size}

@@ -25,7 +25,8 @@ function makeMockRequest(file: unknown): NextRequest {
   });
   req.formData = jest.fn().mockResolvedValue({
     get: (name: string) => (name === 'file' ? file : null),
-  } as any);
+    // Only `get` is exercised by the route, so a partial FormData is enough.
+  } as unknown as FormData);
   return req;
 }
 

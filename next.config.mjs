@@ -42,6 +42,13 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // `next lint` and `next build` only lint app/, pages/, components/, lib/ and
+  // src/ by default, which silently skipped hooks/, types/, __tests__/ and the
+  // root config files. Lint the whole project instead; ESLint already ignores
+  // node_modules and dot-directories such as .next.
+  eslint: {
+    dirs: ['.'],
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
   },

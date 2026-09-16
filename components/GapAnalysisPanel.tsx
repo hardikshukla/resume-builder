@@ -325,9 +325,10 @@ export default function GapAnalysisPanel({
                   '&:hover': { backgroundColor: 'rgba(237,108,2,0.1)' },
                 }}
               >
+                {/* The progress spinner replaces the icon while a refresh runs. */}
                 {isRefreshing
                   ? <CircularProgress size={16} color="warning" />
-                  : <AutorenewIcon fontSize="small" sx={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />}
+                  : <AutorenewIcon fontSize="small" />}
               </IconButton>
             </Box>
           </AccordionSummary>

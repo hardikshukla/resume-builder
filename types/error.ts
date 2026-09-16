@@ -7,11 +7,23 @@ export interface ApiErrorResponse {
   };
 }
 
+/**
+ * The fields toApiErrorResponse reads off an unknown thrown value. SDK errors
+ * (e.g. Anthropic.APIError) carry `status` and `headers`; some HTTP clients use
+ * `statusCode` instead. Everything is optional because `err` can be anything.
+ */
+interface ErrorLike {
+  status?: unknown;
+  statusCode?: unknown;
+  headers?: Record<string, string | undefined>;
+}
+
 export function toApiErrorResponse(err: unknown): ApiErrorResponse {
   const message = err instanceof Error ? err.message : String(err);
-  
-  // Anthropic API errors sometimes have status/statusCode
-  const status = (err as any)?.status || (err as any)?.statusCode;
+
+  // Only objects can carry these fields; primitives (a thrown string) cannot.
+  const errorLike: ErrorLike = typeof err === 'object' && err !== null ? (err as ErrorLike) : {};
+  const status = errorLike.status || errorLike.statusCode;
   
   let type: ApiErrorResponse['error']['type'] = 'FATAL';
   let retryAfterSeconds: number | undefined;
@@ -19,7 +31,7 @@ export function toApiErrorResponse(err: unknown): ApiErrorResponse {
   if (status === 429 || message.toLowerCase().includes('rate limit') || message.includes('429')) {
     type = 'RATE_LIMIT';
     // If there's a retry header or we can parse it from headers
-    const retryHeader = (err as any)?.headers?.['retry-after'];
+    const retryHeader = errorLike.headers?.['retry-after'];
     if (retryHeader) {
       const parsed = parseInt(retryHeader, 10);
       if (!isNaN(parsed)) {

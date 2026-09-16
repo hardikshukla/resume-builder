@@ -151,3 +151,12 @@ export interface FieldStatus {
   ok: boolean;
   message: string;
 }
+
+/** A Claude model the user can pick in the model selector. */
+export interface ModelOption {
+  id: string;
+  /** Display name, e.g. "Claude Sonnet 4.6". Also shown in the context pill. */
+  name: string;
+  /** Short qualifier shown after the name in the picker, e.g. "Recommended". */
+  hint?: string;
+}

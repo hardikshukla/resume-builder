@@ -3,6 +3,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Home from '../app/page';
+import { RESUME_STORAGE_KEY } from '@/lib/constants';
 
 // Mock hooks. Mutable so a test can change the key while a check is in flight.
 const mockApiKeyState = { anthropicKey: 'test-key', dropboxToken: 'test-token' };
@@ -30,7 +31,7 @@ jest.mock('@/hooks/useGenerate', () => ({
     resume: 'Original Resume Text',
     jobDescription: 'Original JD Text',
     companyName: 'Test Company',
-    selectedModel: 'claude-3-5-sonnet-20241022',
+    selectedModel: 'claude-sonnet-4-6',
     setSelectedModel: mockSetSelectedModel,
     setJD: mockSetJD,
     setCompany: mockSetCompany,
@@ -46,8 +47,12 @@ jest.mock('@/hooks/useGenerate', () => ({
   }),
 }));
 
+// Keeps the page's timeout callback so tests can fire the inactivity lock on demand.
+let mockOnInactivityTimeout: (() => void) | undefined;
 jest.mock('@/hooks/useInactivityTimeout', () => ({
-  useInactivityTimeout: () => {},
+  useInactivityTimeout: (_minutes: number, onTimeout: () => void) => {
+    mockOnInactivityTimeout = onTimeout;
+  },
 }));
 
 // Mock fetch globally
@@ -256,7 +261,7 @@ describe('Home Page Component', () => {
       await act(async () => {
         fastNewKey.resolve(jsonResponse({
           success: true,
-          models: [{ id: 'claude-3-5-sonnet-20241022', name: 'Sonnet' }],
+          models: [{ id: 'claude-sonnet-4-6', name: 'Sonnet' }],
         }));
       });
       expect(screen.getByTestId('field-status-ok')).toBeInTheDocument();
@@ -312,5 +317,16 @@ describe('Home Page Component', () => {
 
     fireEvent.blur(screen.getByLabelText(/Dropbox access token/i));
     await waitFor(() => expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument());
+  });
+  it('wipes the saved resume and session data when the inactivity lock fires', () => {
+    localStorage.setItem(RESUME_STORAGE_KEY, 'Jane Doe resume');
+    sessionStorage.setItem('anthropic_key', 'sk-ant-test');
+    render(<Home />);
+
+    act(() => mockOnInactivityTimeout?.());
+
+    expect(localStorage.getItem(RESUME_STORAGE_KEY)).toBeNull();
+    expect(sessionStorage.getItem('anthropic_key')).toBeNull();
+    expect(screen.getByText(/Session Expired/i)).toBeInTheDocument();
   });
 });

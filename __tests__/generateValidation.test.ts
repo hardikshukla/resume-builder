@@ -20,7 +20,7 @@ describe('validateGenerateRequest()', () => {
       mode: 'generate',
       resume: 'Experienced engineer',
       jobDescription: 'Hiring a backend engineer',
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-6',
     });
 
     expect(result.success).toBe(true);

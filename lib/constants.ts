@@ -1,6 +1,8 @@
 /**
- * constants.ts — Shared input size limits.
+ * constants.ts — Shared limits, model ids and app-wide constants.
  */
+
+import { ModelOption } from '@/types';
 
 /** Maximum resume character length accepted by the API. */
 export const MAX_RESUME_CHARS = 15_000;
@@ -14,24 +16,59 @@ export const RESUME_WARN_CHARS = 12_000;
 /** Char count at which the UI shows an amber warning for JD. */
 export const JD_WARN_CHARS = 6_000;
 
-/** Default Anthropic model name. */
-export const ANTHROPIC_DEFAULT_MODEL = 'claude-3-7-sonnet-20250219';
+/**
+ * Current Claude model ids used by this app.
+ *
+ * `sonnet` is the default: like the retired Claude 3.7 Sonnet it replaces, it
+ * does not think unless asked, so responses keep the same shape. `sonnet5`
+ * and `opus` think by default; lib/llm/anthropic.ts handles the thinking block
+ * that precedes their text output.
+ */
+export const MODEL_IDS = {
+  sonnet: 'claude-sonnet-4-6',
+  sonnet5: 'claude-sonnet-5',
+  opus: 'claude-opus-5',
+  haiku: 'claude-haiku-4-5',
+} as const;
 
-/** Supported Claude models. */
-export const DEFAULT_MODELS = [
-  { id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet (Recommended)' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet' },
-  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5 (Fast)' },
-  { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus (Advanced)' },
+/** Model used for generation when a request does not name one. */
+export const ANTHROPIC_DEFAULT_MODEL: string = MODEL_IDS.sonnet;
+
+/** Model used for the lightweight JD keyword extraction step. */
+export const JD_EXTRACTION_MODEL: string = MODEL_IDS.haiku;
+
+/**
+ * Models offered in the picker before a key is entered (or if the live
+ * /api/models lookup fails). Once a key is validated, the picker is replaced
+ * with the models that key can actually use.
+ */
+export const DEFAULT_MODELS: ModelOption[] = [
+  { id: MODEL_IDS.sonnet, name: 'Claude Sonnet 4.6', hint: 'Recommended' },
+  { id: MODEL_IDS.sonnet5, name: 'Claude Sonnet 5' },
+  { id: MODEL_IDS.opus, name: 'Claude Opus 5', hint: 'Advanced' },
+  { id: MODEL_IDS.haiku, name: 'Claude Haiku 4.5', hint: 'Fast' },
 ];
 
-/** Fallback mappings when a requested model is unsupported/unavailable. */
+/**
+ * Retired or alias model ids, mapped to the current model that replaces them.
+ * Applied before every request, so a stale id never costs a failed API call.
+ */
 export const MODEL_FALLBACKS: Record<string, string> = {
-  'claude-3-7-sonnet-latest': 'claude-3-7-sonnet-20250219',
-  'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-20241022',
-  'claude-3-5-haiku-20241022': 'claude-haiku-4-5-20251001',
-  'claude-3-5-haiku-latest': 'claude-haiku-4-5-20251001',
-  'claude-haiku-4-5-latest': 'claude-haiku-4-5-20251001',
+  // Claude 3.x Sonnet — all retired.
+  'claude-3-7-sonnet-20250219': MODEL_IDS.sonnet,
+  'claude-3-7-sonnet-latest': MODEL_IDS.sonnet,
+  'claude-3-5-sonnet-20241022': MODEL_IDS.sonnet,
+  'claude-3-5-sonnet-20240620': MODEL_IDS.sonnet,
+  'claude-3-5-sonnet-latest': MODEL_IDS.sonnet,
+  // Claude 3 Opus — retired.
+  'claude-3-opus-20240229': MODEL_IDS.opus,
+  'claude-3-opus-latest': MODEL_IDS.opus,
+  // Claude 3.x Haiku — retired.
+  'claude-3-5-haiku-20241022': MODEL_IDS.haiku,
+  'claude-3-5-haiku-latest': MODEL_IDS.haiku,
+  'claude-3-haiku-20240307': MODEL_IDS.haiku,
+  // Not a real alias, but previously shipped in this map; kept so old callers still resolve.
+  'claude-haiku-4-5-latest': MODEL_IDS.haiku,
 };
 
 export interface ModelCapability {
@@ -74,6 +111,12 @@ export const getModelCapabilities = (modelId: string): ModelCapability => {
  * single app — it lands on the visitor's own app list.
  */
 export const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps';
+
+/**
+ * localStorage key for the pasted resume. It is kept across tab closes for
+ * convenience, and wiped when the inactivity lock fires.
+ */
+export const RESUME_STORAGE_KEY = 'rb_resume';
 
 /** App version from package.json, injected at build time by next.config.mjs. */
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '';

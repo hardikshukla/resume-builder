@@ -1,54 +1,61 @@
-// Since instrumentation.ts exports register() and configures Sentry internally, 
-// we will test the logic of the beforeSend scrubber by simulating the event.
+/**
+ * sentry.test.ts — the real Sentry `beforeSend` scrubber.
+ *
+ * This previously exercised a copy of the scrubber pasted into the test, which
+ * had already drifted from the configs (it did not redact resume or JD text).
+ * It now imports the shared implementation every Sentry config uses.
+ */
+import { readFileSync } from 'fs';
+import path from 'path';
+import { scrubEvent, REDACTED_FIELDS, REDACTED_PLACEHOLDER } from '@/lib/sentry/scrubEvent';
 
-describe('Sentry Scrubber', () => {
-  it('should redact dropboxToken, anthropicKey, and openaiKey', () => {
-    // Simulated beforeSend from instrumentation.ts
-    const beforeSend = (event: any) => {
-      if (event.request?.data) {
-        const data = event.request.data;
-        if (data.anthropicKey) data.anthropicKey = '[REDACTED]';
-        if (data.openaiKey)    data.openaiKey    = '[REDACTED]';
-        if (data.dropboxToken) data.dropboxToken = '[REDACTED]';
-      }
-      return event;
-    };
-
-    const mockEvent = {
+describe('scrubEvent', () => {
+  it('redacts every sensitive request-body field', () => {
+    const event = {
       request: {
         data: {
           anthropicKey: 'sk-ant-1234',
           openaiKey: 'sk-1234',
           dropboxToken: 'sl.B1234',
-          otherData: 'safe'
-        }
-      }
+          resume: 'Jane Doe, engineer',
+          jobDescription: 'Senior engineer role',
+          otherData: 'safe',
+        },
+      },
     };
 
-    const processedEvent = beforeSend(mockEvent);
+    const result = scrubEvent(event);
 
-    expect(processedEvent.request.data.anthropicKey).toBe('[REDACTED]');
-    expect(processedEvent.request.data.openaiKey).toBe('[REDACTED]');
-    expect(processedEvent.request.data.dropboxToken).toBe('[REDACTED]');
-    expect(processedEvent.request.data.otherData).toBe('safe');
+    for (const field of REDACTED_FIELDS) {
+      expect(result.request.data[field]).toBe(REDACTED_PLACEHOLDER);
+    }
+    expect(result.request.data.otherData).toBe('safe');
   });
 
-  it('should not throw if request data is missing', () => {
-    const beforeSend = (event: any) => {
-      if (event.request?.data) {
-        const data = event.request.data;
-        if (data.anthropicKey) data.anthropicKey = '[REDACTED]';
-        if (data.openaiKey)    data.openaiKey    = '[REDACTED]';
-        if (data.dropboxToken) data.dropboxToken = '[REDACTED]';
-      }
-      return event;
-    };
-
-    const mockEvent = {
-      request: {}
-    };
-
-    const processedEvent = beforeSend(mockEvent);
-    expect(processedEvent).toEqual(mockEvent);
+  it('returns the same event object, as beforeSend requires', () => {
+    const event = { request: { data: { anthropicKey: 'sk-ant-1234' } } };
+    expect(scrubEvent(event)).toBe(event);
   });
+
+  it('leaves empty values untouched', () => {
+    const event = { request: { data: { anthropicKey: '', resume: 'text' } } };
+    const result = scrubEvent(event);
+    expect(result.request.data.anthropicKey).toBe('');
+    expect(result.request.data.resume).toBe(REDACTED_PLACEHOLDER);
+  });
+
+  it('does not throw when request data is missing or not an object', () => {
+    expect(() => scrubEvent({})).not.toThrow();
+    expect(() => scrubEvent({ request: {} })).not.toThrow();
+    expect(scrubEvent({ request: { data: 'raw body' } }).request.data).toBe('raw body');
+  });
+
+  it.each(['sentry.client.config.ts', 'sentry.server.config.ts', 'sentry.edge.config.ts'])(
+    '%s uses the shared scrubber',
+    (file) => {
+      const source = readFileSync(path.join(__dirname, '..', file), 'utf8');
+      expect(source).toContain("from '@/lib/sentry/scrubEvent'");
+      expect(source).toMatch(/beforeSend:\s*scrubEvent/);
+    }
+  );
 });

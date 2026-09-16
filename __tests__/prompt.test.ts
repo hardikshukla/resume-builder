@@ -9,8 +9,8 @@ import {
   REFINE_SYSTEM_PROMPT,
   JD_EXTRACTION_SYSTEM_PROMPT,
 } from '../lib/prompt';
+import * as promptModule from '../lib/prompt';
 import { ResumeBuilderOutputSchema } from '../lib/llm/schema';
-import { Recommendation } from '../types';
 
 // ── SYSTEM_PROMPT ────────────────────────────────────────────────────────────
 
@@ -181,9 +181,8 @@ describe('JD_EXTRACTION_SYSTEM_PROMPT', () => {
   });
 
   it('does not expose the buildJDExtractionPrompt function', () => {
-    const mod = require('../lib/prompt');
-    expect(typeof mod.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
-    expect(mod.buildJDExtractionPrompt).toBeUndefined();
+    expect(typeof promptModule.JD_EXTRACTION_SYSTEM_PROMPT).toBe('string');
+    expect('buildJDExtractionPrompt' in promptModule).toBe(false);
   });
 
   it('instructs the model to use the CANDIDATE IS APPLYING TO hint', () => {

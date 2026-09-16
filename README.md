@@ -109,7 +109,7 @@ The app works without any `.env.local` configuration — users paste their own A
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | *(unset)* | Server-side Anthropic key. If set, users don't need to provide their own. |
-| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20241022` | Default Claude model ID (user can override in UI) |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Model used when an `/api/generate` request omits `model`. The UI always sends the model picked in the selector, so this only affects direct API callers. |
 | `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser error tracking (optional) |
 | `SENTRY_DSN` | *(unset)* | Sentry DSN for server-side tracking (optional) |
 | `SENTRY_ORG` | *(unset)* | Sentry org slug — only needed for CI source-map upload |

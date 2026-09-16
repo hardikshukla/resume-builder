@@ -116,8 +116,8 @@ describe('useGenerate — state setters', () => {
 
   it('setSelectedModel updates selectedModel', () => {
     const { result } = renderHook(() => useGenerate());
-    act(() => { result.current.setSelectedModel('claude-3-opus-20240229'); });
-    expect(result.current.selectedModel).toBe('claude-3-opus-20240229');
+    act(() => { result.current.setSelectedModel('claude-opus-5'); });
+    expect(result.current.selectedModel).toBe('claude-opus-5');
   });
 });
 
