@@ -75,6 +75,9 @@ export const getModelCapabilities = (modelId: string): ModelCapability => {
  */
 export const DROPBOX_APP_CONSOLE_URL = 'https://www.dropbox.com/developers/apps';
 
+/** App version from package.json, injected at build time by next.config.mjs. */
+export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+
 /** Maximum file upload size in bytes (5 MB). */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 

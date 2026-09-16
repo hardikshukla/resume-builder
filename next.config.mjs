@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+
 /** @type {import('next').NextConfig} */
+
+// The header version badge reads package.json at build time, so bumping the
+// version there is the only step — nothing to keep in sync by hand.
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // ── Security Headers (T5.4) ────────────────────────────────────────────────
 // Applied to every route. Sentry integration is deferred to S6.
@@ -36,6 +42,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+  },
   async headers() {
     return [
       {

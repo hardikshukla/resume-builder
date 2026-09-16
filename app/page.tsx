@@ -36,7 +36,7 @@ import { generateCoverLetterDOCX } from '@/lib/coverLetterGenerator';
 import { buildDownloadFilename } from '@/lib/utils/string';
 import { toDropboxErrorMessage } from '@/lib/utils/dropboxError';
 import { describeKeyCheckFailure, UNREACHABLE_KEY_MESSAGE } from '@/lib/utils/keyCheckError';
-import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS } from '@/lib/constants';
+import { MAX_RESUME_CHARS, MAX_JD_CHARS, RESUME_WARN_CHARS, JD_WARN_CHARS, DEFAULT_MODELS, APP_VERSION } from '@/lib/constants';
 import GapAnalysisPanel from '@/components/GapAnalysisPanel';
 import ResumePreview from '@/components/ResumePreview';
 import CoverLetterPreview from '@/components/CoverLetterPreview';
@@ -739,7 +739,9 @@ export default function Home() {
           </Box>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Chip label="v3.0" size="small" variant="outlined" sx={{ borderColor: 'divider', color: 'text.secondary' }} />
+          {APP_VERSION && (
+            <Chip label={`v${APP_VERSION}`} size="small" variant="outlined" sx={{ borderColor: 'divider', color: 'text.secondary' }} />
+          )}
           <IconButton href="https://github.com/hardikshukla/resume-builder" target="_blank" rel="noopener noreferrer" sx={{ color: 'text.secondary' }}>
             <GitHubIcon />
           </IconButton>
