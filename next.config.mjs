@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 
@@ -75,4 +76,24 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * withSentryConfig is what actually turns Sentry on:
+ * - injects instrumentation-client.ts (browser Sentry) into the client bundle;
+ * - on Next 14, enables experimental.instrumentationHook so instrumentation.ts
+ *   loads the server and edge configs.
+ * With no DSN set, Sentry.init is a no-op, so this is safe without a Sentry project.
+ */
+export default withSentryConfig(nextConfig, {
+  // Browser events go to /monitoring on this app, which forwards them to
+  // Sentry. Keeps the CSP at connect-src 'self' and survives ad-blockers.
+  // Only applies to sentry.io DSNs; a self-hosted DSN is called directly and
+  // its host must then be added to connect-src above.
+  tunnelRoute: '/monitoring',
+  // Source maps are uploaded only when Sentry credentials are configured.
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Keep build output quiet locally; show plugin logs in CI.
+  silent: !process.env.CI,
+});

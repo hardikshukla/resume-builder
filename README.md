@@ -110,10 +110,12 @@ The app works without any `.env.local` configuration — users paste their own A
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | *(unset)* | Server-side Anthropic key. If set, users don't need to provide their own. |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-6` | Model used when an `/api/generate` request omits `model`. The UI always sends the model picked in the selector, so this only affects direct API callers. |
-| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser error tracking. **Not active yet** — see note below. |
-| `SENTRY_DSN` | *(unset)* | Sentry DSN for server-side tracking. **Not active yet** — see note below. |
+| `NEXT_PUBLIC_SENTRY_DSN` | *(unset)* | Sentry DSN for browser and server error tracking (optional) |
+| `SENTRY_DSN` | *(unset)* | Server-only DSN; overrides `NEXT_PUBLIC_SENTRY_DSN` on the server (optional) |
+| `SENTRY_AUTH_TOKEN` | *(unset)* | Uploads source maps at build time; skipped when unset (optional) |
+| `SENTRY_ORG` / `SENTRY_PROJECT` | *(unset)* | Sentry org and project for the source-map upload (optional) |
 
-> **Sentry is not wired up yet.** `sentry.*.config.ts` exist, but nothing loads them: on Next 14 the server config needs `experimental.instrumentationHook`, and the browser config needs `withSentryConfig` in `next.config.mjs`. Until that is added, setting the DSNs has no effect.
+> **Sentry** is off until a DSN is set. It reports **errors only** (`tracesSampleRate: 0`), and a shared scrubber (`lib/sentry/scrubEvent.ts`) redacts API keys, tokens, resume and JD text before anything is sent. Browser events are tunnelled through `/monitoring` on this app, so the CSP stays `connect-src 'self'`; that tunnel only works for sentry.io DSNs — a self-hosted DSN's host must be added to `connect-src` in `next.config.mjs`.
 
 > **API keys never go in `.env` permanently.** If `ANTHROPIC_API_KEY` is not set, users bring their own key via the UI. Keys travel only in HTTPS request bodies and are never logged, stored, or returned by the server.
 
@@ -519,7 +521,7 @@ Set these in **Vercel Dashboard → Project → Settings → Environment Variabl
 ANTHROPIC_API_KEY=sk-ant-...        # Optional: users can bring their own key in the UI
 ```
 
-Sentry DSNs can be set too, but have no effect until Sentry is wired up (see [Environment Variables](#environment-variables)).
+To turn on error tracking, also set `NEXT_PUBLIC_SENTRY_DSN` (and optionally `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for readable stack traces) — see [Environment Variables](#environment-variables).
 
 No API keys are required in Vercel — users bring their own via the UI.
 
